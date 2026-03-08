@@ -1356,7 +1356,12 @@ function msShowTab(name){
       else{t.style.color='';t.style.borderBottomColor='';}
     }
   });
-  if(name==='master'){ msRenderMasterDeptTabs(); msRenderMasterTable(); }
+  if(name==='master'){
+    msRenderMasterDeptTabs();
+    msRenderMasterTable();
+    // Firebaseからアーカイブを取得してセレクトを更新（セッション外でも使えるように）
+    msRefreshImportSelect();
+  }
   if(name==='hist'){ msRenderHistDeptTabs(); msRenderHistList(); }
 }
 
@@ -1534,20 +1539,48 @@ function msRenderMasterTable(){
     <td><input type="number" step="any" value="${e(m.init||'')}" placeholder="0" oninput="msUpdateMaster('${m.id}','init',this.value)" style="text-align:right"></td>
     <td style="text-align:center"><button class="ms-del-btn" onclick="msDeleteMasterRow('${m.id}')">削除</button></td>
   </tr>`).join('');
-
-  // アーカイブ選択肢を更新
-  const sel=document.getElementById('msImportSrcSel'); if(!sel)return;
-  const arcList=getArcList();
-  const hasSession=!!(order&&order.length&&Object.values(pages||{}).some(pg=>(pg.rows||[]).some(r=>r.n)));
-  sel.innerHTML='<option value="">― アーカイブを選択 ―</option>'
-    +(hasSession?'<option value="__session__">✅ 現在の棚卸セッション（入力中）</option>':'')
-    +arcList.map(a=>`<option value="${a.id}">${a.date}　${a.label}</option>`).join('');
-  // ページ選択欄をリセット
-  const pgBox=document.getElementById('msImportPageBox');
-  if(pgBox) pgBox.style.display='none';
 }
 
-// アーカイブ選択が変わったらページ一覧を表示
+// インポート用セレクトをFirebase同期してから更新
+function msRefreshImportSelect(){
+  const sel=document.getElementById('msImportSrcSel'); if(!sel)return;
+  const pgBox=document.getElementById('msImportPageBox');
+
+  function populateSel(){
+    const arcList=getArcList();
+    const hasSession=!!(order&&order.length&&Object.values(pages||{}).some(pg=>(pg.rows||[]).some(r=>r.n)));
+    sel.innerHTML='<option value="">― アーカイブを選択 ―</option>'
+      +(hasSession?'<option value="__session__">✅ 現在の棚卸セッション（入力中）</option>':'')
+      +(arcList.length
+        ? arcList.map(a=>`<option value="${a.id}">${a.date}　${a.label}</option>`).join('')
+        : '<option disabled>（保存済みアーカイブなし）</option>');
+    if(pgBox) pgBox.style.display='none';
+  }
+
+  // まずローカルで即表示
+  populateSel();
+
+  // Firebaseからアーカイブを取得して追記（セッション外でも動くよう直接参照）
+  if(!offline&&db){
+    db.ref('archive').once('value',sn=>{
+      const data=sn.val();
+      if(!data) return;
+      const local=getArcList();
+      const localIds=new Set(local.map(a=>a.id));
+      let added=false;
+      Object.values(data).forEach(a=>{
+        if(!a||!a.id||localIds.has(a.id)) return;
+        local.unshift(a);
+        added=true;
+      });
+      if(added){
+        try{localStorage.setItem(AK,JSON.stringify(local.slice(0,50)));}catch(e){}
+        populateSel(); // 再描画
+      }
+    });
+  }
+}
+
 function msImportSrcChanged(){
   const sel=document.getElementById('msImportSrcSel');
   const val=sel?sel.value:'';
@@ -2477,10 +2510,16 @@ function renderPTabs(){
   });
   h+=`<button class="ptadd" onclick="addPage()">＋マイページ追加</button>`;
   el.innerHTML=h;
+  initPtabTouchListeners();
 }
 
 // ページタブのドラッグ＆ドロップ並び替え
+// ============================================================
+// ページタブ並び替え（PC マウス + iPad/スマホ タッチ 統合）
+// ============================================================
 let ptabDraggingKey=null;
+
+/* ── マウス用（PC） ── */
 function ptabDragStart(ev,k){
   ptabDraggingKey=k;
   ev.dataTransfer.effectAllowed='move';
@@ -2493,26 +2532,112 @@ function ptabDragOver(ev){
 }
 function ptabDragEnd(ev){
   ev.currentTarget.style.opacity='';
-  ev.currentTarget.style.outline='';
-  // 全タブのアウトラインをクリア
   document.querySelectorAll('.ptab').forEach(el=>{el.style.outline='';});
 }
 function ptabDrop(ev,targetKey){
   ev.preventDefault();
   ev.currentTarget.style.outline='';
-  if(!ptabDraggingKey||ptabDraggingKey===targetKey)return;
-  const fromIdx=order.indexOf(ptabDraggingKey);
-  const toIdx=order.indexOf(targetKey);
-  if(fromIdx<0||toIdx<0)return;
-  // orderを並び替え
-  order.splice(fromIdx,1);
-  order.splice(toIdx,0,ptabDraggingKey);
+  ptabReorder(targetKey);
+}
+
+/* ── タッチ用（iPad / スマホ）── */
+let _ptTouch={key:null,clone:null,origEl:null,startX:0,startY:0,moved:false};
+
+function ptabTouchStart(ev,k){
+  // ハンドル以外からのタッチは無視
+  if(!ev.target.classList.contains('ptab-drag-handle')) return;
+  const el=ev.currentTarget;
+  const t=ev.touches[0];
+  _ptTouch.key=k;
+  _ptTouch.origEl=el;
+  _ptTouch.startX=t.clientX;
+  _ptTouch.startY=t.clientY;
+  _ptTouch.moved=false;
+
+  // クローンを作ってbodyに貼る
+  const rect=el.getBoundingClientRect();
+  const clone=el.cloneNode(true);
+  clone.style.cssText=`position:fixed;z-index:9999;left:${rect.left}px;top:${rect.top}px;
+    width:${rect.width}px;opacity:.85;pointer-events:none;
+    box-shadow:0 6px 20px rgba(0,0,0,.25);border-radius:6px;`;
+  document.body.appendChild(clone);
+  _ptTouch.clone=clone;
+  el.style.opacity='.3';
+}
+
+function ptabTouchMove(ev){
+  if(!_ptTouch.key) return;
+  ev.preventDefault(); // スクロールを止める
+  const t=ev.touches[0];
+  const dx=t.clientX-_ptTouch.startX;
+  const dy=t.clientY-_ptTouch.startY;
+  _ptTouch.moved=true;
+
+  // クローンを追従
+  if(_ptTouch.clone){
+    const rect=_ptTouch.origEl.getBoundingClientRect();
+    _ptTouch.clone.style.left=(rect.left+dx)+'px';
+    _ptTouch.clone.style.top=(rect.top+dy)+'px';
+  }
+
+  // 現在カーソル下のタブを探してハイライト
+  document.querySelectorAll('.ptab').forEach(el=>{el.style.outline='';});
+  const under=ptabElementAt(t.clientX,t.clientY);
+  if(under&&under!==_ptTouch.origEl) under.style.outline='2px solid #E8630A';
+}
+
+function ptabTouchEnd(ev){
+  if(!_ptTouch.key) return;
+  const t=ev.changedTouches[0];
+
+  // クローン除去
+  if(_ptTouch.clone){ _ptTouch.clone.remove(); _ptTouch.clone=null; }
+  if(_ptTouch.origEl) _ptTouch.origEl.style.opacity='';
+  document.querySelectorAll('.ptab').forEach(el=>{el.style.outline='';});
+
+  if(_ptTouch.moved){
+    const under=ptabElementAt(t.clientX,t.clientY);
+    if(under){
+      const targetKey=under.dataset.pk;
+      ptabReorder(targetKey);
+    }
+  }
+  _ptTouch={key:null,clone:null,origEl:null,startX:0,startY:0,moved:false};
+}
+
+// 座標からタブ要素を返す（クローンを一時非表示にして取得）
+function ptabElementAt(x,y){
+  if(_ptTouch.clone) _ptTouch.clone.style.display='none';
+  const el=document.elementFromPoint(x,y);
+  if(_ptTouch.clone) _ptTouch.clone.style.display='';
+  return el ? el.closest('.ptab') : null;
+}
+
+// 実際の順序変更（マウス・タッチ共通）
+function ptabReorder(targetKey){
+  if(!ptabDraggingKey&&!_ptTouch.key) return;
+  const fromKey=ptabDraggingKey||_ptTouch.key;
   ptabDraggingKey=null;
-  // Firebaseに同期
+  if(!fromKey||fromKey===targetKey) return;
+  const fromIdx=order.indexOf(fromKey);
+  const toIdx=order.indexOf(targetKey);
+  if(fromIdx<0||toIdx<0) return;
+  order.splice(fromIdx,1);
+  order.splice(toIdx,0,fromKey);
   if(!offline&&db&&sid) db.ref('s/'+sid+'/order').set(order);
   renderPTabs();
   toast('ページ順を変更しました');
 }
+
+// renderPTabs後にタッチリスナーをセット
+function initPtabTouchListeners(){
+  document.querySelectorAll('.ptab').forEach(el=>{
+    el.addEventListener('touchstart',ev=>ptabTouchStart(ev,el.dataset.pk),{passive:false});
+    el.addEventListener('touchmove',ptabTouchMove,{passive:false});
+    el.addEventListener('touchend',ptabTouchEnd);
+  });
+}
+
 
 function renderTable(){
   if(!curKey||!pages[curKey])return;
