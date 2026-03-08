@@ -720,13 +720,18 @@ svg.trend-chart text{font-family:inherit}
         <!-- 棚卸データからインポート -->
         <div id="msImportBox" style="background:#f0faf4;border:1.5px solid #2d7a4f;border-radius:8px;padding:12px 14px;margin-bottom:14px">
           <div style="font-size:12px;font-weight:700;color:#1a3a2a;margin-bottom:8px">📥 棚卸データから商品をインポート</div>
-          <div style="font-size:11px;color:#4a7a5a;margin-bottom:10px">保存済みの棚卸アーカイブに登録された商品名・単位を自動で読み込みます。</div>
-          <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">
-            <select id="msImportSrcSel" style="flex:1;padding:7px 10px;border:1px solid #b0d0b8;border-radius:6px;font-size:12px;font-family:inherit;min-width:160px">
-              <option value="">― アーカイブを選択 ―</option>
-            </select>
-            <button class="ms-save-btn" onclick="msImportFromArc()" style="padding:9px 16px;font-size:12px;white-space:nowrap">📥 インポート</button>
+          <div style="font-size:11px;color:#4a7a5a;margin-bottom:10px">棚卸アーカイブのページを選んで商品名・単位を読み込みます。</div>
+          <!-- ① 読み込み元 -->
+          <div style="font-size:11px;color:#4a7a5a;font-weight:700;margin-bottom:4px">① 読み込み元を選択</div>
+          <select id="msImportSrcSel" onchange="msImportSrcChanged()" style="width:100%;padding:8px 10px;border:1px solid #b0d0b8;border-radius:6px;font-size:12px;font-family:inherit;margin-bottom:10px">
+            <option value="">― アーカイブを選択 ―</option>
+          </select>
+          <!-- ② ページ選択（アーカイブ選択後に出現） -->
+          <div id="msImportPageBox" style="display:none">
+            <div style="font-size:11px;color:#4a7a5a;font-weight:700;margin-bottom:6px">② インポートするページを選ぶ（複数可）</div>
+            <div id="msImportPageList" style="display:flex;flex-wrap:wrap;gap:6px;margin-bottom:10px"></div>
           </div>
+          <button class="ms-save-btn" onclick="msImportFromArc()" style="padding:9px 16px;font-size:12px;white-space:nowrap;width:100%">📥 選択したページからインポート</button>
           <div id="msImportMsg" style="font-size:11px;color:#1a7a4a;margin-top:6px;display:none"></div>
         </div>
         <table class="master-tbl">
@@ -838,6 +843,12 @@ svg.trend-chart text{font-family:inherit}
             <tbody id="tbody"></tbody>
             <tfoot id="tfoot"></tfoot>
           </table>
+        </div>
+        <!-- 行追加ボタン -->
+        <div style="display:flex;gap:8px;padding:8px 12px;background:#f8fafc;border-top:1px solid #eef0f3;border-radius:0 0 10px 10px">
+          <button onclick="addRows(5)"  style="flex:1;padding:8px;border:1.5px dashed #1a6ea6;border-radius:6px;background:#fff;color:#1a6ea6;font-size:12px;font-weight:700;cursor:pointer;font-family:inherit">＋5行追加</button>
+          <button onclick="addRows(10)" style="flex:1;padding:8px;border:1.5px dashed #1a6ea6;border-radius:6px;background:#fff;color:#1a6ea6;font-size:12px;font-weight:700;cursor:pointer;font-family:inherit">＋10行追加</button>
+          <button onclick="addRows(25)" style="flex:1;padding:8px;border:1.5px dashed #1a6ea6;border-radius:6px;background:#fff;color:#1a6ea6;font-size:12px;font-weight:700;cursor:pointer;font-family:inherit">＋25行追加</button>
         </div>
       </div>
 
@@ -1018,11 +1029,12 @@ function mkRows(){
 // 画面切替
 // ============================================================
 function showPage(id){
-  ['pgSetup','pgSession','pgApp'].forEach(p=>{
+  ['pgSetup','pgSession','pgApp','pgMstock'].forEach(p=>{
     const el=document.getElementById(p);
-    el.classList.remove('show');
+    if(el) el.classList.remove('show');
   });
-  document.getElementById(id).classList.add('show');
+  const target=document.getElementById(id);
+  if(target) target.classList.add('show');
 }
 
 // ============================================================
@@ -1523,23 +1535,74 @@ function msRenderMasterTable(){
     <td style="text-align:center"><button class="ms-del-btn" onclick="msDeleteMasterRow('${m.id}')">削除</button></td>
   </tr>`).join('');
 
-  // インポート用セレクトを更新
+  // アーカイブ選択肢を更新
   const sel=document.getElementById('msImportSrcSel'); if(!sel)return;
   const arcList=getArcList();
-  // 現在セッション中のデータも選択肢に
-  const hasSession = !!(order&&order.length&&Object.values(pages||{}).some(pg=>(pg.rows||[]).some(r=>r.n)));
-  sel.innerHTML='<option value="">― 読み込み元を選択 ―</option>'
+  const hasSession=!!(order&&order.length&&Object.values(pages||{}).some(pg=>(pg.rows||[]).some(r=>r.n)));
+  sel.innerHTML='<option value="">― アーカイブを選択 ―</option>'
     +(hasSession?'<option value="__session__">✅ 現在の棚卸セッション（入力中）</option>':'')
-    +arcList.map(a=>`<option value="${a.id}">${a.date} ${a.label}（${a.cnt||0}点）</option>`).join('');
+    +arcList.map(a=>`<option value="${a.id}">${a.date}　${a.label}</option>`).join('');
+  // ページ選択欄をリセット
+  const pgBox=document.getElementById('msImportPageBox');
+  if(pgBox) pgBox.style.display='none';
 }
 
-// 棚卸データから商品マスタへインポート
+// アーカイブ選択が変わったらページ一覧を表示
+function msImportSrcChanged(){
+  const sel=document.getElementById('msImportSrcSel');
+  const val=sel?sel.value:'';
+  const pgBox=document.getElementById('msImportPageBox');
+  const pgList=document.getElementById('msImportPageList');
+  if(!pgBox||!pgList)return;
+
+  if(!val){ pgBox.style.display='none'; return; }
+
+  // ソース決定
+  let srcPages={}, srcOrder=[];
+  if(val==='__session__'){
+    srcPages=pages||{}; srcOrder=order||Object.keys(srcPages);
+  } else {
+    const arc=getArcList().find(a=>a.id===val);
+    if(!arc){ pgBox.style.display='none'; return; }
+    srcPages=arc.pages||{}; srcOrder=arc.order||Object.keys(srcPages);
+  }
+
+  // ページが1つしかなければ全部選択状態で表示
+  const pageItems=srcOrder.map((k,i)=>{
+    const pg=srcPages[k]||{};
+    const cnt=(pg.rows||[]).filter(r=>r.n).length;
+    const label=pg.tanto||pg.ownerName||`${i+1}P`;
+    return {k, label, cnt};
+  }).filter(p=>p.cnt>0);
+
+  if(!pageItems.length){ pgBox.style.display='none'; return; }
+
+  pgList.innerHTML=pageItems.map(p=>`
+    <label style="display:inline-flex;align-items:center;gap:5px;
+      padding:5px 12px;border:1.5px solid #b0d0b8;border-radius:20px;
+      background:#fff;cursor:pointer;font-size:12px;font-weight:600;
+      transition:.15s" class="ms-page-chk-label">
+      <input type="checkbox" value="${p.k}" checked
+        style="accent-color:#2d7a4f;width:14px;height:14px">
+      ${e(p.label)}<span style="font-size:10px;color:#888;font-weight:400">（${p.cnt}点）</span>
+    </label>
+  `).join('');
+  pgBox.style.display='block';
+}
+
+// 棚卸データから商品マスタへインポート（ページ指定）
 function msImportFromArc(){
   if(!msCurDept){alert('先に部門を選択してください');return;}
   const sel=document.getElementById('msImportSrcSel');
   const val=sel?sel.value:''; if(!val){alert('読み込み元を選択してください');return;}
 
-  // ページデータを取得
+  // 選択されたページキーを収集
+  const checkedKeys=new Set(
+    [...document.querySelectorAll('#msImportPageList input[type=checkbox]:checked')]
+      .map(cb=>cb.value)
+  );
+
+  // ソース決定
   let srcPages={};
   if(val==='__session__'){
     srcPages=pages||{};
@@ -1549,23 +1612,25 @@ function msImportFromArc(){
     srcPages=arc.pages||{};
   }
 
-  // 全商品を重複排除して収集（商品名をキーに単位を保持）
+  // チェックされたページの商品のみ収集（ページ指定なければ全ページ）
+  const useAllPages=checkedKeys.size===0;
   const map={};
-  Object.values(srcPages).forEach(pg=>{
+  Object.entries(srcPages).forEach(([k,pg])=>{
+    if(!useAllPages && !checkedKeys.has(k)) return;
     (pg.rows||[]).forEach(r=>{
       const name=(r.n||'').trim(); if(!name)return;
       if(!map[name]) map[name]={name, unit:r.u||'個', memo:''};
     });
   });
+
   const newItems=Object.values(map);
-  if(!newItems.length){alert('商品データが見つかりませんでした');return;}
+  if(!newItems.length){alert('選択したページに商品データがありませんでした');return;}
 
   const data=msGetDepts();
   if(!data.masters[msCurDept]) data.masters[msCurDept]=[];
   const existing=data.masters[msCurDept];
   const existingNames=new Set(existing.map(m=>m.name));
 
-  // 既存にないものだけ追加
   let addedCount=0;
   newItems.forEach(item=>{
     if(existingNames.has(item.name))return;
@@ -1581,8 +1646,8 @@ function msImportFromArc(){
   if(msg){
     msg.style.display='block';
     msg.textContent=addedCount>0
-      ?`✅ ${addedCount}件の商品を追加しました（重複${newItems.length-addedCount}件はスキップ）`
-      :`ℹ️ すべての商品はすでに登録済みです（${newItems.length}件）`;
+      ?`✅ ${addedCount}件追加しました（重複${newItems.length-addedCount}件はスキップ）`
+      :`ℹ️ すべて登録済みです（${newItems.length}件）`;
     setTimeout(()=>{msg.style.display='none';},4000);
   }
   if(addedCount>0) toast(`${addedCount}件の商品をインポートしました`);
@@ -2314,15 +2379,38 @@ let debT={};
 function upd(k,ri,f,v){
   if(!pages[k])return;
   pages[k].rows[ri][f]=v;
+  // 最終行に入力したら自動で1行追加
+  if(ri===pages[k].rows.length-1 && v.trim()!==''){
+    pages[k].rows.push({n:'',z:'10',k:'',u:'',p:'',ss:'',sr:'',st:'',b:'',cat:'',bc:'',pt:'通常'});
+  }
   renderTable(); renderQbar();
   const dk=k+'_'+ri+'_'+f;
   clearTimeout(debT[dk]);
   debT[dk]=setTimeout(()=>{
     if(!offline&&db){
-      db.ref('s/'+sid+'/pages/'+k+'/rows/'+ri+'/'+f).set(v);
+      db.ref('s/'+sid+'/pages/'+k+'/rows').set(pages[k].rows);
       db.ref('s/'+sid+'/pages/'+k+'/at').set(Date.now());
     }
   },400);
+}
+
+function addRows(n){
+  if(!curKey||!pages[curKey])return;
+  const blank={n:'',z:'10',k:'',u:'',p:'',ss:'',sr:'',st:'',b:'',cat:'',bc:'',pt:'通常'};
+  for(let i=0;i<n;i++) pages[curKey].rows.push({...blank});
+  renderTable(); renderQbar();
+  if(!offline&&db){
+    db.ref('s/'+sid+'/pages/'+curKey+'/rows').set(pages[curKey].rows);
+    db.ref('s/'+sid+'/pages/'+curKey+'/at').set(Date.now());
+  }
+  // 追加した最初の行へスクロール
+  const tbody=document.getElementById('tbody');
+  if(tbody){
+    const rows=tbody.querySelectorAll('tr');
+    const target=rows[rows.length-n];
+    if(target) target.scrollIntoView({behavior:'smooth',block:'center'});
+  }
+  toast(n+'行追加しました');
 }
 
 // ============================================================
@@ -2367,10 +2455,15 @@ function renderPTabs(){
     const t=pg.tanto||'', catId=pg.catId||'';
     const catLabel=((CATS.find(c=>c.id===catId)||{}).l||catId||'未設定');
     const opts=CATS.map(c=>`<option value="${e(c.id)}"${catId===c.id?' selected':''}>${e(c.l)}</option>`).join('');
-    h+=`<div class="ptab">
-      <div class="ptab-top${on?' on':''}" onclick="switchPage('${k}')">
-        <span>${i+1}P</span>
-        <span style="font-size:11px;max-width:110px;overflow:hidden;text-overflow:ellipsis">${e(t)||'未設定'}</span>
+    h+=`<div class="ptab" draggable="true" data-pk="${k}"
+      ondragstart="ptabDragStart(event,'${k}')"
+      ondragover="ptabDragOver(event)"
+      ondragend="ptabDragEnd(event)"
+      ondrop="ptabDrop(event,'${k}')">
+      <div class="ptab-top${on?' on':''}">
+        <span class="ptab-drag-handle" title="ドラッグして並び替え" style="cursor:grab;color:#aab;padding:0 4px;font-size:14px;user-select:none">⠿</span>
+        <span onclick="switchPage('${k}')" style="cursor:pointer">${i+1}P</span>
+        <span onclick="switchPage('${k}')" style="cursor:pointer;font-size:11px;max-width:110px;overflow:hidden;text-overflow:ellipsis">${e(t)||'未設定'}</span>
         ${catId?`<span style="font-size:9px;background:#FF6600;color:#fff;border-radius:3px;padding:1px 5px">${e(catLabel)}</span>`:''}
       </div>
       <div class="ptab-bot" style="flex-wrap:wrap;gap:4px;padding:5px 6px">
@@ -2384,6 +2477,41 @@ function renderPTabs(){
   });
   h+=`<button class="ptadd" onclick="addPage()">＋マイページ追加</button>`;
   el.innerHTML=h;
+}
+
+// ページタブのドラッグ＆ドロップ並び替え
+let ptabDraggingKey=null;
+function ptabDragStart(ev,k){
+  ptabDraggingKey=k;
+  ev.dataTransfer.effectAllowed='move';
+  ev.currentTarget.style.opacity='.4';
+}
+function ptabDragOver(ev){
+  ev.preventDefault();
+  ev.dataTransfer.dropEffect='move';
+  ev.currentTarget.style.outline='2px solid #E8630A';
+}
+function ptabDragEnd(ev){
+  ev.currentTarget.style.opacity='';
+  ev.currentTarget.style.outline='';
+  // 全タブのアウトラインをクリア
+  document.querySelectorAll('.ptab').forEach(el=>{el.style.outline='';});
+}
+function ptabDrop(ev,targetKey){
+  ev.preventDefault();
+  ev.currentTarget.style.outline='';
+  if(!ptabDraggingKey||ptabDraggingKey===targetKey)return;
+  const fromIdx=order.indexOf(ptabDraggingKey);
+  const toIdx=order.indexOf(targetKey);
+  if(fromIdx<0||toIdx<0)return;
+  // orderを並び替え
+  order.splice(fromIdx,1);
+  order.splice(toIdx,0,ptabDraggingKey);
+  ptabDraggingKey=null;
+  // Firebaseに同期
+  if(!offline&&db&&sid) db.ref('s/'+sid+'/order').set(order);
+  renderPTabs();
+  toast('ページ順を変更しました');
 }
 
 function renderTable(){
