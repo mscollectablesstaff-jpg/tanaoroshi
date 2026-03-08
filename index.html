@@ -214,6 +214,101 @@ tbody tr:hover td.sticky-name{background:#e8f0f8}
 .scan-manual{margin-top:10px}
 .scan-manual input{width:100%;padding:10px;border-radius:6px;border:1.5px solid #333;background:#222;color:#fff;font-size:16px;text-align:center;font-family:monospace;letter-spacing:2px}
 .scan-manual input:focus{outline:none;border-color:#1a6ea6}
+
+/* ===== 月次在庫管理 ===== */
+.mstock-page{background:#f0f4f8;min-height:100vh}
+.mstock-topbar{background:#1a3a2a;color:#fff;padding:10px 16px;display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap}
+.mstock-logo{font-size:15px;font-weight:700;display:flex;align-items:center;gap:8px}
+.mstock-main{padding:14px;max-width:900px;margin:0 auto}
+.mstock-card{background:#fff;border-radius:10px;padding:18px;box-shadow:0 1px 4px rgba(0,0,0,.08);margin-bottom:14px}
+.mstock-card h2{font-size:14px;font-weight:700;color:#1a3a2a;margin-bottom:12px;padding-bottom:8px;border-bottom:2px solid #2d7a4f;display:flex;align-items:center;gap:8px}
+.ms-dept-tabs{display:flex;gap:6px;flex-wrap:wrap;margin-bottom:14px}
+.ms-dept-tab{padding:7px 16px;border-radius:20px;border:1.5px solid #dde3ea;background:#fafbfc;font-size:12px;font-weight:700;cursor:pointer;color:#6b7a8d;transition:.15s}
+.ms-dept-tab.on{background:#2d7a4f;color:#fff;border-color:#2d7a4f}
+.ms-dept-tab:hover:not(.on){border-color:#2d7a4f;color:#2d7a4f}
+.ms-dept-add{padding:7px 12px;border-radius:20px;border:1.5px dashed #aab;background:#fafbfc;font-size:12px;cursor:pointer;color:#aab}
+.ms-dept-add:hover{border-color:#2d7a4f;color:#2d7a4f}
+/* 商品マスタ */
+.master-tbl{width:100%;border-collapse:collapse;font-size:13px}
+.master-tbl th{background:#1a3a2a;color:#fff;padding:8px 12px;text-align:left;font-size:11px}
+.master-tbl td{padding:7px 10px;border-bottom:1px solid #eef0f3;vertical-align:middle}
+.master-tbl input,.master-tbl select{width:100%;padding:5px 7px;border:1px solid #dde3ea;border-radius:5px;font-size:12px;font-family:inherit;background:#fafbfc}
+.master-tbl input:focus,.master-tbl select:focus{outline:none;border-color:#2d7a4f;background:#fff}
+.ms-add-row-btn{display:flex;align-items:center;gap:6px;background:#e8f5e9;border:1.5px dashed #2d7a4f;border-radius:7px;padding:9px 16px;color:#2d7a4f;font-size:12px;font-weight:700;cursor:pointer;margin-top:8px;width:100%;justify-content:center}
+.ms-add-row-btn:hover{background:#2d7a4f;color:#fff}
+/* 月次入力 */
+.ms-month-sel{display:flex;align-items:center;gap:10px;margin-bottom:14px;flex-wrap:wrap}
+.ms-month-inp{padding:8px 12px;border:1.5px solid #dde3ea;border-radius:8px;font-size:14px;font-weight:700;font-family:inherit;color:#1a3a2a}
+.ms-month-inp:focus{outline:none;border-color:#2d7a4f}
+.count-tbl{width:100%;border-collapse:collapse;font-size:13px}
+.count-tbl th{background:#1a3a2a;color:#fff;padding:9px 12px;text-align:left;font-size:11px}
+.count-tbl th.r{text-align:right}
+.count-tbl td{padding:7px 10px;border-bottom:1px solid #eef0f3;vertical-align:middle}
+.count-tbl td.name-col{font-weight:600;color:#1a3a2a}
+.count-tbl td.unit-col{color:#6b7a8d;font-size:11px;text-align:center}
+.count-tbl td.prev-col{text-align:right;color:#aab;font-size:12px}
+.count-inp{width:90px;padding:6px 8px;border:1.5px solid #dde3ea;border-radius:6px;font-size:14px;font-weight:700;text-align:right;font-family:inherit;color:#1a3a2a;transition:.15s}
+.count-inp:focus{outline:none;border-color:#2d7a4f;background:#f0faf4}
+.count-inp.changed{border-color:#2d7a4f;background:#f0faf4}
+.diff-badge{display:inline-block;border-radius:10px;padding:2px 8px;font-size:11px;font-weight:700;margin-left:6px}
+.diff-plus{background:#fde8e8;color:#e74c3c}
+.diff-minus{background:#e8f5e9;color:#1a7a4a}
+.diff-zero{background:#f0f2f5;color:#aab}
+/* 月次グラフ */
+.ms-chart-wrap{overflow-x:auto}
+.ms-legend{display:flex;flex-wrap:wrap;gap:12px;margin-top:10px;font-size:11px}
+.ms-legend-item{display:flex;align-items:center;gap:5px}
+.ms-legend-dot{width:10px;height:10px;border-radius:50%}
+/* 月次一覧 */
+.ms-hist-item{display:flex;align-items:center;gap:10px;padding:10px 14px;border:1px solid #dde3ea;border-radius:8px;margin-bottom:6px;background:#fafbfc}
+.ms-hist-item:hover{background:#f0faf4;border-color:#2d7a4f;cursor:pointer}
+.ms-hist-date{font-size:13px;font-weight:700;color:#1a3a2a;min-width:80px}
+.ms-hist-dept{font-size:12px;color:#2d7a4f;font-weight:700;min-width:100px}
+.ms-hist-cnt{font-size:12px;color:#6b7a8d;flex:1}
+.ms-save-btn{background:#2d7a4f;color:#fff;border:none;border-radius:8px;padding:11px 24px;font-size:14px;font-weight:700;cursor:pointer;font-family:inherit;transition:.15s}
+.ms-save-btn:hover{background:#1a5c3a}
+.ms-del-btn{background:#fee;color:#e74c3c;border:1px solid #fcc;border-radius:5px;padding:4px 10px;font-size:11px;cursor:pointer;font-family:inherit}
+
+.hist-card{background:#fff;border-radius:10px;padding:18px;box-shadow:0 1px 4px rgba(0,0,0,.08);margin-bottom:12px}
+.hist-card h2{font-size:15px;color:#0f2744;margin-bottom:14px;padding-bottom:8px;border-bottom:2px solid #1a6ea6;display:flex;align-items:center;gap:8px}
+.arc-item{border:1px solid #dde3ea;border-radius:8px;padding:12px 16px;margin-bottom:8px;display:flex;align-items:center;gap:12px;cursor:pointer;transition:.15s;background:#fafbfc}
+.arc-item:hover{border-color:#1a6ea6;background:#f0f6ff}
+.arc-item.current{border-color:#1a7a4a;background:#f0faf4}
+.arc-date{font-size:13px;font-weight:700;color:#0f2744;min-width:110px}
+.arc-label{font-size:12px;color:#6b7a8d;flex:1}
+.arc-val{font-size:14px;font-weight:700;color:#1a7a4a;text-align:right;min-width:100px}
+.arc-cnt{font-size:11px;color:#aab;text-align:right;min-width:60px}
+.arc-btns{display:flex;gap:6px;margin-left:8px}
+.arc-btn{border:none;border-radius:5px;padding:5px 10px;font-size:11px;font-weight:700;cursor:pointer;font-family:inherit}
+.arc-btn-copy{background:#e8f4fd;color:#1a6ea6}
+.arc-btn-copy:hover{background:#1a6ea6;color:#fff}
+.arc-btn-open{background:#e8f5e9;color:#1a7a4a}
+.arc-btn-open:hover{background:#1a7a4a;color:#fff}
+.arc-btn-del{background:#fee;color:#e74c3c}
+.arc-btn-del:hover{background:#e74c3c;color:#fff}
+
+/* 比較テーブル */
+.cmptbl{width:100%;border-collapse:collapse;font-size:12px}
+.cmptbl th{background:#0f2744;color:#fff;padding:8px 12px;text-align:right;font-size:11px}
+.cmptbl th:first-child{text-align:left}
+.cmptbl td{padding:8px 12px;border-bottom:1px solid #dde3ea;text-align:right}
+.cmptbl td:first-child{text-align:left;font-weight:600;color:#0f2744}
+.diff-up{color:#e74c3c;font-weight:700}
+.diff-dn{color:#1a7a4a;font-weight:700}
+.diff-eq{color:#aab}
+
+/* 推移グラフ */
+.chart-wrap{overflow-x:auto;padding:8px 0}
+svg.trend-chart text{font-family:inherit}
+
+/* セッション画面の履歴ボタン */
+.arc-section{margin-top:16px;border-top:1px solid #dde3ea;padding-top:14px}
+.arc-section-title{font-size:11px;font-weight:700;color:#6b7a8d;margin-bottom:8px}
+.arc-mini{display:flex;align-items:center;gap:8px;padding:9px 12px;border:1px solid #dde3ea;border-radius:7px;margin-bottom:6px;background:#fafbfc;cursor:pointer;transition:.15s}
+.arc-mini:hover{border-color:#1a6ea6;background:#f0f6ff}
+.arc-mini-date{font-size:12px;font-weight:700;color:#0f2744;min-width:95px}
+.arc-mini-val{font-size:12px;color:#1a7a4a;font-weight:700;flex:1;text-align:right}
+.arc-mini-btn{border:none;border-radius:5px;padding:4px 10px;font-size:11px;font-weight:700;cursor:pointer;background:#1a6ea6;color:#fff;white-space:nowrap}
 </style>
 </head>
 <body>
@@ -268,6 +363,7 @@ tbody tr:hover td.sticky-name{background:#e8f0f8}
     <input class="inp" id="myNameInp" placeholder="例：山田">
 
     <button class="btn btn-navy" onclick="doCreate()">✨ 新しい棚卸を開始する</button>
+    <button class="btn" style="background:#2d7a4f;color:#fff;margin-top:8px" onclick="doMstock()">☕ 月次在庫管理を開く</button>
     <div class="divider">または参加</div>
     <div class="lbl">セッションコード（6桁）</div>
     <input class="inp inp-code" id="joinCodeInp" placeholder="XXXXXX" maxlength="6">
@@ -275,6 +371,95 @@ tbody tr:hover td.sticky-name{background:#e8f0f8}
     <button class="btn btn-gray" style="margin-top:6px" onclick="showPage('pgSetup')">⚙ Firebase設定を変更</button>
 
     <div id="recentList" style="margin-top:18px"></div>
+
+    <!-- アーカイブ履歴 -->
+    <div class="arc-section" id="arcSection" style="display:none">
+      <div class="arc-section-title">📁 過去の棚卸履歴（前回からコピーして開始できます）</div>
+      <div id="arcSessionList"></div>
+    </div>
+  </div>
+</div>
+
+<!-- ===== MONTHLY STOCK PAGE ===== -->
+<div class="page mstock-page" id="pgMstock">
+  <div class="mstock-topbar">
+    <div class="mstock-logo">☕ 月次在庫管理</div>
+    <div style="display:flex;gap:8px;flex-wrap:wrap">
+      <button class="tbtn" style="background:#2d7a4f;color:#fff" onclick="msSave()">💾 保存</button>
+      <button class="tbtn" style="background:#1a6ea6;color:#fff" onclick="msShowTab('hist')">📊 履歴・グラフ</button>
+      <button class="tbtn tbtn-exit" onclick="msDone()">← 戻る</button>
+    </div>
+  </div>
+  <div class="mstock-main">
+
+    <!-- タブ：入力 / 商品マスタ / 履歴 -->
+    <div style="display:flex;gap:0;margin-bottom:14px;border-bottom:2px solid #dde3ea">
+      <div class="tab on" id="mstab-input" onclick="msShowTab('input')" style="color:#2d7a4f;border-bottom-color:#2d7a4f">📝 月次入力</div>
+      <div class="tab" id="mstab-master" onclick="msShowTab('master')">⚙ 商品マスタ</div>
+      <div class="tab" id="mstab-hist" onclick="msShowTab('hist')">📊 履歴・グラフ</div>
+    </div>
+
+    <!-- 入力パネル -->
+    <div id="mspnl-input">
+      <div class="mstock-card">
+        <h2>📅 部門・月を選ぶ</h2>
+        <div class="ms-dept-tabs" id="msDeptTabs"></div>
+        <div class="ms-month-sel">
+          <input type="month" class="ms-month-inp" id="msMonthInp">
+          <span style="font-size:12px;color:#6b7a8d">対象月</span>
+        </div>
+      </div>
+      <div class="mstock-card">
+        <h2>📦 在庫カウント入力</h2>
+        <div id="msCountArea">
+          <div style="color:#aab;font-size:13px;text-align:center;padding:20px">部門を選択してください</div>
+        </div>
+        <div style="margin-top:14px;text-align:right">
+          <button class="ms-save-btn" onclick="msSave()">💾 この月の在庫を保存</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- 商品マスタパネル -->
+    <div id="mspnl-master" style="display:none">
+      <div class="mstock-card">
+        <h2>⚙ 部門管理</h2>
+        <div class="ms-dept-tabs" id="msMasterDeptTabs"></div>
+        <div style="display:flex;gap:8px;margin-top:10px">
+          <input class="inp" id="msNewDeptInp" placeholder="新しい部門名（例：コーヒースタンド）" style="flex:1;margin-bottom:0">
+          <button class="ms-save-btn" onclick="msAddDept()" style="padding:10px 16px;font-size:13px">＋追加</button>
+        </div>
+      </div>
+      <div class="mstock-card">
+        <h2>📋 商品マスタ <span id="masterDeptLabel" style="font-size:12px;color:#2d7a4f;font-weight:400"></span></h2>
+        <table class="master-tbl">
+          <thead><tr>
+            <th style="width:40%">商品名</th>
+            <th style="width:15%">単位</th>
+            <th style="width:20%">規格・メモ</th>
+            <th style="width:15%">初期在庫数</th>
+            <th style="width:10%"></th>
+          </tr></thead>
+          <tbody id="masterTbody"></tbody>
+        </table>
+        <div class="ms-add-row-btn" onclick="msAddMasterRow()">＋ 商品を追加</div>
+      </div>
+    </div>
+
+    <!-- 履歴・グラフパネル -->
+    <div id="mspnl-hist" style="display:none">
+      <div class="mstock-card">
+        <h2>📊 部門別 在庫推移グラフ</h2>
+        <div class="ms-dept-tabs" id="msHistDeptTabs"></div>
+        <div id="msChartArea" style="min-height:180px;display:flex;align-items:center;justify-content:center;color:#aab;font-size:13px">部門を選択してください</div>
+        <div class="ms-legend" id="msLegend"></div>
+      </div>
+      <div class="mstock-card">
+        <h2>📋 月次記録一覧</h2>
+        <div id="msHistList"><div style="color:#aab;font-size:13px;text-align:center;padding:20px">記録がありません</div></div>
+      </div>
+    </div>
+
   </div>
 </div>
 
@@ -292,6 +477,7 @@ tbody tr:hover td.sticky-name{background:#e8f0f8}
     </div>
     <div class="topbar-right">
       <span class="save-status" id="saveStat"></span>
+      <button class="tbtn" style="background:#1a7a4a;color:#fff" onclick="doArchive()">💾 <span>完了保存</span></button>
       <button class="tbtn tbtn-excel" onclick="doExcel()">⬇ <span>Excel</span></button>
       <button class="tbtn tbtn-air" onclick="showTab('air')">🏷 <span>Airレジ</span></button>
       <button class="tbtn tbtn-exit" onclick="doExit()">退出</button>
@@ -310,6 +496,7 @@ tbody tr:hover td.sticky-name{background:#e8f0f8}
     <div class="tab on" id="tab-entry" onclick="showTab('entry')">棚卸入力</div>
     <div class="tab" id="tab-sum" onclick="showTab('sum')">集計・合計</div>
     <div class="tab" id="tab-air" onclick="showTab('air')">Airレジ出力</div>
+    <div class="tab" id="tab-hist" onclick="showTab('hist')">📊 履歴・比較</div>
   </div>
 
   <div class="main-content">
@@ -435,6 +622,23 @@ tbody tr:hover td.sticky-name{background:#e8f0f8}
       </div>
     </div>
 
+    <!-- 履歴・比較パネル -->
+    <div class="panel" id="pnl-hist">
+      <div class="hist-card">
+        <h2>📁 棚卸アーカイブ一覧</h2>
+        <p style="font-size:12px;color:#6b7a8d;margin-bottom:14px">「💾 完了保存」で保存した棚卸の履歴です。前回データをコピーして新規棚卸を開始できます。</p>
+        <div id="arcList"><div style="color:#aab;font-size:13px;text-align:center;padding:20px">アーカイブがありません</div></div>
+      </div>
+      <div class="hist-card">
+        <h2>📊 在庫金額の推移</h2>
+        <div id="trendChart" style="min-height:160px;display:flex;align-items:center;justify-content:center;color:#aab;font-size:13px">データがありません</div>
+      </div>
+      <div class="hist-card">
+        <h2>🔍 前回との比較</h2>
+        <div id="compareBox"><div style="color:#aab;font-size:13px;text-align:center;padding:20px">アーカイブが2件以上で表示されます</div></div>
+      </div>
+    </div>
+
   </div><!-- /main-content -->
 </div><!-- /pgApp -->
 
@@ -491,6 +695,9 @@ let airCats = CATS.filter(c=>c.id).map(c=>({id:c.id, name:c.l}));
 const R = 25;
 const FK = 'tb_fb_v3';
 const RK = 'tb_recent_v3';
+const AK = 'tb_archive_v3'; // アーカイブ履歴
+const MK = 'tb_mstock_v1'; // 月次在庫データ
+const MDK = 'tb_mdept_v1'; // 月次在庫部門・マスタ
 
 // ============================================================
 // 状態
@@ -709,11 +916,625 @@ function startListeners(){
   });
 }
 
+// ============================================================
+// 月次在庫管理
+// ============================================================
+let msCurDept = null; // 現在選択中の部門ID
+
+// --- データアクセス ---
+function msGetDepts(){
+  try{ return JSON.parse(localStorage.getItem(MDK)||'null') || {
+    depts:[{id:'d1',name:'コーヒースタンド',color:'#2d7a4f'}],
+    masters:{'d1':[
+      {id:'m1',name:'コーヒー豆',unit:'kg',memo:'',init:''},
+      {id:'m2',name:'茶葉',unit:'g',memo:'',init:''},
+      {id:'m3',name:'シロップ',unit:'本',memo:'',init:''},
+      {id:'m4',name:'カップ',unit:'個',memo:'',init:''},
+      {id:'m5',name:'ミルク',unit:'L',memo:'',init:''}
+    ]}
+  };
+  }catch(e){return {depts:[],masters:{}};}
+}
+function msSaveDepts(data){ try{localStorage.setItem(MDK,JSON.stringify(data));}catch(e){} }
+
+function msGetRecords(){
+  try{ return JSON.parse(localStorage.getItem(MK)||'[]'); }catch(e){return[];}
+}
+function msSaveRecords(list){ try{localStorage.setItem(MK,JSON.stringify(list));}catch(e){} }
+
+// --- 画面遷移 ---
+function doMstock(){
+  showPage('pgMstock');
+  const now=new Date();
+  document.getElementById('msMonthInp').value=now.getFullYear()+'-'+String(now.getMonth()+1).padStart(2,'0');
+  msRenderDeptTabs();
+  msShowTab('input');
+  if(!msCurDept){
+    const data=msGetDepts();
+    if(data.depts.length) msCurDept=data.depts[0].id;
+  }
+  msRenderDeptTabs();
+  msRenderCountArea();
+}
+function msDone(){ showPage('pgSession'); }
+
+function msShowTab(name){
+  ['input','master','hist'].forEach(n=>{
+    const p=document.getElementById('mspnl-'+n);
+    const t=document.getElementById('mstab-'+n);
+    if(p) p.style.display=(n===name?'block':'none');
+    if(t){
+      t.classList.toggle('on',n===name);
+      if(n===name){t.style.color='#2d7a4f';t.style.borderBottomColor='#2d7a4f';}
+      else{t.style.color='';t.style.borderBottomColor='';}
+    }
+  });
+  if(name==='master'){ msRenderMasterDeptTabs(); msRenderMasterTable(); }
+  if(name==='hist'){ msRenderHistDeptTabs(); msRenderHistList(); }
+}
+
+// --- 部門タブ ---
+const MS_COLORS=['#2d7a4f','#1a6ea6','#d4a017','#8e44ad','#e67e22','#e74c3c','#16a085','#2c3e50'];
+function msRenderDeptTabs(){
+  const data=msGetDepts();
+  const el=document.getElementById('msDeptTabs'); if(!el)return;
+  el.innerHTML=data.depts.map(d=>`
+    <div class="ms-dept-tab${msCurDept===d.id?' on':''}" style="${msCurDept===d.id?'background:'+d.color+';border-color:'+d.color:''}"
+      onclick="msSelectDept('${d.id}')">${d.name}</div>
+  `).join('')+'<div class="ms-dept-add" onclick="msShowTab(\'master\')">＋ 部門を管理</div>';
+}
+function msSelectDept(id){ msCurDept=id; msRenderDeptTabs(); msRenderCountArea(); }
+
+// --- 月次カウント入力 ---
+function msRenderCountArea(){
+  const el=document.getElementById('msCountArea'); if(!el)return;
+  if(!msCurDept){el.innerHTML='<div style="color:#aab;font-size:13px;text-align:center;padding:20px">部門を選択してください</div>';return;}
+  const data=msGetDepts();
+  const dept=data.depts.find(d=>d.id===msCurDept);
+  const masters=data.masters[msCurDept]||[];
+  if(!masters.length){
+    el.innerHTML='<div style="color:#aab;font-size:13px;text-align:center;padding:20px">商品マスタに商品がありません。<br><button onclick="msShowTab(\'master\')" style="margin-top:8px;background:#2d7a4f;color:#fff;border:none;border-radius:6px;padding:8px 16px;cursor:pointer;font-size:12px">⚙ 商品マスタを設定する</button></div>';
+    return;
+  }
+  const month=document.getElementById('msMonthInp').value;
+  // 前回データを取得
+  const records=msGetRecords();
+  const cur=records.find(r=>r.deptId===msCurDept&&r.month===month);
+  const prevRecords=records.filter(r=>r.deptId===msCurDept&&r.month<month).sort((a,b)=>b.month.localeCompare(a.month));
+  const prev=prevRecords[0]||null;
+
+  const rows=masters.map(m=>{
+    const curVal=cur?(cur.counts[m.id]||''):'';
+    const prevVal=prev?(prev.counts[m.id]||''):m.init||'';
+    const prevNum=parseFloat(prevVal)||0;
+    const curNum=parseFloat(curVal);
+    let diffHtml='';
+    if(curVal!==''&&prevVal!==''){
+      const diff=curNum-prevNum;
+      const cls=diff>0?'diff-plus':diff<0?'diff-minus':'diff-zero';
+      const sign=diff>0?'+':'';
+      diffHtml=`<span class="diff-badge ${cls}">${sign}${diff}</span>`;
+    }
+    return `<tr>
+      <td class="name-col">${e(m.name)}</td>
+      <td class="unit-col">${e(m.unit)}</td>
+      <td class="prev-col">${prevVal!==''?prevVal+' '+e(m.unit):'-'}<br><span style="font-size:10px;color:#ccc">${prev?prev.month:'前回なし'}</span></td>
+      <td style="text-align:center">
+        <input class="count-inp${curVal!==''?' changed':''}" type="number" step="any"
+          value="${curVal}" placeholder="0"
+          id="cnt_${m.id}"
+          oninput="msCountChanged(this)">
+      </td>
+      <td>${diffHtml}<span id="diff_${m.id}"></span></td>
+      <td class="unit-col">${e(m.unit)}</td>
+    </tr>`;
+  }).join('');
+
+  el.innerHTML=`
+    <div style="font-size:12px;color:#2d7a4f;font-weight:700;margin-bottom:10px">${dept?dept.name:''} — ${month}</div>
+    <div style="overflow-x:auto"><table class="count-tbl">
+      <thead><tr>
+        <th>商品名</th><th>単位</th><th class="r">前回在庫</th><th class="r">今回在庫</th><th>増減</th><th></th>
+      </tr></thead>
+      <tbody>${rows}</tbody>
+    </table></div>`;
+}
+function msCountChanged(inp){
+  inp.classList.add('changed');
+  // リアルタイムで増減バッジ更新
+  const id=inp.id.replace('cnt_','');
+  const month=document.getElementById('msMonthInp').value;
+  const records=msGetRecords();
+  const data=msGetDepts();
+  const masters=data.masters[msCurDept]||[];
+  const m=masters.find(x=>x.id===id); if(!m)return;
+  const prevRecords=records.filter(r=>r.deptId===msCurDept&&r.month<month).sort((a,b)=>b.month.localeCompare(a.month));
+  const prev=prevRecords[0]||null;
+  const prevVal=prev?(prev.counts[id]||''):m.init||'';
+  const diffEl=document.getElementById('diff_'+id); if(!diffEl)return;
+  if(inp.value!==''&&prevVal!==''){
+    const diff=parseFloat(inp.value)-parseFloat(prevVal);
+    const cls=diff>0?'diff-plus':diff<0?'diff-minus':'diff-zero';
+    const sign=diff>0?'+':'';
+    diffEl.innerHTML=`<span class="diff-badge ${cls}">${sign}${diff}</span>`;
+  } else { diffEl.innerHTML=''; }
+}
+
+// --- 保存 ---
+function msSave(){
+  if(!msCurDept){alert('部門を選択してください');return;}
+  const month=document.getElementById('msMonthInp').value;
+  if(!month){alert('月を選択してください');return;}
+  const data=msGetDepts();
+  const masters=data.masters[msCurDept]||[];
+  const counts={};
+  masters.forEach(m=>{
+    const inp=document.getElementById('cnt_'+m.id);
+    if(inp&&inp.value!=='') counts[m.id]=inp.value;
+  });
+  if(!Object.keys(counts).length){alert('在庫数を1つ以上入力してください');return;}
+  const records=msGetRecords();
+  const idx=records.findIndex(r=>r.deptId===msCurDept&&r.month===month);
+  const dept=data.depts.find(d=>d.id===msCurDept);
+  const rec={id:'ms'+Date.now(),deptId:msCurDept,deptName:dept?dept.name:'',month,counts,at:Date.now()};
+  if(idx>=0) records[idx]=rec; else records.push(rec);
+  records.sort((a,b)=>b.month.localeCompare(a.month)||b.at-a.at);
+  msSaveRecords(records);
+  // Firebase保存
+  if(db&&!offline) db.ref('mstock/'+msCurDept+'/'+month.replace('-','')).set(rec).catch(()=>{});
+  toast('💾 '+month+' の在庫を保存しました');
+  msRenderCountArea();
+}
+
+// --- 商品マスタ ---
+function msRenderMasterDeptTabs(){
+  const data=msGetDepts();
+  const el=document.getElementById('msMasterDeptTabs'); if(!el)return;
+  el.innerHTML=data.depts.map(d=>`
+    <div class="ms-dept-tab${msCurDept===d.id?' on':''}"
+      style="${msCurDept===d.id?'background:'+d.color+';border-color:'+d.color:''}"
+      onclick="msMasterSelectDept('${d.id}','${e(d.name)}')">${d.name}
+      <span onclick="event.stopPropagation();msDeleteDept('${d.id}')" style="margin-left:6px;opacity:.6;font-size:10px">✕</span>
+    </div>
+  `).join('');
+  const lbl=document.getElementById('masterDeptLabel');
+  const dept=data.depts.find(d=>d.id===msCurDept);
+  if(lbl) lbl.textContent=dept?'— '+dept.name:'';
+}
+function msMasterSelectDept(id,name){
+  msCurDept=id;
+  msRenderMasterDeptTabs();
+  msRenderMasterTable();
+  msRenderDeptTabs();
+}
+function msAddDept(){
+  const inp=document.getElementById('msNewDeptInp');
+  const name=(inp.value||'').trim(); if(!name){alert('部門名を入力してください');return;}
+  const data=msGetDepts();
+  const id='d'+Date.now();
+  const color=MS_COLORS[data.depts.length%MS_COLORS.length];
+  data.depts.push({id,name,color});
+  data.masters[id]=[];
+  msSaveDepts(data);
+  msCurDept=id;
+  inp.value='';
+  msRenderMasterDeptTabs(); msRenderMasterTable(); msRenderDeptTabs();
+  toast('部門「'+name+'」を追加しました');
+}
+function msDeleteDept(id){
+  const data=msGetDepts();
+  const dept=data.depts.find(d=>d.id===id);
+  if(!confirm((dept?dept.name:'この部門')+'を削除しますか？記録も消えます'))return;
+  data.depts=data.depts.filter(d=>d.id!==id);
+  delete data.masters[id];
+  msSaveDepts(data);
+  const records=msGetRecords().filter(r=>r.deptId!==id);
+  msSaveRecords(records);
+  if(msCurDept===id) msCurDept=data.depts[0]?.id||null;
+  msRenderMasterDeptTabs(); msRenderMasterTable(); msRenderDeptTabs();
+}
+function msRenderMasterTable(){
+  const el=document.getElementById('masterTbody'); if(!el)return;
+  if(!msCurDept){el.innerHTML='<tr><td colspan="5" style="text-align:center;color:#aab;padding:16px">部門を選択してください</td></tr>';return;}
+  const data=msGetDepts();
+  const masters=data.masters[msCurDept]||[];
+  el.innerHTML=masters.map((m,i)=>`<tr>
+    <td><input value="${e(m.name)}" placeholder="商品名" oninput="msUpdateMaster('${m.id}','name',this.value)"></td>
+    <td><select oninput="msUpdateMaster('${m.id}','unit',this.value)">
+      ${['kg','g','L','ml','本','袋','個','枚','缶','箱','パック','種'].map(u=>`<option${m.unit===u?' selected':''}>${u}</option>`).join('')}
+    </select></td>
+    <td><input value="${e(m.memo||'')}" placeholder="規格・メモ" oninput="msUpdateMaster('${m.id}','memo',this.value)"></td>
+    <td><input type="number" step="any" value="${e(m.init||'')}" placeholder="0" oninput="msUpdateMaster('${m.id}','init',this.value)" style="text-align:right"></td>
+    <td style="text-align:center"><button class="ms-del-btn" onclick="msDeleteMasterRow('${m.id}')">削除</button></td>
+  </tr>`).join('');
+}
+function msUpdateMaster(id,field,val){
+  const data=msGetDepts(); if(!msCurDept)return;
+  const m=data.masters[msCurDept]?.find(x=>x.id===id); if(!m)return;
+  m[field]=val; msSaveDepts(data);
+}
+function msAddMasterRow(){
+  if(!msCurDept){alert('先に部門を選択してください');return;}
+  const data=msGetDepts();
+  if(!data.masters[msCurDept]) data.masters[msCurDept]=[];
+  data.masters[msCurDept].push({id:'m'+Date.now(),name:'',unit:'個',memo:'',init:''});
+  msSaveDepts(data); msRenderMasterTable();
+}
+function msDeleteMasterRow(id){
+  const data=msGetDepts(); if(!msCurDept)return;
+  data.masters[msCurDept]=(data.masters[msCurDept]||[]).filter(m=>m.id!==id);
+  msSaveDepts(data); msRenderMasterTable();
+}
+
+// --- 履歴・グラフ ---
+function msRenderHistDeptTabs(){
+  const data=msGetDepts();
+  const el=document.getElementById('msHistDeptTabs'); if(!el)return;
+  el.innerHTML=data.depts.map(d=>`
+    <div class="ms-dept-tab${msCurDept===d.id?' on':''}"
+      style="${msCurDept===d.id?'background:'+d.color+';border-color:'+d.color:''}"
+      onclick="msHistSelectDept('${d.id}')">${d.name}</div>
+  `).join('');
+}
+function msHistSelectDept(id){ msCurDept=id; msRenderHistDeptTabs(); msRenderChart(); msRenderHistList(); }
+
+function msRenderChart(){
+  const el=document.getElementById('msChartArea'); if(!el)return;
+  if(!msCurDept){el.innerHTML='<div style="color:#aab;font-size:13px;text-align:center;padding:20px">部門を選択してください</div>';return;}
+  const data=msGetDepts();
+  const masters=data.masters[msCurDept]||[];
+  const records=msGetRecords().filter(r=>r.deptId===msCurDept).sort((a,b)=>a.month.localeCompare(b.month));
+  if(records.length<2){el.innerHTML='<div style="color:#aab;font-size:13px;text-align:center;padding:20px">2ヶ月以上のデータがグラフに表示されます</div>';return;}
+  const months=records.map(r=>r.month);
+  const W=Math.max(500,months.length*70+120), H=220;
+  const pad={l:55,r:20,t:20,b:50};
+  const cW=W-pad.l-pad.r, cH=H-pad.t-pad.b;
+  const CHART_COLORS=['#2d7a4f','#1a6ea6','#d4a017','#8e44ad','#e67e22','#e74c3c'];
+  // 表示する商品（入力データがある商品のみ、最大6件）
+  const activeMasters=masters.filter(m=>records.some(r=>r.counts[m.id]!==undefined)).slice(0,6);
+  if(!activeMasters.length){el.innerHTML='<div style="color:#aab;font-size:13px;text-align:center;padding:20px">入力データがありません</div>';return;}
+  // 最大値計算
+  let maxV=1;
+  activeMasters.forEach(m=>{
+    records.forEach(r=>{const v=parseFloat(r.counts[m.id])||0; if(v>maxV)maxV=v;});
+  });
+  const xStep=cW/(months.length-1||1);
+  // y軸ラベル
+  const yLabels=[0,.25,.5,.75,1].map(ratio=>{
+    const y=pad.t+cH-ratio*cH;
+    return `<line x1="${pad.l-4}" y1="${y}" x2="${W-pad.r}" y2="${y}" stroke="#eef0f3" stroke-width="1"/>
+    <text x="${pad.l-7}" y="${y+4}" text-anchor="end" font-size="10" fill="#888">${Math.round(maxV*ratio)}</text>`;
+  }).join('');
+  // x軸ラベル
+  const xLabels=months.map((m,i)=>`<text x="${pad.l+i*xStep}" y="${H-pad.b+14}" text-anchor="middle" font-size="10" fill="#444">${m.slice(5)}</text>`).join('');
+  // 折れ線
+  const lines=activeMasters.map((m,ci)=>{
+    const color=CHART_COLORS[ci%CHART_COLORS.length];
+    const pts=records.map((r,i)=>{
+      const v=parseFloat(r.counts[m.id])||0;
+      return {x:pad.l+i*xStep, y:pad.t+cH-(v/maxV*cH), v};
+    });
+    const polyline=pts.map(p=>p.x+','+p.y).join(' ');
+    const dots=pts.map(p=>`<circle cx="${p.x}" cy="${p.y}" r="4" fill="${color}" stroke="#fff" stroke-width="2"/>`).join('');
+    return `<polyline points="${polyline}" fill="none" stroke="${color}" stroke-width="2" stroke-linejoin="round"/>
+    ${dots}`;
+  }).join('');
+  el.innerHTML=`<div class="ms-chart-wrap"><svg width="${W}" height="${H}" viewBox="0 0 ${W} ${H}" style="font-family:inherit">
+    ${yLabels}${xLabels}
+    <line x1="${pad.l}" y1="${pad.t}" x2="${pad.l}" y2="${pad.t+cH}" stroke="#ccc" stroke-width="1"/>
+    <line x1="${pad.l}" y1="${pad.t+cH}" x2="${W-pad.r}" y2="${pad.t+cH}" stroke="#ccc" stroke-width="1"/>
+    ${lines}
+  </svg></div>`;
+  // 凡例
+  const leg=document.getElementById('msLegend'); if(leg)
+    leg.innerHTML=activeMasters.map((m,ci)=>`<div class="ms-legend-item"><div class="ms-legend-dot" style="background:${CHART_COLORS[ci%CHART_COLORS.length]}"></div>${e(m.name)}（${e(m.unit)}）</div>`).join('');
+}
+
+function msRenderHistList(){
+  const el=document.getElementById('msHistList'); if(!el)return;
+  const data=msGetDepts();
+  let records=msGetRecords();
+  if(msCurDept) records=records.filter(r=>r.deptId===msCurDept);
+  records=records.sort((a,b)=>b.month.localeCompare(a.month)||b.at-a.at);
+  if(!records.length){el.innerHTML='<div style="color:#aab;font-size:13px;text-align:center;padding:20px">記録がありません</div>';return;}
+  const masters_cache={};
+  el.innerHTML=records.map(r=>{
+    const data2=msGetDepts();
+    if(!masters_cache[r.deptId]) masters_cache[r.deptId]=data2.masters[r.deptId]||[];
+    const ms=masters_cache[r.deptId];
+    const summary=ms.filter(m=>r.counts[m.id]!==undefined)
+      .map(m=>m.name+': '+r.counts[m.id]+m.unit).slice(0,4).join(' / ');
+    return `<div class="ms-hist-item" onclick="msLoadRecord('${r.deptId}','${r.month}')">
+      <div class="ms-hist-date">${r.month}</div>
+      <div class="ms-hist-dept">${e(r.deptName||r.deptId)}</div>
+      <div class="ms-hist-cnt">${summary}</div>
+      <button class="ms-del-btn" onclick="event.stopPropagation();msDeleteRecord('${r.id}')">削除</button>
+    </div>`;
+  }).join('');
+}
+function msLoadRecord(deptId, month){
+  msCurDept=deptId;
+  document.getElementById('msMonthInp').value=month;
+  msRenderDeptTabs();
+  msShowTab('input');
+  msRenderCountArea();
+}
+function msDeleteRecord(id){
+  if(!confirm('この記録を削除しますか？'))return;
+  msSaveRecords(msGetRecords().filter(r=>r.id!==id));
+  msRenderHistList(); msRenderChart();
+  toast('削除しました');
+}
+
+function msRenderHistAll(){
+  msRenderHistDeptTabs(); msRenderChart(); msRenderHistList();
+}
+
+function doMstock(){
+  showPage('pgMstock');
+  const now=new Date();
+  document.getElementById('msMonthInp').value=now.getFullYear()+'-'+String(now.getMonth()+1).padStart(2,'0');
+  const data=msGetDepts();
+  if(!msCurDept&&data.depts.length) msCurDept=data.depts[0].id;
+  msRenderDeptTabs();
+  msShowTab('input');
+  msRenderCountArea();
+}
+function msDone(){ showPage('pgSession'); }
+
 function doExit(){
   if(!confirm('退出しますか？'))return;
   if(db&&sid) db.ref('s/'+sid+'/users/'+myId).remove();
   pages={}; order=[]; curKey=null; sid=null;
   showPage('pgSession');
+}
+
+// ============================================================
+// アーカイブ（完了保存・履歴管理）
+// ============================================================
+function calcTotalValue(){
+  let total10=0,total8=0,totalZ=0,cnt=0;
+  Object.values(pages).forEach(pg=>{
+    (pg.rows||[]).forEach(r=>{
+      if(!r.n)return; cnt++;
+      const c=calc(r);
+      if(!r.z||r.z==='10') total10+=c.j||0;
+      else total8+=c.h||0;
+      totalZ+=c.zk||0;
+    });
+  });
+  return {total10,total8,totalZ,total:total10+total8,cnt};
+}
+
+function doArchive(){
+  const meta={
+    date:document.getElementById('hDate').value||new Date().toISOString().slice(0,10),
+    basho:document.getElementById('hBasho').value||'',
+    tanto:document.getElementById('hTanto').value||myName,
+    gyomu:document.getElementById('hGyomu').value||'棚卸'
+  };
+  const label=prompt('この棚卸の名前を入力してください（例: 2025年1月棚卸）', meta.date+' '+meta.gyomu);
+  if(label===null)return;
+  const stats=calcTotalValue();
+  const arc={
+    id:'arc'+Date.now(),
+    sid:sid||'offline',
+    label:label||meta.date,
+    date:meta.date,
+    basho:meta.basho,
+    tanto:meta.tanto,
+    at:Date.now(),
+    total10:stats.total10,
+    total8:stats.total8,
+    totalZ:stats.totalZ,
+    total:stats.total,
+    cnt:stats.cnt,
+    pages:JSON.parse(JSON.stringify(pages)),
+    order:JSON.parse(JSON.stringify(order))
+  };
+  // localStorageに保存
+  try{
+    const list=JSON.parse(localStorage.getItem(AK)||'[]');
+    list.unshift(arc);
+    localStorage.setItem(AK,JSON.stringify(list.slice(0,50)));
+  }catch(e){alert('保存エラー: '+e.message);return;}
+  // Firebaseにも保存
+  if(db&&!offline){
+    db.ref('archive/'+arc.id).set({
+      id:arc.id,sid:arc.sid,label:arc.label,date:arc.date,
+      basho:arc.basho,tanto:arc.tanto,at:arc.at,
+      total10:arc.total10,total8:arc.total8,totalZ:arc.totalZ,
+      total:arc.total,cnt:arc.cnt,
+      pages:arc.pages,order:arc.order
+    }).catch(e=>console.warn('archive FB:',e));
+  }
+  toast('「'+arc.label+'」を保存しました');
+  renderSessionArcList();
+}
+
+function getArcList(){
+  try{return JSON.parse(localStorage.getItem(AK)||'[]');}catch(e){return[];}
+}
+
+function saveArcList(list){
+  try{localStorage.setItem(AK,JSON.stringify(list));}catch(e){}
+}
+
+function deleteArc(id){
+  if(!confirm('このアーカイブを削除しますか？'))return;
+  const list=getArcList().filter(a=>a.id!==id);
+  saveArcList(list);
+  if(db&&!offline) db.ref('archive/'+id).remove().catch(()=>{});
+  renderHistPanel();
+  renderSessionArcList();
+  toast('削除しました');
+}
+
+// 前回データをコピーして新規棚卸開始
+function doCreateFromArc(id){
+  const arc=getArcList().find(a=>a.id===id);
+  if(!arc){alert('データが見つかりません');return;}
+  myName=document.getElementById('myNameInp').value.trim()||arc.tanto||'担当者';
+  sid=genCode();
+  // 商品データをコピー（個数はゼロにリセット）
+  const newPages={};
+  const newOrder=arc.order||Object.keys(arc.pages||{});
+  newOrder.forEach(pk=>{
+    const srcPg=arc.pages[pk];
+    if(!srcPg)return;
+    const newRows=(srcPg.rows||[]).map(r=>({
+      n:r.n||'', z:r.z||'10', k:'', u:r.u||'', p:r.p||'',
+      ss:r.ss||'', sr:r.sr||'', st:r.st||'', b:r.b||'',
+      cat:r.cat||'', bc:r.bc||'', pt:r.pt||'通常'
+    }));
+    // 空行を追加（既存商品の後に25行追加）
+    while(newRows.length<Math.max(newRows.filter(r=>r.n).length+10,R)) newRows.push({n:'',z:'10',k:'',u:'',p:'',ss:'',sr:'',st:'',b:'',cat:'',bc:'',pt:'通常'});
+    newPages[pk]={
+      tanto:srcPg.tanto||myName,
+      ownerId:myId,ownerName:myName,
+      catId:srcPg.catId||'',
+      rows:newRows,at:Date.now()
+    };
+  });
+  pages=newPages; order=newOrder; curKey=order[0]||null;
+  startApp();
+  toast('「'+arc.label+'」からコピーして開始しました');
+  if(!offline&&db){
+    db.ref('s/'+sid).set({
+      meta:{date:new Date().toISOString().slice(0,10),basho:arc.basho||'',tanto:myName,gyomu:'棚卸',kigen:'',by:myId,at:Date.now()},
+      order:newOrder,pages:newPages
+    }).then(()=>startListeners()).catch(e=>console.warn('FB write:',e));
+  }
+  saveRecent(sid,myName);
+}
+
+// セッション画面のアーカイブ一覧
+function renderSessionArcList(){
+  const sec=document.getElementById('arcSection');
+  const el=document.getElementById('arcSessionList');
+  if(!sec||!el)return;
+  const list=getArcList();
+  if(!list.length){sec.style.display='none';return;}
+  sec.style.display='block';
+  el.innerHTML=list.slice(0,8).map(a=>`
+    <div class="arc-mini">
+      <div class="arc-mini-date">${a.date||''}</div>
+      <div style="flex:1;font-size:12px;color:#444;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${a.label}</div>
+      <div class="arc-mini-val">${a.totalZ?'¥'+fm(a.totalZ):(a.total?'¥'+fm(a.total):'')}</div>
+      <button class="arc-mini-btn" onclick="doCreateFromArc('${a.id}')">📋 コピーして開始</button>
+    </div>
+  `).join('');
+}
+
+// アプリ内の履歴パネル
+function renderHistPanel(){
+  renderArcList();
+  renderTrendChart();
+  renderCompare();
+}
+
+function renderArcList(){
+  const el=document.getElementById('arcList');if(!el)return;
+  const list=getArcList();
+  if(!list.length){el.innerHTML='<div style="color:#aab;font-size:13px;text-align:center;padding:20px">アーカイブがありません。「💾 完了保存」を押して棚卸を保存してください。</div>';return;}
+  el.innerHTML=list.map((a,i)=>`
+    <div class="arc-item${i===0?' current':''}">
+      <div>
+        <div class="arc-date">${a.date||''} ${i===0?'<span style="background:#1a7a4a;color:#fff;font-size:10px;padding:2px 6px;border-radius:10px">最新</span>':''}</div>
+        <div class="arc-label">${a.label}</div>
+        ${a.basho?'<div style="font-size:11px;color:#aab">'+a.basho+'</div>':''}
+      </div>
+      <div style="text-align:right">
+        <div class="arc-val">${a.totalZ?'¥'+fm(a.totalZ):''}</div>
+        <div style="font-size:11px;color:#aab">税抜合計 ${a.total?'¥'+fm(a.total):'-'}</div>
+        <div class="arc-cnt">${a.cnt||0}点</div>
+      </div>
+      <div class="arc-btns">
+        <button class="arc-btn arc-btn-copy" onclick="doCreateFromArc('${a.id}')">📋 コピー新規</button>
+        <button class="arc-btn arc-btn-del" onclick="deleteArc('${a.id}')">削除</button>
+      </div>
+    </div>
+  `).join('');
+}
+
+function renderTrendChart(){
+  const el=document.getElementById('trendChart');if(!el)return;
+  const list=getArcList().slice().reverse(); // 古い順
+  if(list.length<2){el.innerHTML='<div style="color:#aab;font-size:13px;text-align:center;padding:20px">2件以上のアーカイブがグラフに表示されます</div>';return;}
+  const W=Math.max(500, list.length*80+100), H=220;
+  const maxV=Math.max(...list.map(a=>a.totalZ||a.total||0))||1;
+  const pad={l:70,r:20,t:20,b:60};
+  const cW=W-pad.l-pad.r, cH=H-pad.t-pad.b;
+  const xStep=cW/(list.length-1||1);
+  const pts=list.map((a,i)=>{
+    const v=a.totalZ||a.total||0;
+    return {x:pad.l+i*xStep, y:pad.t+cH-(v/maxV*cH), v, date:a.date||'', label:a.label};
+  });
+  const polyline=pts.map(p=>p.x+','+p.y).join(' ');
+  const area='M'+pts[0].x+','+( pad.t+cH)+' '+pts.map(p=>'L'+p.x+','+p.y).join(' ')+' L'+pts[pts.length-1].x+','+(pad.t+cH)+' Z';
+  // Y axis labels
+  const yLabels=[0,.25,.5,.75,1].map(r=>{
+    const y=pad.t+cH-r*cH;
+    return `<line x1="${pad.l-4}" y1="${y}" x2="${W-pad.r}" y2="${y}" stroke="#eef0f3" stroke-width="1"/>
+    <text x="${pad.l-8}" y="${y+4}" text-anchor="end" font-size="10" fill="#888">¥${fm(Math.round(maxV*r))}</text>`;
+  }).join('');
+  const dots=pts.map(p=>`
+    <circle cx="${p.x}" cy="${p.y}" r="5" fill="#1a6ea6" stroke="#fff" stroke-width="2"/>
+    <text x="${p.x}" y="${p.y-10}" text-anchor="middle" font-size="10" fill="#1a6ea6" font-weight="700">¥${fm(p.v)}</text>
+    <text x="${p.x}" y="${H-pad.b+16}" text-anchor="middle" font-size="10" fill="#444">${p.date.slice(5)||''}</text>
+    <text x="${p.x}" y="${H-pad.b+28}" text-anchor="middle" font-size="9" fill="#888">${p.label.slice(0,8)}</text>
+  `).join('');
+  el.innerHTML=`<div class="chart-wrap"><svg class="trend-chart" width="${W}" height="${H}" viewBox="0 0 ${W} ${H}">
+    ${yLabels}
+    <path d="${area}" fill="rgba(26,110,166,0.08)"/>
+    <polyline points="${polyline}" fill="none" stroke="#1a6ea6" stroke-width="2.5" stroke-linejoin="round"/>
+    ${dots}
+    <line x1="${pad.l}" y1="${pad.t}" x2="${pad.l}" y2="${pad.t+cH}" stroke="#ccc" stroke-width="1"/>
+    <line x1="${pad.l}" y1="${pad.t+cH}" x2="${W-pad.r}" y2="${pad.t+cH}" stroke="#ccc" stroke-width="1"/>
+  </svg></div>`;
+}
+
+function renderCompare(){
+  const el=document.getElementById('compareBox');if(!el)return;
+  const list=getArcList();
+  if(list.length<2){el.innerHTML='<div style="color:#aab;font-size:13px;text-align:center;padding:20px">アーカイブが2件以上で比較表示されます</div>';return;}
+  const cur=list[0], prev=list[1];
+  // 全商品を集計（新・旧）
+  function flatItems(arc){
+    const map={};
+    Object.values(arc.pages||{}).forEach(pg=>{
+      (pg.rows||[]).forEach(r=>{
+        if(!r.n)return;
+        const k=r.n.trim();
+        if(!map[k]) map[k]={n:k,k:0,p:r.p||0,z:r.z||'10'};
+        map[k].k+=parseFloat(r.k)||0;
+      });
+    });
+    return map;
+  }
+  const curMap=flatItems(cur), prevMap=flatItems(prev);
+  const allKeys=[...new Set([...Object.keys(curMap),...Object.keys(prevMap)])].sort();
+  const rows=allKeys.map(k=>{
+    const c=curMap[k]||{k:0,p:0}, p=prevMap[k]||{k:0,p:0};
+    const diff=c.k-p.k;
+    const diffCls=diff>0?'diff-up':diff<0?'diff-dn':'diff-eq';
+    const sign=diff>0?'+':'';
+    return `<tr>
+      <td>${k}</td>
+      <td>${p.k||'-'}</td>
+      <td>${c.k||'-'}</td>
+      <td class="${diffCls}">${c.k||p.k?sign+diff:'-'}</td>
+      <td>${c.p?'¥'+fm(c.p):p.p?'¥'+fm(p.p):'-'}</td>
+    </tr>`;
+  }).join('');
+  el.innerHTML=`
+    <div style="font-size:12px;color:#6b7a8d;margin-bottom:10px">
+      <b style="color:#0f2744">${prev.date}</b> 「${prev.label}」 → <b style="color:#1a7a4a">${cur.date}</b> 「${cur.label}」
+    </div>
+    <div style="overflow-x:auto"><table class="cmptbl">
+      <thead><tr><th>商品名</th><th>前回個数</th><th>今回個数</th><th>増減</th><th>単価</th></tr></thead>
+      <tbody>${rows}</tbody>
+    </table></div>`;
 }
 
 function genCode(){
@@ -740,7 +1561,7 @@ function renderRecent(){
   const el=document.getElementById('recentList'); if(!el)return;
   try{
     const list=JSON.parse(localStorage.getItem(RK)||'[]');
-    if(!list.length){el.innerHTML='';return}
+    if(!list.length){el.innerHTML='';} else {
     el.innerHTML='<div style="font-size:11px;font-weight:700;color:#6b7a8d;margin-bottom:8px">最近のセッション</div>'+
       list.map(x=>{
         const d=new Date(x.t);
@@ -750,7 +1571,9 @@ function renderRecent(){
           <button class="recent-btn">再参加</button>
         </div>`;
       }).join('');
+    }
   }catch(e){el.innerHTML=''}
+  renderSessionArcList();
 }
 function quickJoin(code,name){
   document.getElementById('joinCodeInp').value=code;
@@ -1290,12 +2113,13 @@ function getProds(){
 // タブ切替
 // ============================================================
 function showTab(name){
-  ['entry','sum','air'].forEach(n=>{
+  ['entry','sum','air','hist'].forEach(n=>{
     document.getElementById('pnl-'+n).classList.toggle('on',n===name);
     document.getElementById('tab-'+n).classList.toggle('on',n===name);
   });
   if(name==='sum') renderSummary();
   if(name==='air'){renderAirTable();renderZTable();renderCatAssign();}
+  if(name==='hist') renderHistPanel();
 }
 
 // ============================================================
