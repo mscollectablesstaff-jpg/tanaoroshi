@@ -189,7 +189,53 @@ tbody tr:hover td.sticky-name{background:#e8f0f8}
 .toast.on{opacity:1;transform:none}
 
 @media(max-width:768px){.hcard{grid-template-columns:1fr 1fr}.tbtn span{display:none}}
-@media print{.topbar,.tabs,.ptabs,.qbar,.online-bar{display:none!important}}
+@media print{
+  body *{visibility:hidden}
+  #printArea,#printArea *{visibility:visible}
+  #printArea{position:fixed;inset:0;background:#fff;z-index:99999;overflow:auto}
+  .no-print{display:none!important}
+}
+
+/* ===== 印刷プレビュー ===== */
+#printArea{display:none;position:fixed;inset:0;background:#fff;z-index:9500;overflow-y:auto;font-family:'Hiragino Kaku Gothic ProN','Yu Gothic','Meiryo',sans-serif;color:#000}
+.print-toolbar{background:#0f2744;color:#fff;padding:10px 20px;display:flex;align-items:center;gap:10px;position:sticky;top:0;z-index:10}
+.print-toolbar button{border:none;border-radius:6px;padding:8px 18px;font-size:13px;font-weight:700;cursor:pointer;font-family:inherit}
+.print-doc{width:210mm;min-height:297mm;margin:20px auto;background:#fff;padding:18mm 15mm 15mm;box-sizing:border-box;box-shadow:0 2px 12px rgba(0,0,0,.15)}
+/* 表紙 */
+.print-cover{border:2px solid #000;padding:20px;margin-bottom:20px}
+.print-title{font-size:22px;font-weight:900;text-align:center;letter-spacing:4px;margin-bottom:18px;border-bottom:3px double #000;padding-bottom:10px}
+.print-meta-grid{display:grid;grid-template-columns:1fr 1fr;gap:0;border:1px solid #000}
+.print-meta-row{display:contents}
+.print-meta-label{background:#f0f0f0;padding:7px 12px;font-size:12px;font-weight:700;border:1px solid #000;border-top:none;border-left:none}
+.print-meta-val{padding:7px 12px;font-size:12px;border:1px solid #000;border-top:none;border-left:none;border-right:none}
+/* 承認欄 */
+.print-sign{display:grid;grid-template-columns:repeat(4,1fr);gap:0;border:1px solid #000;margin-top:16px}
+.print-sign-cell{text-align:center;border-right:1px solid #000;padding:4px}
+.print-sign-cell:last-child{border-right:none}
+.print-sign-title{font-size:10px;font-weight:700;background:#f0f0f0;padding:4px;border-bottom:1px solid #000}
+.print-sign-box{height:40px}
+/* サマリー */
+.print-section-title{font-size:14px;font-weight:700;background:#0f2744;color:#fff;padding:6px 12px;margin:18px 0 8px;letter-spacing:1px}
+.print-sum-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:8px;margin-bottom:14px}
+.print-sum-box{border:1px solid #000;text-align:center;padding:8px 6px}
+.print-sum-label{font-size:10px;color:#555;margin-bottom:4px}
+.print-sum-val{font-size:16px;font-weight:900}
+.print-sum-box.total{background:#0f2744;color:#fff}
+/* ページ別テーブル */
+.print-page-header{display:flex;align-items:center;gap:12px;background:#f8f8f8;border:1px solid #ccc;padding:6px 12px;margin:14px 0 4px;font-size:13px;font-weight:700}
+.print-page-sub{font-size:11px;color:#555;margin-left:auto}
+.print-tbl{width:100%;border-collapse:collapse;font-size:11px;page-break-inside:avoid}
+.print-tbl th{background:#0f2744;color:#fff;padding:5px 6px;text-align:center;border:1px solid #555;font-size:10px;white-space:nowrap}
+.print-tbl td{padding:4px 6px;border:1px solid #ccc;vertical-align:middle}
+.print-tbl td.r{text-align:right}
+.print-tbl td.c{text-align:center}
+.print-tbl tr:nth-child(even){background:#fafafa}
+.print-tbl tr.subtotal{background:#e8edf5;font-weight:700}
+/* ページ区切り */
+.print-page-break{page-break-before:always;padding-top:10mm}
+/* フッター */
+.print-footer{margin-top:20px;border-top:1px solid #000;padding-top:8px;font-size:10px;color:#555;text-align:right}
+
 
 /* バーコードスキャナー */
 .scan-modal{display:none;position:fixed;inset:0;z-index:9000;background:rgba(0,0,0,.85);align-items:center;justify-content:center;flex-direction:column}
@@ -312,6 +358,16 @@ svg.trend-chart text{font-family:inherit}
 </style>
 </head>
 <body>
+
+<!-- ===== 印刷エリア ===== -->
+<div id="printArea">
+  <div class="print-toolbar no-print">
+    <button onclick="window.print()" style="background:#1a7a4a;color:#fff">🖨️ 印刷する</button>
+    <button onclick="closePrint()" style="background:#555;color:#fff">✕ 閉じる</button>
+    <span style="font-size:12px;opacity:.7;margin-left:8px">印刷ダイアログで「用紙サイズ：A4」「余白：なし」に設定してください</span>
+  </div>
+  <div class="print-doc" id="printDoc"></div>
+</div>
 
 <!-- ===== SETUP PAGE ===== -->
 <div class="page show" id="pgSetup">
@@ -478,6 +534,7 @@ svg.trend-chart text{font-family:inherit}
     <div class="topbar-right">
       <span class="save-status" id="saveStat"></span>
       <button class="tbtn" style="background:#1a7a4a;color:#fff" onclick="doArchive()">💾 <span>完了保存</span></button>
+      <button class="tbtn" style="background:#6b4c2a;color:#fff" onclick="doPrint()">🖨️ <span>印刷</span></button>
       <button class="tbtn tbtn-excel" onclick="doExcel()">⬇ <span>Excel</span></button>
       <button class="tbtn tbtn-air" onclick="showTab('air')">🏷 <span>Airレジ</span></button>
       <button class="tbtn tbtn-exit" onclick="doExit()">退出</button>
@@ -504,6 +561,7 @@ svg.trend-chart text{font-family:inherit}
     <!-- 入力パネル -->
     <div class="panel on" id="pnl-entry">
       <div class="hcard">
+        <div><div class="hl">会社名・店舗名</div><input class="hi" id="hCompany" placeholder="例：MS collectables" oninput="syncMeta()"></div>
         <div><div class="hl">棚卸日</div><input class="hi" type="date" id="hDate" oninput="syncMeta()"></div>
         <div><div class="hl">場所</div><input class="hi" id="hBasho" placeholder="例：1F" oninput="syncMeta()"></div>
         <div><div class="hl">担当（全体）</div><input class="hi" id="hTanto" placeholder="責任者名" oninput="syncMeta()"></div>
@@ -1358,6 +1416,205 @@ function doMstock(){
 }
 function msDone(){ showPage('pgSession'); }
 
+// ============================================================
+// 印刷
+// ============================================================
+function doPrint(){
+  const company  = document.getElementById('hCompany')?.value || '';
+  const date     = document.getElementById('hDate')?.value    || '';
+  const basho    = document.getElementById('hBasho')?.value   || '';
+  const tanto    = document.getElementById('hTanto')?.value   || '';
+  const gyomu    = document.getElementById('hGyomu')?.value   || '棚卸';
+  const kigen    = document.getElementById('hKigen')?.value   || '';
+  const now      = new Date();
+  const printAt  = now.getFullYear()+'年'+(now.getMonth()+1)+'月'+now.getDate()+'日 '
+                 + String(now.getHours()).padStart(2,'0')+':'+String(now.getMinutes()).padStart(2,'0');
+
+  // ── 全体集計 ──
+  const {t10,t8,tz} = allTot();
+  const sb   = t10+t8;
+  const z10  = Math.round(t10*0.10);
+  const z8   = Math.round(t8*0.08);
+  const zs   = z10+z8;
+  const sg   = sb+zs;
+  const r10  = sb ? (t10/sb*100).toFixed(1)+'%' : '-';
+  const r8   = sb ? (t8/sb*100).toFixed(1)+'%'  : '-';
+
+  // ── 表紙HTML ──
+  let html = `
+  <div class="print-cover">
+    <div class="print-title">${e(gyomu)}台帳</div>
+    <div class="print-meta-grid">
+      <div class="print-meta-label">会社名・店舗名</div><div class="print-meta-val">${e(company)}</div>
+      <div class="print-meta-label">棚卸日</div><div class="print-meta-val">${fmDate(date)}</div>
+      <div class="print-meta-label">棚卸場所</div><div class="print-meta-val">${e(basho)}</div>
+      <div class="print-meta-label">担当責任者</div><div class="print-meta-val">${e(tanto)}</div>
+      <div class="print-meta-label">期限</div><div class="print-meta-val">${fmDate(kigen)}</div>
+      <div class="print-meta-label">セッションコード</div><div class="print-meta-val">${sid||'OFFLINE'}</div>
+    </div>
+    <div class="print-sign">
+      <div class="print-sign-cell"><div class="print-sign-title">作成者</div><div class="print-sign-box"></div></div>
+      <div class="print-sign-cell"><div class="print-sign-title">確認者</div><div class="print-sign-box"></div></div>
+      <div class="print-sign-cell"><div class="print-sign-title">承認者</div><div class="print-sign-box"></div></div>
+      <div class="print-sign-cell"><div class="print-sign-title">経理確認</div><div class="print-sign-box"></div></div>
+    </div>
+  </div>
+
+  <div class="print-section-title">■ 在庫集計サマリー</div>
+  <div class="print-sum-grid">
+    <div class="print-sum-box">
+      <div class="print-sum-label">10%対象（税抜）</div>
+      <div class="print-sum-val">¥${fm(t10)||0}</div>
+    </div>
+    <div class="print-sum-box">
+      <div class="print-sum-label">8%対象（税抜）</div>
+      <div class="print-sum-val">¥${fm(t8)||0}</div>
+    </div>
+    <div class="print-sum-box">
+      <div class="print-sum-label">消費税合計</div>
+      <div class="print-sum-val">¥${fm(zs)||0}</div>
+    </div>
+    <div class="print-sum-box total">
+      <div class="print-sum-label">税込総合計</div>
+      <div class="print-sum-val">¥${fm(sg)||0}</div>
+    </div>
+  </div>
+  <div class="print-sum-grid">
+    <div class="print-sum-box">
+      <div class="print-sum-label">税抜総合計</div>
+      <div class="print-sum-val">¥${fm(sb)||0}</div>
+    </div>
+    <div class="print-sum-box">
+      <div class="print-sum-label">消費税（10%分）</div>
+      <div class="print-sum-val">¥${fm(z10)||0}</div>
+    </div>
+    <div class="print-sum-box">
+      <div class="print-sum-label">消費税（8%分）</div>
+      <div class="print-sum-val">¥${fm(z8)||0}</div>
+    </div>
+    <div class="print-sum-box total">
+      <div class="print-sum-label">在庫価格（仕入額ベース）</div>
+      <div class="print-sum-val">¥${fm(tz)||0}</div>
+    </div>
+  </div>
+
+  <div class="print-section-title">■ ページ別小計</div>
+  <table class="print-tbl">
+    <thead><tr>
+      <th style="width:40px">P</th>
+      <th style="text-align:left">ページ名 / 担当者</th>
+      <th style="width:110px">10%税抜小計</th>
+      <th style="width:110px">8%税抜小計</th>
+      <th style="width:110px">税抜小計</th>
+      <th style="width:110px">在庫価格計</th>
+    </tr></thead>
+    <tbody>`;
+
+  order.forEach((k,i)=>{
+    const pg = pages[k]||{};
+    const s  = pageSub(pg.rows||[]);
+    html += `<tr>
+      <td class="c">${i+1}</td>
+      <td>${e(pg.tanto||pg.ownerName||'未設定')}</td>
+      <td class="r">${s.p10?'¥'+fm(s.p10):'-'}</td>
+      <td class="r">${s.p8?'¥'+fm(s.p8):'-'}</td>
+      <td class="r">${(s.p10+s.p8)?'¥'+fm(s.p10+s.p8):'-'}</td>
+      <td class="r" style="color:#1a5c2e;font-weight:700">${s.z?'¥'+fm(s.z):'-'}</td>
+    </tr>`;
+  });
+  html += `<tr class="subtotal">
+    <td class="c">計</td><td>全ページ合計</td>
+    <td class="r">¥${fm(t10)||0}</td>
+    <td class="r">¥${fm(t8)||0}</td>
+    <td class="r">¥${fm(sb)||0}</td>
+    <td class="r">¥${fm(tz)||0}</td>
+  </tr></tbody></table>`;
+
+  // ── ページ別明細 ──
+  html += `<div class="print-section-title print-page-break">■ 商品明細（ページ別）</div>`;
+
+  order.forEach((k,i)=>{
+    const pg   = pages[k]||{};
+    const rows = (pg.rows||[]).filter(r=>r.n);
+    const s    = pageSub(pg.rows||[]);
+    if(!rows.length) return;
+
+    html += `
+    <div class="print-page-header">
+      <span>${i+1}ページ</span>
+      <span style="color:#1a6ea6">${e(pg.tanto||pg.ownerName||'')}</span>
+      ${pg.catId?'<span style="font-size:11px;background:#FF6600;color:#fff;border-radius:10px;padding:2px 8px">カテゴリーID: '+e(pg.catId)+'</span>':''}
+      <span class="print-page-sub">小計：税抜 ¥${fm(s.p10+s.p8)} ／ 在庫 ¥${fm(s.z)}</span>
+    </div>
+    <table class="print-tbl">
+      <thead><tr>
+        <th style="width:28px">No</th>
+        <th style="text-align:left;min-width:120px">商品名</th>
+        <th style="width:42px">税率</th>
+        <th style="width:42px">個数</th>
+        <th style="width:36px">単位</th>
+        <th style="width:80px">税込単価</th>
+        <th style="width:80px">税抜単価</th>
+        <th style="width:80px">10%仕入計</th>
+        <th style="width:80px">8%仕入計</th>
+        <th style="width:70px">仕入先</th>
+        <th style="width:52px">仕入率</th>
+        <th style="width:80px">在庫価格</th>
+        <th style="text-align:left">備考</th>
+      </tr></thead>
+      <tbody>`;
+
+    rows.forEach((r,ri)=>{
+      const c   = calc(r);
+      const tax = r.z==='8'?'軽8%':'標10%';
+      html += `<tr>
+        <td class="c">${ri+1}</td>
+        <td>${e(r.n)}</td>
+        <td class="c" style="font-size:10px">${tax}</td>
+        <td class="r">${r.k||''}</td>
+        <td class="c">${e(r.u||'')}</td>
+        <td class="r">${r.p?'¥'+fm(r.p):''}</td>
+        <td class="r">${c.zt?'¥'+fm(c.zt):''}</td>
+        <td class="r">${c.j?'¥'+fm(c.j):''}</td>
+        <td class="r">${c.h?'¥'+fm(c.h):''}</td>
+        <td style="font-size:10px">${e(r.ss||'')}</td>
+        <td class="r">${r.sr?r.sr+'%':''}</td>
+        <td class="r" style="font-weight:700;color:#1a5c2e">${c.zk?'¥'+fm(c.zk):''}</td>
+        <td style="font-size:10px">${e(r.b||'')}</td>
+      </tr>`;
+    });
+
+    html += `<tr class="subtotal">
+      <td class="c" colspan="7" style="text-align:right">ページ小計</td>
+      <td class="r">¥${fm(s.p10)||0}</td>
+      <td class="r">¥${fm(s.p8)||0}</td>
+      <td colspan="2"></td>
+      <td class="r" style="color:#1a5c2e">¥${fm(s.z)||0}</td>
+      <td></td>
+    </tr>
+    </tbody></table>`;
+  });
+
+  // ── フッター ──
+  html += `<div class="print-footer">印刷日時：${printAt}　セッション：${sid||'OFFLINE'}　棚卸システム v3</div>`;
+
+  document.getElementById('printDoc').innerHTML = html;
+  document.getElementById('printArea').style.display = 'block';
+  document.body.style.overflow = 'hidden';
+}
+
+function closePrint(){
+  document.getElementById('printArea').style.display = 'none';
+  document.body.style.overflow = '';
+}
+
+function fmDate(d){
+  if(!d) return '';
+  const p = d.split('-');
+  if(p.length===3) return p[0]+'年'+parseInt(p[1])+'月'+parseInt(p[2])+'日';
+  return d;
+}
+
 function doExit(){
   if(!confirm('退出しますか？'))return;
   if(db&&sid) db.ref('s/'+sid+'/users/'+myId).remove();
@@ -1666,6 +1923,7 @@ function syncMeta(){
   metaT=setTimeout(()=>{
     if(offline||!db||!sid)return;
     db.ref('s/'+sid+'/meta').update({
+      company:document.getElementById('hCompany').value,
       date:document.getElementById('hDate').value,
       basho:document.getElementById('hBasho').value,
       tanto:document.getElementById('hTanto').value,
