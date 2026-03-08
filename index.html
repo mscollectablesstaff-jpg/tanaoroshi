@@ -7,6 +7,7 @@
 <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+JP:wght@400;700;900&display=swap" rel="stylesheet">
 <script src="https://cdn.jsdelivr.net/npm/encoding-japanese@2.0.0/encoding.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jsbarcode/3.11.5/JsBarcode.all.min.js"></script>
 <style>
 *{margin:0;padding:0;box-sizing:border-box}
 html,body{width:100%;min-height:100vh;font-family:'Noto Sans JP',sans-serif;font-size:13px;background:#f0f2f5;color:#1a2332}
@@ -584,6 +585,52 @@ svg.trend-chart text{font-family:inherit}
 .arc-mini-date{font-size:12px;font-weight:700;color:#0f2744;min-width:95px}
 .arc-mini-val{font-size:12px;color:#1a7a4a;font-weight:700;flex:1;text-align:right}
 .arc-mini-btn{border:none;border-radius:5px;padding:4px 10px;font-size:11px;font-weight:700;cursor:pointer;background:#1a6ea6;color:#fff;white-space:nowrap}
+
+/* ===== 入荷・商品登録ページ ===== */
+#pgNyuuka{display:none;flex-direction:column;min-height:100vh;background:#f0f2f5}
+#pgNyuuka.show{display:flex}
+.nk-topbar{background:#0f2744;color:#fff;padding:0 16px;height:52px;display:flex;align-items:center;justify-content:space-between;position:sticky;top:0;z-index:100;flex-shrink:0}
+.nk-logo{font-size:16px;font-weight:900}
+.nk-body{flex:1;padding:14px;overflow:auto}
+.nk-card{background:#fff;border-radius:10px;padding:16px 18px;margin-bottom:14px;box-shadow:0 1px 4px rgba(0,0,0,.08)}
+.nk-card h2{font-size:14px;font-weight:700;color:#0f2744;margin:0 0 12px;padding-bottom:8px;border-bottom:2px solid #f0f2f5}
+.nk-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(160px,1fr));gap:10px;margin-bottom:12px}
+.nk-lbl{font-size:11px;color:#6b7a8d;font-weight:700;margin-bottom:4px}
+.nk-inp{width:100%;padding:8px 10px;border:1px solid #dde3ea;border-radius:6px;font-size:13px;font-family:inherit;background:#fafbfc;box-sizing:border-box}
+.nk-inp:focus{outline:none;border-color:#1a6ea6}
+.nk-tbl{width:100%;border-collapse:collapse;font-size:12px}
+.nk-tbl thead tr{background:#0f2744;color:#fff}
+.nk-tbl th{padding:8px 6px;text-align:center;white-space:nowrap;font-size:11px;font-weight:700;border-right:1px solid rgba(255,255,255,.1)}
+.nk-tbl th.air{background:#FF6600}
+.nk-tbl tbody tr:nth-child(even){background:#f8fafc}
+.nk-tbl tbody tr:hover{background:#e8f0f8}
+.nk-tbl td{padding:3px 4px;border-bottom:1px solid #eef0f3;border-right:1px solid #eef0f3;vertical-align:middle}
+.nk-ci{width:100%;padding:4px 6px;border:1px solid #dde3ea;border-radius:4px;font-size:12px;font-family:inherit;background:#fff;box-sizing:border-box}
+.nk-ci:focus{outline:none;border-color:#1a6ea6}
+.nk-add-btn{display:flex;align-items:center;gap:6px;background:#e8f0ff;border:1.5px dashed #1a6ea6;border-radius:7px;padding:9px 16px;color:#1a6ea6;font-size:12px;font-weight:700;cursor:pointer;margin-top:8px;width:100%;justify-content:center;font-family:inherit}
+.nk-add-btn:hover{background:#1a6ea6;color:#fff}
+.nk-save-btn{background:#1a5c2e;color:#fff;border:none;border-radius:8px;padding:13px 24px;font-size:14px;font-weight:700;cursor:pointer;width:100%;margin-top:10px;font-family:inherit}
+.nk-save-btn:hover{background:#2d7a4f}
+.nk-prod-item{display:flex;align-items:center;gap:8px;padding:9px 12px;border:1px solid #dde3ea;border-radius:8px;margin-bottom:6px;background:#fff;flex-wrap:wrap}
+.nk-prod-bc{font-family:monospace;font-size:11px;background:#f0f2f5;padding:2px 8px;border-radius:4px;color:#0f2744;font-weight:700;white-space:nowrap}
+.nk-prod-name{font-size:13px;font-weight:700;flex:1;min-width:100px}
+.nk-prod-price{font-size:13px;color:#1a5c2e;font-weight:700;white-space:nowrap}
+.nk-prod-cat{font-size:10px;background:#fff3e0;color:#FF6600;border-radius:3px;padding:1px 6px;font-weight:700;white-space:nowrap}
+.nk-label-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(180px,1fr));gap:8px;margin-bottom:12px}
+.nk-label-item{border:1px solid #dde3ea;border-radius:8px;padding:10px;background:#fff;display:flex;flex-direction:column;gap:6px}
+.nk-label-check{display:flex;align-items:center;gap:6px;font-size:12px;font-weight:600;width:100%;cursor:pointer}
+.nk-arr-list{display:flex;flex-direction:column;gap:6px}
+.nk-arr-item{background:#f8fafc;border:1px solid #dde3ea;border-radius:8px;padding:10px 14px;font-size:12px}
+.nk-arr-head{display:flex;align-items:center;gap:10px;margin-bottom:6px}
+.nk-arr-date{font-weight:700;color:#0f2744}
+.nk-arr-sup{color:#6b7a8d}
+.nk-arr-items{display:flex;flex-wrap:wrap;gap:4px}
+.nk-arr-tag{background:#e8f0ff;color:#1a6ea6;border-radius:4px;padding:2px 8px;font-size:11px;font-weight:600}
+@media(max-width:600px){
+  .nk-label-grid{grid-template-columns:1fr 1fr}
+  .nk-grid{grid-template-columns:1fr}
+}
+#nkOcrDrop.drag-on{background:#deeeff;border-color:#1a6ea6}
 </style>
 </head>
 <body>
@@ -649,6 +696,7 @@ svg.trend-chart text{font-family:inherit}
 
     <button class="btn btn-navy" onclick="doCreate()">✨ 新しい棚卸を開始する</button>
     <button class="btn" style="background:#2d7a4f;color:#fff;margin-top:8px" onclick="doMstock()">☕ 月次在庫管理を開く</button>
+    <button class="btn" style="background:#6a1a9a;color:#fff;margin-top:8px" onclick="doNyuuka()">📦 入荷・商品登録</button>
     <div class="divider">または参加</div>
     <div class="lbl">セッションコード（6桁）</div>
     <input class="inp inp-code" id="joinCodeInp" placeholder="XXXXXX" maxlength="6">
@@ -1030,7 +1078,7 @@ function mkRows(){
 // 画面切替
 // ============================================================
 function showPage(id){
-  ['pgSetup','pgSession','pgApp','pgMstock'].forEach(p=>{
+  ['pgSetup','pgSession','pgApp','pgMstock','pgNyuuka'].forEach(p=>{
     const el=document.getElementById(p);
     if(el) el.classList.remove('show');
   });
@@ -3604,6 +3652,634 @@ window.addEventListener('DOMContentLoaded',()=>{
   }
   // なければ設定画面を表示
 });
+
+// ============================================================
+// 入荷・商品登録管理
+// ============================================================
+const PK  = 'tb_products_v1';
+const NAK = 'tb_arrivals_v1';
+
+function nkGetProducts(){ try{return JSON.parse(localStorage.getItem(PK)||'[]');}catch(e){return[];} }
+function nkSaveProducts(list){ try{localStorage.setItem(PK,JSON.stringify(list));}catch(e){} }
+function nkGetArrivals(){ try{return JSON.parse(localStorage.getItem(NAK)||'[]');}catch(e){return[];} }
+function nkSaveArrivals(list){ try{localStorage.setItem(NAK,JSON.stringify(list.slice(0,500)));}catch(e){} }
+
+// ── 納品書OCR ─────────────────────────────────
+let nkOcrFileData=null; // {base64, mediaType}
+
+function nkOcrDrop(ev){
+  ev.preventDefault();
+  document.getElementById('nkOcrDrop').classList.remove('drag-on');
+  const file=ev.dataTransfer.files[0]; if(!file)return;
+  nkOcrLoadFile(file);
+}
+function nkOcrFileSelected(input){
+  const file=input.files[0]; if(!file)return;
+  nkOcrLoadFile(file);
+}
+
+function nkOcrLoadFile(file){
+  const allowed=['image/jpeg','image/png','image/webp','image/gif','application/pdf'];
+  if(!allowed.includes(file.type)){alert('JPG/PNG/PDF ファイルを選択してください');return;}
+  const reader=new FileReader();
+  reader.onload=ev=>{
+    const dataUrl=ev.target.result;
+    const base64=dataUrl.split(',')[1];
+    nkOcrFileData={base64, mediaType:file.type, name:file.name};
+    // プレビュー表示
+    const pa=document.getElementById('nkOcrPreviewArea');
+    const img=document.getElementById('nkOcrPreviewImg');
+    const pdfDiv=document.getElementById('nkOcrPreviewPdf');
+    pa.style.display='block';
+    if(file.type==='application/pdf'){
+      img.style.display='none';
+      pdfDiv.style.display='block';
+      document.getElementById('nkOcrPdfName').textContent=file.name;
+    } else {
+      img.src=dataUrl; img.style.display='block';
+      pdfDiv.style.display='none';
+    }
+    document.getElementById('nkOcrStatus').style.display='none';
+  };
+  reader.readAsDataURL(file);
+}
+
+async function nkRunOcr(){
+  if(!nkOcrFileData){alert('ファイルを選択してください');return;}
+  const btn=document.getElementById('nkOcrRunBtn');
+  const status=document.getElementById('nkOcrStatus');
+  btn.disabled=true; btn.textContent='🤖 読み取り中...';
+  status.style.display='block'; status.textContent='AIが納品書を解析しています...';
+
+  const hint=(document.getElementById('nkOcrHint').value||'').trim();
+  const hintText=hint?`\n\n補足指示：${hint}`:'';
+
+  const prompt=`この納品書・請求書・入荷リストから商品情報を読み取り、以下のJSON形式で返してください。
+商品名・数量・仕入単価（税抜き）・税率を読み取れる範囲で抽出してください。
+読み取れない項目はnullにしてください。
+仕入先・会社名がわかれば supplierに入れてください。
+
+出力形式（JSONのみ、説明文なし）：
+{
+  "supplier": "仕入先名またはnull",
+  "date": "YYYY-MM-DD形式またはnull",
+  "items": [
+    {"name": "商品名", "qty": 数量, "cost": 税抜単価または税込単価, "taxRate": "10"または"8", "unit": "単位"}
+  ]
+}${hintText}`;
+
+  try{
+    // PDF は document タイプ、画像は image タイプで送る
+    const contentBlock = nkOcrFileData.mediaType==='application/pdf'
+      ? {type:'document', source:{type:'base64', media_type:'application/pdf', data:nkOcrFileData.base64}}
+      : {type:'image',    source:{type:'base64', media_type:nkOcrFileData.mediaType, data:nkOcrFileData.base64}};
+
+    const resp=await fetch('https://api.anthropic.com/v1/messages',{
+      method:'POST',
+      headers:{'Content-Type':'application/json'},
+      body:JSON.stringify({
+        model:'claude-sonnet-4-20250514',
+        max_tokens:1000,
+        messages:[{role:'user', content:[contentBlock,{type:'text',text:prompt}]}]
+      })
+    });
+    const data=await resp.json();
+    const text=(data.content||[]).map(b=>b.text||'').join('');
+
+    // JSONを抽出してパース
+    const jsonMatch=text.match(/\{[\s\S]*\}/);
+    if(!jsonMatch) throw new Error('JSONが見つかりませんでした');
+    const parsed=JSON.parse(jsonMatch[0]);
+
+    // 仕入先・日付を自動入力
+    if(parsed.supplier){
+      const sup=document.getElementById('nkSupplier');
+      if(sup&&!sup.value) sup.value=parsed.supplier;
+    }
+    if(parsed.date){
+      const dt=document.getElementById('nkDate');
+      if(dt&&!dt.value) dt.value=parsed.date;
+    }
+
+    // 商品リストに追加
+    const items=parsed.items||[];
+    if(!items.length) throw new Error('商品が読み取れませんでした');
+
+    // 既存の空行をクリアして差し替え
+    nkArrivalRows=nkArrivalRows.filter(r=>r.n.trim());
+    items.forEach(it=>{
+      nkArrivalRows.push({
+        n:it.name||'',
+        z:it.taxRate==='8'?'8':'10',
+        qty:it.qty||1,
+        cost:it.cost||'',
+        p:'', u:it.unit||'点',
+        cat:'', catId:'', bc:'', isNew:true
+      });
+    });
+    if(!nkArrivalRows.length) nkAddRow();
+    nkRenderArrival();
+
+    status.textContent=`✅ ${items.length}件の商品を読み取りました。内容を確認・修正してから保存してください。`;
+    status.style.color='#1a7a4a';
+    btn.textContent='🤖 もう一度読み取る';
+  }catch(err){
+    status.textContent='❌ 読み取りエラー：'+err.message;
+    status.style.color='#e74c3c';
+    btn.textContent='🤖 AIで読み取る';
+    console.error(err);
+  }
+  btn.disabled=false;
+}
+
+
+function nkNextBarcode(){
+  const prods=nkGetProducts(); let maxNum=0;
+  prods.forEach(p=>{ const m=p.barcode&&p.barcode.match(/^MS(\d+)$/); if(m) maxNum=Math.max(maxNum,parseInt(m[1],10)); });
+  return 'MS'+String(maxNum+1).padStart(6,'0');
+}
+
+function doNyuuka(){
+  showPage('pgNyuuka');
+  document.getElementById('nkDate').value=new Date().toISOString().slice(0,10);
+  nkArrivalRows=[];
+  nkAddRow();
+  nkShowTab('arrival');
+}
+
+function nkShowTab(name){
+  ['arrival','products','labels','history'].forEach(n=>{
+    const p=document.getElementById('nkpnl-'+n);
+    const t=document.getElementById('nktab-'+n);
+    if(p) p.style.display=(n===name?'block':'none');
+    if(t) t.classList.toggle('on',n===name);
+  });
+  if(name==='products') nkRenderProducts();
+  if(name==='labels')   nkRenderLabelList();
+  if(name==='history')  nkRenderHistory();
+}
+
+let nkArrivalRows=[];
+
+function nkAddRow(){
+  nkArrivalRows.push({n:'',z:'10',qty:1,cost:'',p:'',u:'点',cat:'',catId:'',bc:'',isNew:true});
+  nkRenderArrival();
+}
+
+function nkRenderArrival(){
+  const tbody=document.getElementById('nkTbody'); if(!tbody)return;
+  tbody.innerHTML=nkArrivalRows.map((r,i)=>`<tr>
+    <td style="text-align:center">
+      <button onclick="nkDelRow(${i})" style="background:none;border:1px solid #e74c3c;color:#e74c3c;border-radius:4px;padding:1px 6px;cursor:pointer;font-size:11px">✕</button>
+    </td>
+    <td style="min-width:150px">
+      <input class="nk-ci" value="${e(r.n)}" placeholder="商品名を入力" style="min-width:140px"
+        oninput="nkArrivalRows[${i}].n=this.value" onblur="nkAutoFill(${i})">
+    </td>
+    <td><select class="nk-ci" onchange="nkArrivalRows[${i}].z=this.value">
+      <option value="10"${r.z==='10'?' selected':''}>10%</option>
+      <option value="8"${r.z==='8'?' selected':''}>8%</option>
+    </select></td>
+    <td><input class="nk-ci" type="number" min="1" value="${r.qty}" oninput="nkArrivalRows[${i}].qty=this.value" style="text-align:right"></td>
+    <td><input class="nk-ci" type="number" value="${r.cost}" placeholder="原価" oninput="nkArrivalRows[${i}].cost=this.value" style="text-align:right"></td>
+    <td style="background:#e8faf0">
+      <input class="nk-ci" type="number" value="${r.p}" placeholder="売価"
+        oninput="nkArrivalRows[${i}].p=this.value" style="text-align:right;font-weight:700;color:#1a5c2e">
+    </td>
+    <td><input class="nk-ci" value="${e(r.u)}" placeholder="点" oninput="nkArrivalRows[${i}].u=this.value" style="width:50px"></td>
+    <td><select class="nk-ci" style="color:${r.catId?'#FF6600':'#888'};font-weight:${r.catId?'700':'400'}"
+      onchange="nkArrivalRows[${i}].catId=this.value;nkArrivalRows[${i}].cat=(CATS.find(c=>c.id===this.value)||{}).l||'';this.style.color=this.value?'#FF6600':'#888';this.style.fontWeight=this.value?'700':'400'">
+      ${CATS.map(c=>`<option value="${e(c.id)}"${r.catId===c.id?' selected':''}>${e(c.l)}</option>`).join('')}
+    </select></td>
+    <td><input class="nk-ci" value="${e(r.catId)}" placeholder="ID" style="width:70px;font-size:11px"
+      oninput="nkArrivalRows[${i}].catId=this.value"></td>
+    <td style="text-align:center">
+      ${r.bc
+        ?`<span style="font-family:monospace;font-size:10px;font-weight:700;background:#e8f5e9;color:#1a5c2e;padding:3px 6px;border-radius:4px">${e(r.bc)}</span>`
+        :`<span style="font-size:10px;color:#aab">保存時発行</span>`}
+    </td>
+  </tr>`).join('');
+}
+
+function nkDelRow(i){
+  nkArrivalRows.splice(i,1);
+  if(!nkArrivalRows.length) nkAddRow();
+  else nkRenderArrival();
+}
+
+function nkAutoFill(i){
+  const name=nkArrivalRows[i].n.trim(); if(!name)return;
+  const found=nkGetProducts().find(p=>p.name===name);
+  if(!found)return;
+  const r=nkArrivalRows[i];
+  if(!r.p)     r.p=found.price||'';
+  if(!r.catId) r.catId=found.catId||'';
+  if(!r.cat)   r.cat=found.category||'';
+  if(r.u==='点') r.u=found.unit||'点';
+  r.z=found.taxRate||'10';
+  r.bc=found.barcode||'';
+  r.isNew=false;
+  nkRenderArrival();
+  toast(`「${name}」の情報を補完しました`);
+}
+
+function nkSaveArrival(){
+  const rows=nkArrivalRows.filter(r=>r.n.trim());
+  if(!rows.length){alert('商品を1件以上入力してください');return;}
+  const date=document.getElementById('nkDate').value;
+  const supplier=document.getElementById('nkSupplier').value.trim();
+  const memo=document.getElementById('nkMemo').value.trim();
+
+  const prods=nkGetProducts();
+  const prodMap={};
+  prods.forEach(p=>{prodMap[p.name]=p;});
+
+  let newCount=0,updCount=0;
+  const savedItems=[];
+  rows.forEach(r=>{
+    const name=r.n.trim(); if(!name)return;
+    if(prodMap[name]){
+      const p=prodMap[name];
+      if(r.p)    p.price=r.p;
+      if(r.cost) p.costPrice=r.cost;
+      if(r.catId){p.catId=r.catId;}
+      if(r.cat)  p.category=r.cat;
+      if(r.z)    p.taxRate=r.z;
+      if(r.u)    p.unit=r.u;
+      if(supplier) p.supplier=supplier;
+      r.bc=p.barcode;
+      updCount++;
+    } else {
+      const bc=nkNextBarcode();
+      const np={
+        id:'p'+Date.now()+'_'+Math.random().toString(36).slice(2,5),
+        name, barcode:bc,
+        price:r.p||'', costPrice:r.cost||'',
+        taxRate:r.z||'10', unit:r.u||'点',
+        category:r.cat||'', catId:r.catId||'',
+        supplier:supplier||'', createdAt:Date.now()
+      };
+      prods.push(np);
+      prodMap[name]=np;
+      r.bc=bc;
+      newCount++;
+    }
+    savedItems.push({name,barcode:r.bc,qty:parseInt(r.qty)||1,cost:r.cost,price:r.p});
+  });
+
+  nkSaveProducts(prods);
+  const arrivals=nkGetArrivals();
+  arrivals.unshift({id:'a'+Date.now(),date,supplier,memo,items:savedItems,at:Date.now()});
+  nkSaveArrivals(arrivals);
+  nkRenderArrival();
+  toast(`新規${newCount}件・更新${updCount}件`);
+  if(confirm(`保存完了！\n新規：${newCount}件　更新：${updCount}件\n\nバーコードシール印刷画面を開きますか？`)){
+    nkShowTab('labels');
+  }
+}
+
+function nkRenderProducts(){
+  const list=document.getElementById('nkProdList'); if(!list)return;
+  const q=(document.getElementById('nkProdSearch')||{}).value||'';
+  let prods=nkGetProducts();
+  if(q) prods=prods.filter(p=>p.name.includes(q)||(p.barcode||'').includes(q));
+  const cnt=document.getElementById('nkProdCount');
+  if(cnt) cnt.textContent=`（${prods.length}件）`;
+  if(!prods.length){
+    list.innerHTML='<div style="text-align:center;color:#aab;padding:32px">商品がまだ登録されていません。入荷入力から登録してください。</div>';
+    return;
+  }
+  list.innerHTML=prods.map(p=>`
+    <div class="nk-prod-item">
+      <span class="nk-prod-bc">${e(p.barcode)}</span>
+      <span class="nk-prod-name">${e(p.name)}</span>
+      ${p.category?`<span class="nk-prod-cat">${e(p.category)}</span>`:''}
+      <span class="nk-prod-price">${p.price?'¥'+Number(p.price).toLocaleString():'価格未設定'}</span>
+      <span style="font-size:11px;color:#aab">${p.unit||''}</span>
+      <button onclick="nkDeleteProduct('${p.id}')"
+        style="border:1px solid #e74c3c;color:#e74c3c;background:none;border-radius:4px;padding:2px 8px;font-size:11px;cursor:pointer;margin-left:auto;font-family:inherit">削除</button>
+    </div>
+  `).join('');
+}
+
+function nkDeleteProduct(id){
+  if(!confirm('この商品を削除しますか？')) return;
+  nkSaveProducts(nkGetProducts().filter(p=>p.id!==id));
+  nkRenderProducts();
+}
+
+function nkExportAir(){
+  const prods=nkGetProducts();
+  if(!prods.length){alert('登録済み商品がありません');return;}
+  const header='商品コード,商品名,価格,税種別,カテゴリーID,バーコード,単位';
+  const rows=prods.map(p=>[
+    p.barcode||'',
+    `"${(p.name||'').replace(/"/g,'""')}"`,
+    p.price||'',
+    p.taxRate==='8'?'軽減税率対象':'通常税率',
+    p.catId||'',
+    p.barcode||'',
+    p.unit||''
+  ].join(','));
+  const csv='\uFEFF'+[header,...rows].join('\r\n');
+  const blob=new Blob([csv],{type:'text/csv;charset=utf-8'});
+  const a=document.createElement('a');
+  a.href=URL.createObjectURL(blob);
+  a.download=`airレジ商品登録_${new Date().toISOString().slice(0,10)}.csv`;
+  a.click();
+  toast(`${prods.length}件のCSVをダウンロードしました`);
+}
+
+function nkRenderLabelList(){
+  const el=document.getElementById('nkLabelList'); if(!el)return;
+  const prods=nkGetProducts();
+  if(!prods.length){
+    el.innerHTML='<div style="text-align:center;color:#aab;padding:32px;grid-column:1/-1">商品がありません。入荷入力から登録してください。</div>';
+    return;
+  }
+  el.innerHTML=prods.map((p,i)=>`
+    <div class="nk-label-item">
+      <label class="nk-label-check">
+        <input type="checkbox" id="lchk_${i}" value="${p.id}" checked style="accent-color:#0f2744;width:14px;height:14px;flex-shrink:0">
+        <span style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap;flex:1">${e(p.name)}</span>
+      </label>
+      <div style="font-size:10px;color:#888;font-family:monospace;text-align:center">${e(p.barcode)}</div>
+      ${p.price?`<div style="font-size:12px;font-weight:700;color:#c00;text-align:center">¥${Number(p.price).toLocaleString()}</div>`:''}
+      <div style="display:flex;align-items:center;justify-content:center;gap:6px;font-size:11px;color:#6b7a8d">
+        印刷枚数: <input type="number" min="1" max="99" value="1" id="lqty_${i}"
+          style="width:48px;text-align:center;border:1px solid #dde3ea;border-radius:4px;padding:4px;font-size:13px;font-family:inherit">
+      </div>
+    </div>
+  `).join('');
+}
+
+function nkSelectAllLabels(val){
+  document.querySelectorAll('#nkLabelList input[type=checkbox]').forEach(cb=>cb.checked=val);
+}
+
+function nkPrintLabels(){
+  const prods=nkGetProducts();
+  const prodMap={};
+  prods.forEach(p=>{prodMap[p.id]=p;});
+  const items=[];
+  document.querySelectorAll('#nkLabelList input[type=checkbox]:checked').forEach(cb=>{
+    const id=cb.value;
+    const idx=cb.id.replace('lchk_','');
+    const qty=parseInt((document.getElementById('lqty_'+idx)||{}).value||1);
+    const p=prodMap[id]; if(!p)return;
+    for(let i=0;i<qty;i++) items.push(p);
+  });
+  if(!items.length){alert('印刷する商品を選択してください');return;}
+
+  // ── A-one 31397 レイアウト仕様 ──────────────────────
+  // ラベル寸法: 20mm × 8mm
+  // 配列: 8列 × 25行 = 200面/シート
+  // 上余白: 9mm  左余白: 8mm
+  // 縦ピッチ: 8mm（間隔なし連続）
+  // 横ピッチ: 25.4mm（ラベル20mm + 隙間5.4mm）
+  const COLS=8, ROWS=25, PER=COLS*ROWS; // 200
+  const LW='20mm', LH='8mm';
+  // 横ピッチ = (210 - 8×2 - 8×20) / 7 ≈ 4.86mm 隙間 → col-gap:4.86mm
+  // 縦ピッチ = (297 - 9×2 - 25×8) / 24 ≈ 3.33mm 隙間 → row-gap:3.33mm
+
+  let sheets='';
+  for(let s=0;s<Math.ceil(items.length/PER);s++){
+    const chunk=[...items.slice(s*PER,(s+1)*PER)];
+    while(chunk.length<PER) chunk.push(null);
+
+    let cells='';
+    chunk.forEach((p,ci)=>{
+      if(!p){ cells+='<div></div>'; return; }
+      const uid='bcsvg_'+s+'_'+ci;
+      // 商品名：長すぎる場合は省略。最大幅に収まるよう小フォント
+      const name=p.name||'';
+      cells+=`<div style="
+        width:20mm;height:8mm;overflow:hidden;
+        display:flex;flex-direction:column;
+        align-items:center;justify-content:flex-start;
+        padding:0.3mm 0.5mm 0;box-sizing:border-box;
+      ">
+        <div style="
+          font-size:4.5pt;font-weight:700;line-height:1.1;
+          width:100%;text-align:center;
+          overflow:hidden;white-space:nowrap;text-overflow:ellipsis;
+          margin-bottom:0.2mm;flex-shrink:0;
+        ">${e(name)}</div>
+        <svg id="${uid}" data-bc="${e(p.barcode)}"
+          style="width:19mm;flex-shrink:0;display:block"></svg>
+        <div style="
+          font-size:3.5pt;font-family:monospace;line-height:1;
+          width:100%;text-align:center;margin-top:0.1mm;flex-shrink:0;
+          letter-spacing:-0.01em;
+        ">${e(p.barcode)}</div>
+      </div>`;
+    });
+
+    sheets+=`
+    <div style="
+      position:relative;
+      width:210mm;height:297mm;
+      padding-top:9mm;padding-left:8mm;
+      box-sizing:border-box;
+      page-break-after:always;overflow:hidden;
+    ">
+      <div style="
+        display:grid;
+        grid-template-columns:repeat(${COLS},20mm);
+        grid-template-rows:repeat(${ROWS},8mm);
+        column-gap:4.86mm;
+        row-gap:3.33mm;
+      ">${cells}</div>
+    </div>`;
+  }
+
+  const printDoc=document.getElementById('printDoc');
+  printDoc.innerHTML=`
+  <style>
+    @page{ size:A4 portrait; margin:0 }
+    body{ margin:0; }
+  </style>
+  <div style="font-family:sans-serif">${sheets}</div>`;
+
+  document.getElementById('printArea').style.display='block';
+  document.getElementById('pgNyuuka').style.display='none';
+
+  setTimeout(()=>{
+    document.querySelectorAll('[data-bc]').forEach(svg=>{
+      const bc=svg.dataset.bc; if(!bc)return;
+      // 20mm幅に収まるよう width×lineWidth で調整
+      // MS000001 = 8文字 Code128: 最低幅確保
+      try{
+        JsBarcode(svg, bc, {
+          format:'CODE128',
+          width:1.0,        // バー1本の幅(px)→細く
+          height:22,        // バー高さ(px)
+          displayValue:false,
+          margin:0,
+          marginLeft:0, marginRight:0, marginTop:0, marginBottom:0,
+        });
+        // SVGにmax-widthをピクセルで設定してはみ出し防止
+        svg.style.maxWidth='19mm';
+        svg.style.height='auto';
+      }catch(err){ console.warn('bc err',bc,err); }
+    });
+    window.print();
+    document.getElementById('printArea').style.display='none';
+    document.getElementById('pgNyuuka').style.display='flex';
+    printDoc.innerHTML='';
+  },400);
+}
+
+function nkRenderHistory(){
+  const el=document.getElementById('nkHistList'); if(!el)return;
+  const list=nkGetArrivals();
+  if(!list.length){
+    el.innerHTML='<div style="text-align:center;color:#aab;padding:32px">入荷履歴がありません</div>';
+    return;
+  }
+  el.innerHTML=list.map(a=>`
+    <div class="nk-arr-item">
+      <div class="nk-arr-head">
+        <span class="nk-arr-date">${e(a.date)}</span>
+        ${a.supplier?`<span class="nk-arr-sup">📦 ${e(a.supplier)}</span>`:''}
+        ${a.memo?`<span style="font-size:11px;color:#aab">${e(a.memo)}</span>`:''}
+        <span style="margin-left:auto;font-size:11px;color:#1a5c2e;font-weight:700">${(a.items||[]).length}品目</span>
+      </div>
+      <div class="nk-arr-items">
+        ${(a.items||[]).map(it=>`<span class="nk-arr-tag">${e(it.name)} ×${it.qty||1}</span>`).join('')}
+      </div>
+    </div>
+  `).join('');
+}
 </script>
+<!-- ===== 入荷・商品登録 PAGE ===== -->
+<div class="page" id="pgNyuuka">
+  <div class="nk-topbar">
+    <div class="nk-logo">📦 入荷・商品登録</div>
+    <div style="display:flex;gap:6px;align-items:center">
+      <button class="tbtn" onclick="nkExportAir()" style="background:#FF6600;color:#fff">🛒 Airレジ出力</button>
+      <button class="tbtn tbtn-exit" onclick="showPage('pgSession')">← 戻る</button>
+    </div>
+  </div>
+  <div class="tabs" style="background:#fff;border-bottom:2px solid #dde3ea;display:flex;padding:0 16px">
+    <div class="tab on" id="nktab-arrival" onclick="nkShowTab('arrival')">📦 入荷入力</div>
+    <div class="tab" id="nktab-products" onclick="nkShowTab('products')">📋 商品一覧</div>
+    <div class="tab" id="nktab-labels" onclick="nkShowTab('labels')">🏷 シール印刷</div>
+    <div class="tab" id="nktab-history" onclick="nkShowTab('history')">📁 入荷履歴</div>
+  </div>
+  <div class="nk-body">
+
+    <!-- ── 入荷入力パネル ── -->
+    <div id="nkpnl-arrival">
+
+      <!-- OCR取り込みカード -->
+      <div class="nk-card" id="nkOcrCard">
+        <h2>📄 納品書をOCRで読み取る <span style="font-size:11px;font-weight:400;color:#6b7a8d">写真・PDFをアップロードすると商品リストを自動入力</span></h2>
+        <div id="nkOcrDrop"
+          ondragover="event.preventDefault();this.classList.add('drag-on')"
+          ondragleave="this.classList.remove('drag-on')"
+          ondrop="nkOcrDrop(event)"
+          onclick="document.getElementById('nkOcrFile').click()"
+          style="border:2px dashed #c8d4f0;border-radius:10px;padding:28px;text-align:center;cursor:pointer;transition:.2s;background:#f8faff">
+          <div style="font-size:32px;margin-bottom:8px">📷</div>
+          <div style="font-size:13px;font-weight:700;color:#1a6ea6;margin-bottom:4px">写真またはPDFをドロップ・タップして選択</div>
+          <div style="font-size:11px;color:#aab">JPG / PNG / PDF 対応 ・ ファイルは外部に送信されません</div>
+        </div>
+        <input type="file" id="nkOcrFile" accept="image/*,application/pdf" style="display:none" onchange="nkOcrFileSelected(this)">
+        <!-- プレビュー＋実行 -->
+        <div id="nkOcrPreviewArea" style="display:none;margin-top:12px">
+          <div style="display:flex;align-items:flex-start;gap:12px;flex-wrap:wrap">
+            <div style="flex:1;min-width:180px">
+              <img id="nkOcrPreviewImg" style="max-width:100%;max-height:220px;border-radius:6px;border:1px solid #dde3ea;display:none">
+              <div id="nkOcrPreviewPdf" style="display:none;background:#f0f2f5;border-radius:6px;padding:16px;text-align:center;font-size:13px;color:#6b7a8d">
+                📄 <span id="nkOcrPdfName"></span>
+              </div>
+            </div>
+            <div style="flex:1;min-width:200px;display:flex;flex-direction:column;gap:8px">
+              <div style="font-size:12px;font-weight:700;color:#0f2744">AIへの補足指示（任意）</div>
+              <textarea id="nkOcrHint" rows="3" placeholder="例：「税率はすべて10%」「単位は個で統一」など" style="width:100%;padding:8px;border:1px solid #dde3ea;border-radius:6px;font-size:12px;font-family:inherit;resize:vertical;box-sizing:border-box"></textarea>
+              <button onclick="nkRunOcr()" id="nkOcrRunBtn"
+                style="padding:12px;background:#1a6ea6;color:#fff;border:none;border-radius:8px;font-size:13px;font-weight:700;cursor:pointer;font-family:inherit">
+                🤖 AIで読み取る
+              </button>
+            </div>
+          </div>
+          <div id="nkOcrStatus" style="margin-top:10px;font-size:12px;color:#1a6ea6;display:none"></div>
+        </div>
+      </div>
+
+      <div class="nk-card">
+        <h2>📅 入荷情報</h2>
+        <div class="nk-grid">
+          <div><div class="nk-lbl">入荷日</div><input class="nk-inp" type="date" id="nkDate"></div>
+          <div><div class="nk-lbl">仕入先</div><input class="nk-inp" id="nkSupplier" placeholder="例：○○商事"></div>
+          <div><div class="nk-lbl">備考（納品書番号など）</div><input class="nk-inp" id="nkMemo" placeholder="No.12345"></div>
+        </div>
+      </div>
+      <div class="nk-card">
+        <h2>📦 入荷商品リスト <span style="font-size:11px;font-weight:400;color:#6b7a8d">※既存商品名を入力すると情報が自動補完されます</span></h2>
+        <div style="overflow-x:auto">
+          <table class="nk-tbl">
+            <thead><tr>
+              <th style="width:28px"></th>
+              <th style="min-width:150px;text-align:left;padding-left:8px">商品名</th>
+              <th style="width:66px">税率</th>
+              <th style="width:62px">数量</th>
+              <th style="width:86px">仕入単価</th>
+              <th style="width:96px;background:#1a5c2e">税込売価</th>
+              <th style="width:62px">単位</th>
+              <th class="air" style="min-width:120px">Airカテゴリー</th>
+              <th class="air" style="width:76px">カテゴリーID</th>
+              <th style="width:96px">バーコード</th>
+            </tr></thead>
+            <tbody id="nkTbody"></tbody>
+          </table>
+        </div>
+        <button class="nk-add-btn" onclick="nkAddRow()">＋ 商品を追加</button>
+        <button class="nk-save-btn" onclick="nkSaveArrival()">💾 入荷を保存してバーコードを発行</button>
+      </div>
+    </div>
+
+    <!-- ── 商品一覧パネル ── -->
+    <div id="nkpnl-products" style="display:none">
+      <div class="nk-card">
+        <div style="display:flex;align-items:center;gap:8px;margin-bottom:12px;flex-wrap:wrap">
+          <h2 style="margin:0;border:none;flex:1">📋 登録済み商品一覧 <span id="nkProdCount" style="font-size:11px;color:#6b7a8d;font-weight:400"></span></h2>
+          <input id="nkProdSearch" class="nk-inp" placeholder="🔍 商品名で絞り込み" style="width:180px;margin:0" oninput="nkRenderProducts()">
+          <button onclick="nkExportAir()" style="background:#FF6600;color:#fff;border:none;border-radius:6px;padding:8px 14px;font-size:12px;font-weight:700;cursor:pointer;white-space:nowrap">🛒 Airレジ出力</button>
+        </div>
+        <div id="nkProdList"></div>
+      </div>
+    </div>
+
+    <!-- ── シール印刷パネル ── -->
+    <div id="nkpnl-labels" style="display:none">
+      <div class="nk-card">
+        <h2>🏷 バーコードシール印刷</h2>
+        <div style="background:#f0f6ff;border:1px solid #c8d4f0;border-radius:7px;padding:10px 14px;margin-bottom:14px;font-size:12px;color:#1a3a6a">
+          <b>エーワン 31397</b> 専用レイアウト ／ A4 ・ <b>20mm × 8mm</b> ・ <b>8列 × 25行 = 200面/シート</b><br>
+          各ラベルに <b>商品名（上段）・バーコード（中段）・番号（下段）</b> を印刷します。<br>
+          ※印刷ダイアログで「余白なし」「実際のサイズ（倍率100%）」に設定してください。
+        </div>
+        <div style="display:flex;gap:8px;margin-bottom:12px;flex-wrap:wrap;align-items:center">
+          <button onclick="nkSelectAllLabels(true)" style="font-size:11px;padding:6px 12px;border:1px solid #dde3ea;border-radius:5px;background:#fff;cursor:pointer;font-family:inherit">全選択</button>
+          <button onclick="nkSelectAllLabels(false)" style="font-size:11px;padding:6px 12px;border:1px solid #dde3ea;border-radius:5px;background:#fff;cursor:pointer;font-family:inherit">全解除</button>
+          <button onclick="nkPrintLabels()" style="font-size:13px;font-weight:700;padding:8px 20px;border:none;border-radius:6px;background:#0f2744;color:#fff;cursor:pointer;font-family:inherit">🖨️ 印刷プレビューを開く</button>
+        </div>
+        <div id="nkLabelList" class="nk-label-grid"></div>
+      </div>
+    </div>
+
+    <!-- ── 入荷履歴パネル ── -->
+    <div id="nkpnl-history" style="display:none">
+      <div class="nk-card">
+        <h2>📁 入荷履歴</h2>
+        <div id="nkHistList" class="nk-arr-list"></div>
+      </div>
+    </div>
+
+  </div>
+</div>
+
 </body>
 </html>
