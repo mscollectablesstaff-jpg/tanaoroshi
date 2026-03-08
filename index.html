@@ -3790,52 +3790,60 @@ function nkOcrLoadFile(file){
 // ── Tesseract.js OCR（完全無料・ブラウザ内処理）─────────
 async function nkRunOcr(){
   if(!nkOcrFileData){alert('写真またはファイルを選択してください');return;}
+
+  // Tesseract.js がロードされているか確認
+  if(typeof Tesseract==='undefined'){
+    alert('OCRライブラリの読み込みに失敗しました。\nページを再読み込み（Ctrl+Shift+R）してから再試行してください。');
+    return;
+  }
+
   const btn=document.getElementById('nkOcrRunBtn');
   const status=document.getElementById('nkOcrStatus');
   btn.disabled=true;
   status.style.display='block';
 
+  const setMsg=(msg,color)=>{
+    status.style.color=color||'#1a6ea6';
+    status.textContent=msg;
+  };
+
   try{
-    // --- 進捗メッセージ ---
-    const setMsg=(msg,color)=>{
-      status.style.color=color||'#1a6ea6';
-      status.textContent=msg;
-    };
+    setMsg('📥 日本語OCRデータを準備中（初回は20秒ほどかかります）...');
+    btn.textContent='⏳ 処理中...';
 
-    setMsg('📦 OCRエンジンを初期化中...');
-    btn.textContent='⏳ 初期化中...';
-
-    const worker=await Tesseract.createWorker('jpn+eng',1,{
-      logger: m=>{
-        if(m.status==='recognizing text'){
-          const pct=Math.round((m.progress||0)*100);
-          btn.textContent=`⏳ 読み取り中 ${pct}%`;
-          setMsg(`🔍 OCR処理中… ${pct}%`);
-        } else if(m.status==='loading language traineddata'){
-          setMsg('📥 日本語データを読み込み中（初回のみ）...');
+    // v5の推奨API: Tesseract.recognize() を直接呼ぶ
+    const result = await Tesseract.recognize(
+      nkOcrFileData.dataUrl,
+      'jpn+eng',
+      {
+        logger: m=>{
+          if(m.status==='recognizing text'){
+            const pct=Math.round((m.progress||0)*100);
+            btn.textContent=`⏳ 読み取り中 ${pct}%`;
+            setMsg(`🔍 OCR処理中… ${pct}%`);
+          } else if(m.status==='loading language traineddata'){
+            setMsg('📥 日本語データを読み込み中（初回のみ）...');
+            btn.textContent='⏳ ダウンロード中...';
+          } else if(m.status==='initializing tesseract'){
+            setMsg('⚙️ OCRエンジンを起動中...');
+          }
         }
       }
-    });
+    );
 
-    setMsg('🔍 文字を読み取っています...');
-
-    const { data:{ text } } = await worker.recognize(nkOcrFileData.dataUrl);
-    await worker.terminate();
+    const text = result.data.text || '';
 
     if(!text.trim()) throw new Error('文字が読み取れませんでした。写真をもっと明るく・鮮明に撮り直してください。');
 
-    // --- OCRテキストをパース ---
-    const lines = text.split('\n').map(l=>l.trim()).filter(l=>l.length>1);
-
-    // OCRテキスト全文を確認用に表示するエリア
+    // OCRテキスト全文を確認用に表示
     nkShowOcrRaw(text);
 
-    // 商品行を抽出（数字と文字が混在する行を商品として扱う）
+    // 商品行を抽出
+    const lines = text.split('\n').map(l=>l.trim()).filter(l=>l.length>1);
     const items = nkParseOcrLines(lines);
 
     if(items.length===0){
-      // パースできなくても生テキストを表示して手動入力を促す
-      setMsg('⚠️ 商品の自動解析が難しい形式でした。下のテキストを参考に手動で入力してください。', '#e67e00');
+      setMsg('⚠️ 商品の自動解析が難しい形式でした。下のOCR生テキストを参考に手動で入力してください。', '#e67e00');
       btn.textContent='🔍 もう一度読み取る';
       btn.disabled=false;
       return;
