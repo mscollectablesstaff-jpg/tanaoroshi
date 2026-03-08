@@ -809,7 +809,6 @@ function initFB(cfg,btn){
   try{
     if(!window.firebase){throw new Error('Firebaseライブラリが読み込まれていません')}
     if(firebase.apps.length>0){
-      // すでに初期化済みの場合はそのまま使う
       db=firebase.database();
     } else {
       firebase.initializeApp(cfg);
@@ -818,11 +817,13 @@ function initFB(cfg,btn){
     offline=false;
     if(btn){btn.textContent='💾 保存して続ける';btn.disabled=false}
     document.getElementById('modeLabel').textContent='🔴 リアルタイム同期モード';
-    showPage('pgSession');
-    renderRecent();
+    // Firebaseからアーカイブ・月次データを同期してからセッション画面へ
+    syncFromFirebase(()=>{
+      showPage('pgSession');
+      renderRecent();
+    });
   }catch(e){
     if(btn){btn.textContent='💾 保存して続ける';btn.disabled=false}
-    // エラーを画面に表示
     let errEl=document.getElementById('saveErr');
     if(!errEl){
       errEl=document.createElement('div');
@@ -833,6 +834,80 @@ function initFB(cfg,btn){
     errEl.style.display='block';
     errEl.textContent='❌ エラー：'+e.message;
   }
+}
+
+// ============================================================
+// Firebase ↔ ローカル 双方向同期
+// ============================================================
+function syncFromFirebase(cb){
+  if(!db){if(cb)cb();return;}
+  let done=0;
+  const finish=()=>{done++;if(done>=2&&cb)cb();};
+
+  // ① アーカイブ同期
+  db.ref('archive').once('value').then(snap=>{
+    if(snap.exists()){
+      const fbData=snap.val();
+      const local=getArcList();
+      const localIds=new Set(local.map(a=>a.id));
+      // Firebaseにあってローカルにないものをマージ
+      const fbList=Object.values(fbData).filter(a=>a&&a.id&&!localIds.has(a.id));
+      if(fbList.length){
+        const merged=[...local,...fbList].sort((a,b)=>b.at-a.at).slice(0,50);
+        saveArcList(merged);
+      }
+    }
+    finish();
+  }).catch(()=>finish());
+
+  // ② 月次在庫同期
+  db.ref('mstock').once('value').then(snap=>{
+    if(snap.exists()){
+      const fbDepts=snap.val();
+      const local=msGetRecords();
+      const localIds=new Set(local.map(r=>r.id));
+      const fbList=[];
+      Object.values(fbDepts).forEach(dept=>{
+        Object.values(dept).forEach(rec=>{
+          if(rec&&rec.id&&!localIds.has(rec.id)) fbList.push(rec);
+        });
+      });
+      if(fbList.length){
+        const merged=[...local,...fbList].sort((a,b)=>b.month.localeCompare(a.month)||b.at-a.at);
+        msSaveRecords(merged);
+      }
+    }
+    finish();
+  }).catch(()=>finish());
+}
+
+// リアルタイムリスナー（アーカイブ・月次の追加を自動検知）
+function startGlobalListeners(){
+  if(!db)return;
+  // アーカイブの追加を監視
+  db.ref('archive').on('child_added', snap=>{
+    const arc=snap.val(); if(!arc||!arc.id)return;
+    const local=getArcList();
+    if(!local.find(a=>a.id===arc.id)){
+      local.unshift(arc);
+      saveArcList(local.sort((a,b)=>b.at-a.at).slice(0,50));
+      renderSessionArcList();
+    }
+  });
+  // 月次の追加を監視
+  db.ref('mstock').on('child_changed', snap=>{
+    const dept=snap.val(); if(!dept)return;
+    const local=msGetRecords();
+    let updated=false;
+    Object.values(dept).forEach(rec=>{
+      if(!rec||!rec.id)return;
+      const idx=local.findIndex(r=>r.id===rec.id);
+      if(idx>=0){local[idx]=rec;}else{local.push(rec);updated=true;}
+    });
+    if(updated){
+      msSaveRecords(local.sort((a,b)=>b.month.localeCompare(a.month)||b.at-a.at));
+    }
+  });
 }
 
 // ============================================================
@@ -884,6 +959,7 @@ function startApp(){
 
 function startListeners(){
   if(!db||!sid) return;
+  startGlobalListeners(); // アーカイブ・月次のリアルタイム同期開始
   // ユーザー登録
   const uref=db.ref('s/'+sid+'/users/'+myId);
   const reg=()=>uref.set({name:myName,at:Date.now()});
