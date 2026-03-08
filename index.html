@@ -4040,15 +4040,7 @@ function nkPrintLabels(){
   if(!items.length){alert('印刷する商品を選択してください');return;}
 
   // ── A-one 31397 レイアウト仕様 ──────────────────────
-  // ラベル寸法: 20mm × 8mm
-  // 配列: 8列 × 25行 = 200面/シート
-  // 上余白: 9mm  左余白: 8mm
-  // 縦ピッチ: 8mm（間隔なし連続）
-  // 横ピッチ: 25.4mm（ラベル20mm + 隙間5.4mm）
-  const COLS=8, ROWS=25, PER=COLS*ROWS; // 200
-  const LW='20mm', LH='8mm';
-  // 横ピッチ = (210 - 8×2 - 8×20) / 7 ≈ 4.86mm 隙間 → col-gap:4.86mm
-  // 縦ピッチ = (297 - 9×2 - 25×8) / 24 ≈ 3.33mm 隙間 → row-gap:3.33mm
+  const COLS=8, ROWS=25, PER=COLS*ROWS;
 
   let sheets='';
   for(let s=0;s<Math.ceil(items.length/PER);s++){
@@ -4059,84 +4051,63 @@ function nkPrintLabels(){
     chunk.forEach((p,ci)=>{
       if(!p){ cells+='<div></div>'; return; }
       const uid='bcsvg_'+s+'_'+ci;
-      // 商品名：長すぎる場合は省略。最大幅に収まるよう小フォント
-      const name=p.name||'';
-      cells+=`<div style="
-        width:20mm;height:8mm;overflow:hidden;
-        display:flex;flex-direction:column;
-        align-items:center;justify-content:flex-start;
-        padding:0.3mm 0.5mm 0;box-sizing:border-box;
-      ">
-        <div style="
-          font-size:4.5pt;font-weight:700;line-height:1.1;
-          width:100%;text-align:center;
-          overflow:hidden;white-space:nowrap;text-overflow:ellipsis;
-          margin-bottom:0.2mm;flex-shrink:0;
-        ">${e(name)}</div>
-        <svg id="${uid}" data-bc="${e(p.barcode)}"
-          style="width:19mm;flex-shrink:0;display:block"></svg>
-        <div style="
-          font-size:3.5pt;font-family:monospace;line-height:1;
-          width:100%;text-align:center;margin-top:0.1mm;flex-shrink:0;
-          letter-spacing:-0.01em;
-        ">${e(p.barcode)}</div>
+      const name=(p.name||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+      const bc=(p.barcode||'').replace(/&/g,'&amp;');
+      cells+=`<div style="width:20mm;height:8mm;overflow:hidden;display:flex;flex-direction:column;align-items:center;justify-content:flex-start;padding:0.3mm 0.5mm 0;box-sizing:border-box;">
+        <div style="font-size:4.5pt;font-weight:700;line-height:1.1;width:100%;text-align:center;overflow:hidden;white-space:nowrap;text-overflow:ellipsis;margin-bottom:0.2mm;flex-shrink:0;">${name}</div>
+        <svg id="${uid}" data-bc="${bc}" style="width:19mm;flex-shrink:0;display:block"></svg>
+        <div style="font-size:3.5pt;font-family:monospace;line-height:1;width:100%;text-align:center;margin-top:0.1mm;flex-shrink:0;letter-spacing:-0.01em;">${bc}</div>
       </div>`;
     });
 
-    sheets+=`
-    <div style="
-      position:relative;
-      width:210mm;height:297mm;
-      padding-top:9mm;padding-left:8mm;
-      box-sizing:border-box;
-      page-break-after:always;overflow:hidden;
-    ">
-      <div style="
-        display:grid;
-        grid-template-columns:repeat(${COLS},20mm);
-        grid-template-rows:repeat(${ROWS},8mm);
-        column-gap:4.86mm;
-        row-gap:3.33mm;
-      ">${cells}</div>
+    sheets+=`<div style="position:relative;width:210mm;height:297mm;padding-top:9mm;padding-left:8mm;box-sizing:border-box;page-break-after:always;overflow:hidden;">
+      <div style="display:grid;grid-template-columns:repeat(${COLS},20mm);grid-template-rows:repeat(${ROWS},8mm);column-gap:4.86mm;row-gap:3.33mm;">${cells}</div>
     </div>`;
   }
 
-  const printDoc=document.getElementById('printDoc');
-  printDoc.innerHTML=`
+  // JsBarcode CDN URL（現ページから取得）
+  const jsbSrc='https://cdnjs.cloudflare.com/ajax/libs/jsbarcode/3.11.5/JsBarcode.all.min.js';
+
+  // 新しいウィンドウでラベルのみ印刷
+  const win=window.open('','_blank','width=900,height=700');
+  win.document.write(`<!DOCTYPE html><html><head><meta charset="UTF-8">
+  <title>バーコードシール印刷</title>
   <style>
     @page{ size:A4 portrait; margin:0 }
-    body{ margin:0; }
+    *{ box-sizing:border-box }
+    body{ margin:0;padding:0;background:#fff;font-family:sans-serif }
+    .no-print{ position:fixed;top:0;left:0;right:0;background:#222;color:#fff;padding:10px 20px;display:flex;gap:12px;align-items:center;z-index:9999 }
+    .no-print button{ padding:8px 22px;border:none;border-radius:6px;font-size:13px;font-weight:700;cursor:pointer }
+    .sheets{ margin-top:48px }
+    @media print{
+      .no-print{ display:none!important }
+      .sheets{ margin-top:0 }
+    }
   </style>
-  <div style="font-family:sans-serif">${sheets}</div>`;
-
-  document.getElementById('printArea').style.display='block';
-  document.getElementById('pgNyuuka').style.display='none';
-
-  setTimeout(()=>{
-    document.querySelectorAll('[data-bc]').forEach(svg=>{
-      const bc=svg.dataset.bc; if(!bc)return;
-      // 20mm幅に収まるよう width×lineWidth で調整
-      // MS000001 = 8文字 Code128: 最低幅確保
-      try{
-        JsBarcode(svg, bc, {
-          format:'CODE128',
-          width:1.0,        // バー1本の幅(px)→細く
-          height:22,        // バー高さ(px)
-          displayValue:false,
-          margin:0,
-          marginLeft:0, marginRight:0, marginTop:0, marginBottom:0,
-        });
-        // SVGにmax-widthをピクセルで設定してはみ出し防止
-        svg.style.maxWidth='19mm';
-        svg.style.height='auto';
-      }catch(err){ console.warn('bc err',bc,err); }
-    });
-    window.print();
-    document.getElementById('printArea').style.display='none';
-    document.getElementById('pgNyuuka').style.display='flex';
-    printDoc.innerHTML='';
-  },400);
+  </head><body>
+  <div class="no-print">
+    <span style="font-size:13px">A-one 31397 バーコードシール</span>
+    <button onclick="window.print()" style="background:#1a7a4a;color:#fff">🖨️ 印刷する</button>
+    <button onclick="window.close()" style="background:#555;color:#fff">✕ 閉じる</button>
+    <span style="font-size:11px;color:#aaa">※印刷設定：余白なし・倍率100%</span>
+  </div>
+  <div class="sheets">${sheets}</div>
+  <script src="${jsbSrc}"><\/script>
+  <script>
+    window.onload=function(){
+      document.querySelectorAll('[data-bc]').forEach(function(svg){
+        var bc=svg.dataset.bc; if(!bc)return;
+        try{
+          JsBarcode(svg,bc,{format:'CODE128',width:1.0,height:22,displayValue:false,margin:0,marginLeft:0,marginRight:0,marginTop:0,marginBottom:0});
+          svg.style.maxWidth='19mm';svg.style.height='auto';
+        }catch(e){}
+      });
+    };
+  <\/script>
+  </body></html>`);
+  win.document.close();
 }
+
 
 function nkRenderHistory(){
   const el=document.getElementById('nkHistList'); if(!el)return;
