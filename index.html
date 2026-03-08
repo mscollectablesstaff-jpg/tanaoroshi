@@ -869,7 +869,6 @@ function fy(n){return '¥'+(n?fm(n):'0');}
 function renderAll(){renderPTabs();renderTable();renderQbar();}
 
 function renderPTabs(){
-function renderPTabs(){
   const el=document.getElementById('ptabs');if(!el)return;
   let h='';
   order.forEach((k,i)=>{
@@ -1138,12 +1137,13 @@ function showAcList(input, field, ri, pageKey) {
   if (!list) { list = document.createElement('div'); list.className = 'ac-list'; wrap.appendChild(list); }
   const items = acGet(field, input.value);
   if (!items.length) { list.classList.remove('show'); return; }
-  list.innerHTML = items.map(v =>
-    `<div class="ac-item" onmousedown="acSelect(event,'${pageKey}',${ri},'${field}','${v.replace(/'/g,"\\'")}')">
-      ${v}
-      <span style="float:right;font-size:10px;color:#bbb;cursor:pointer" onmousedown="acDelete(event,'${field}','${v.replace(/'/g,"\\'")}')">✕</span>
-    </div>`
-  ).join('');
+  list.innerHTML = items.map(function(v){
+    var safe = v.replace(/'/g,'&#39;');
+    return '<div class="ac-item" onmousedown="acSelect(event,\'' + pageKey + '\',' + ri + ',\'' + field + '\',\'' + safe + '\')">'
+      + v
+      + '<span style="float:right;font-size:10px;color:#bbb;cursor:pointer" onmousedown="acDelete(event,\'' + field + '\',\'' + safe + '\')">✕</span>'
+      + '</div>';
+  }).join('');
   list.classList.add('show');
 }
 
