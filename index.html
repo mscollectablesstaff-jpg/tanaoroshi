@@ -231,13 +231,19 @@ tbody tr:hover td.sticky-name{background:#e8f0f8}
         <li>「プロジェクトを追加」→ 名前を入力して作成</li>
         <li>左メニュー「構築」→「Realtime Database」→「データベースを作成」→<b>テストモード</b>で開始</li>
         <li>⚙「プロジェクトの設定」→ 画面を下にスクロール →「アプリを追加」→「&lt;/&gt;」</li>
-        <li>表示されるコードを↓に貼り付け</li>
+        <li>表示されるコードを↓の枠に貼り付け</li>
       </ol>
     </div>
 
+    <!-- コード貼り付けエリア -->
     <div class="lbl">firebaseConfig のコードをそのまま貼り付け</div>
-    <textarea class="inp" id="fcPaste" rows="5" style="height:100px;font-family:monospace;font-size:11px;resize:none" placeholder='apiKey: "AIza...",&#10;databaseURL: "https://...",&#10;projectId: "..."' oninput="parsePaste()" onpaste="setTimeout(parsePaste,50)"></textarea>
-    <div id="parseMsg" style="font-size:12px;min-height:18px;margin:-8px 0 10px;color:#27ae60"></div>
+    <textarea class="inp" id="fcPaste" rows="6"
+      style="height:110px;font-family:monospace;font-size:11px;resize:none;background:#f8f9fb"
+      placeholder='const firebaseConfig = {&#10;  apiKey: "AIza...",&#10;  databaseURL: "https://xxx-rtdb.firebaseio.com",&#10;  projectId: "..."&#10;};'></textarea>
+    <button class="btn" id="btnParse"
+      style="background:#1a6ea6;color:#fff;margin-top:6px;margin-bottom:4px;font-size:13px;padding:10px"
+      onclick="doParse()">🔍 上のコードから自動読み取り</button>
+    <div id="parseMsg" style="font-size:12px;min-height:18px;margin-bottom:10px;color:#27ae60;text-align:center"></div>
 
     <div class="lbl">データベースURL</div>
     <input class="inp" id="sDbUrl" placeholder="https://xxxxx-default-rtdb.firebaseio.com">
@@ -516,24 +522,40 @@ function showPage(id){
 // ============================================================
 // Firebase設定
 // ============================================================
-function parsePaste(){
-  const t=document.getElementById('fcPaste').value;
-  // 1行ずつスキャンしてキー: "値" を抽出
-  const map={};
-  t.split('\n').forEach(line=>{
-    const m=line.match(/^\s*(\w+)\s*:\s*["']?([^"',\s}]+)/);
-    if(m) map[m[1]]=m[2].trim();
+function doParse(){
+  const t = document.getElementById('fcPaste').value;
+  const msg = document.getElementById('parseMsg');
+  if(!t.trim()){ msg.textContent='⚠️ コードを貼り付けてからボタンを押してください'; msg.style.color='#e74c3c'; return; }
+
+  // 1行ずつ解析
+  const map = {};
+  t.split('\n').forEach(line => {
+    // "キー": "値" または キー: "値" 両対応
+    const m = line.match(/["']?(\w+)["']?\s*:\s*["']([^"']+)["']/);
+    if(m) map[m[1]] = m[2];
   });
-  const url=map['databaseURL']||'';
-  const api=map['apiKey']||'';
-  const proj=map['projectId']||'';
-  if(url) document.getElementById('sDbUrl').value=url;
-  if(api) document.getElementById('sApiKey').value=api;
-  if(proj) document.getElementById('sProjId').value=proj;
-  const n=[url,api,proj].filter(Boolean).length;
-  document.getElementById('parseMsg').textContent=n===3?'✅ 3項目読み取り完了':n?n+'/3項目読み取り':'';
-  document.getElementById('parseMsg').style.color=n===3?'#27ae60':'#e67e22';
+
+  const url  = map['databaseURL'] || '';
+  const api  = map['apiKey']      || '';
+  const proj = map['projectId']   || '';
+
+  if(url)  document.getElementById('sDbUrl').value  = url;
+  if(api)  document.getElementById('sApiKey').value = api;
+  if(proj) document.getElementById('sProjId').value = proj;
+
+  const found = [url, api, proj].filter(Boolean).length;
+  if(found === 3){
+    msg.textContent = '✅ 3項目読み取り完了！このまま「保存して続ける」を押してください';
+    msg.style.color = '#27ae60';
+  } else if(found > 0){
+    msg.textContent = found + '/3項目のみ読み取れました。残りは手動で入力してください';
+    msg.style.color = '#e67e22';
+  } else {
+    msg.textContent = '❌ 読み取れませんでした。コード全体が貼り付けられているか確認してください';
+    msg.style.color = '#e74c3c';
+  }
 }
+function parsePaste(){ doParse(); }
 
 function doSave(){
   const url=document.getElementById('sDbUrl').value.trim();
