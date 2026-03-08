@@ -1789,21 +1789,30 @@ document.getElementById('scanModal').addEventListener('click', function(e) {
   if (e.target === this) closeScan();
 });
 window.addEventListener('DOMContentLoaded',()=>{
-  // 保存済み設定があれば読み込んでセッション画面へ
-  const saved=localStorage.getItem(FK);
+  // デフォルトのFirebase設定（変更不要）
+  const DEFAULT_CFG = {
+    apiKey: "AIzaSyCBsNUecuJqTQJXxBFpkeO2y4CBOp91-xM",
+    databaseURL: "https://inv2025-336d7-default-rtdb.firebaseio.com",
+    projectId: "inv2025-336d7"
+  };
+
+  // 保存済み設定 or デフォルト設定で自動接続
+  let cfg = DEFAULT_CFG;
+  const saved = localStorage.getItem(FK);
   if(saved){
     try{
-      const cfg=JSON.parse(saved);
-      if(cfg.databaseURL&&cfg.apiKey&&cfg.projectId){
-        document.getElementById('sDbUrl').value=cfg.databaseURL;
-        document.getElementById('sApiKey').value=cfg.apiKey;
-        document.getElementById('sProjId').value=cfg.projectId;
-        loadFB(()=>initFB(cfg,null));
-        return;
-      }
+      const s = JSON.parse(saved);
+      if(s.databaseURL && s.apiKey && s.projectId) cfg = s;
     }catch(ex){}
   }
-  // なければ設定画面（すでに表示中）
+
+  // 入力欄にも反映
+  document.getElementById('sDbUrl').value  = cfg.databaseURL;
+  document.getElementById('sApiKey').value = cfg.apiKey;
+  document.getElementById('sProjId').value = cfg.projectId;
+
+  // 自動接続
+  loadFB(()=>initFB(cfg, null));
 });
 </script>
 </body>
