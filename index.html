@@ -3226,23 +3226,56 @@ function showTab(name){
 // ============================================================
 let _bcpFiltered=[];
 
+// 印刷対象ソースを統合：商品マスタ ＋ 現在のセッション入力行
+function bcpGetAllSources(){
+  // 1) 商品マスタ（入荷登録済み）
+  const masterProds=nkGetProducts();
+  const masterMap={};
+  masterProds.forEach(p=>{ masterMap[p.name]=p; });
+
+  // 2) セッション入力行からバーコードがある商品を収集
+  const sessionItems=[];
+  const seenNames=new Set(masterProds.map(p=>p.name));
+  order.forEach(k=>{
+    const pg=pages[k]||{};
+    (pg.rows||[]).forEach(r=>{
+      const name=(r.n||'').trim();
+      const bc=(r.bc||'').trim();
+      if(!name||!bc) return;           // 商品名かバーコードが空はスキップ
+      if(seenNames.has(name)) return;  // マスタ登録済みは重複しない
+      seenNames.add(name);
+      sessionItems.push({
+        id:'sess_'+name,
+        name,
+        barcode: bc,
+        price: r.p||'',
+        category: r.cat||'',
+        taxRate: r.z||'10',
+        _source:'session'             // セッション由来マーカー
+      });
+    });
+  });
+
+  return [...masterProds, ...sessionItems];
+}
+
 function bcpRender(){
-  const prods=nkGetProducts();
+  const all=bcpGetAllSources();
   // カテゴリー一覧を更新
   const catSel=document.getElementById('bcpCatFilter');
   const prevCat=catSel.value;
-  const cats=[...new Set(prods.map(p=>p.category||'').filter(c=>c))].sort();
+  const cats=[...new Set(all.map(p=>p.category||'').filter(c=>c))].sort();
   catSel.innerHTML='<option value="">すべてのカテゴリー</option>';
   cats.forEach(c=>{ const o=document.createElement('option'); o.value=c; o.textContent=c; catSel.appendChild(o); });
-  catSel.value=prevCat;
+  if(cats.includes(prevCat)) catSel.value=prevCat;
   bcpFilter();
 }
 
 function bcpFilter(){
   const cat=document.getElementById('bcpCatFilter').value;
   const kw=(document.getElementById('bcpSearch').value||'').trim().toLowerCase();
-  const prods=nkGetProducts();
-  _bcpFiltered=prods.filter(p=>{
+  const all=bcpGetAllSources();
+  _bcpFiltered=all.filter(p=>{
     if(cat && (p.category||'')!==cat) return false;
     if(kw && !(p.name||'').toLowerCase().includes(kw)) return false;
     return true;
@@ -3259,20 +3292,25 @@ function bcpRenderList(){
   }
   list.style.display='grid'; empty.style.display='none';
   list.innerHTML=_bcpFiltered.map((p,i)=>{
+    const isSession=p._source==='session';
     const cat=p.category?`<span style="font-size:10px;color:#6b7a8d;background:#f0f2f5;padding:1px 6px;border-radius:10px">${e(p.category)}</span>`:'';
     const price=p.price?`<span style="font-size:11px;color:#1a5c2e">¥${Number(p.price).toLocaleString()}</span>`:'';
-    return `<label style="display:flex;align-items:flex-start;gap:8px;background:#fff;border:1.5px solid #dde3ea;border-radius:8px;padding:8px 10px;cursor:pointer;transition:.1s" id="bcpitem_${i}">
-      <input type="checkbox" value="${e(p.id)}" id="bcpchk_${i}"
-        style="margin-top:3px;flex-shrink:0;width:15px;height:15px;cursor:pointer"
+    const badge=isSession?`<span style="font-size:9px;background:#fff3cd;color:#856404;border:1px solid #f0c040;padding:1px 5px;border-radius:8px">入力中</span>`:'';
+    const hasBc=!!(p.barcode||'').trim();
+    return `<label style="display:flex;align-items:flex-start;gap:8px;background:#fff;border:1.5px solid ${isSession?'#f0c040':'#dde3ea'};border-radius:8px;padding:8px 10px;cursor:pointer;transition:.1s;opacity:${hasBc?1:0.5}" id="bcpitem_${i}">
+      <input type="checkbox" value="${e(p.id||p.name)}" id="bcpchk_${i}"
+        ${!hasBc?'disabled title="バーコード未入力のため印刷不可"':''}
+        style="margin-top:3px;flex-shrink:0;width:15px;height:15px;cursor:${hasBc?'pointer':'not-allowed'}"
         onchange="bcpUpdateStyle(${i})">
       <div style="flex:1;min-width:0">
         <div style="font-size:12px;font-weight:700;color:#0f2744;overflow:hidden;white-space:nowrap;text-overflow:ellipsis" title="${e(p.name)}">${e(p.name)}</div>
-        <div style="display:flex;gap:6px;align-items:center;flex-wrap:wrap;margin-top:3px">${cat}${price}</div>
-        <div style="font-size:10px;color:#aab;font-family:monospace;margin-top:2px">${e(p.barcode||'バーコードなし')}</div>
+        <div style="display:flex;gap:6px;align-items:center;flex-wrap:wrap;margin-top:3px">${badge}${cat}${price}</div>
+        <div style="font-size:10px;color:${hasBc?'#aab':'#e74c3c'};font-family:monospace;margin-top:2px">${hasBc?e(p.barcode):'バーコード未入力'}</div>
       </div>
       <div>
         <input type="number" min="1" max="99" value="1" id="bcpqty_${i}"
           onclick="event.stopPropagation()"
+          ${!hasBc?'disabled':''}
           style="width:44px;padding:4px;border:1px solid #dde3ea;border-radius:4px;font-size:12px;text-align:center;font-family:inherit"
           title="印刷枚数">
         <div style="font-size:9px;color:#aab;text-align:center">枚</div>
