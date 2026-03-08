@@ -1004,8 +1004,38 @@ svg.trend-chart text{font-family:inherit}
 
     <!-- 🏷 バーコード印刷パネル -->
     <div class="panel" id="pnl-bcprint" style="padding:12px 16px">
+
+      <!-- 自動発番カード -->
       <div style="background:#fff;border-radius:10px;border:1px solid #dde3ea;padding:14px 16px;margin-bottom:12px">
-        <h2 style="font-size:14px;font-weight:700;color:#0f2744;margin:0 0 12px;padding-bottom:8px;border-bottom:2px solid #f0f2f5">🏷 バーコードシール印刷</h2>
+        <h2 style="font-size:14px;font-weight:700;color:#0f2744;margin:0 0 10px;padding-bottom:8px;border-bottom:2px solid #f0f2f5">
+          🔢 バーコード自動発番
+        </h2>
+        <div style="display:flex;gap:12px;align-items:center;flex-wrap:wrap">
+          <div style="flex:1;min-width:220px;font-size:12px;color:#555;line-height:1.8;background:#f8faff;border:1px solid #c8d4f0;border-radius:8px;padding:10px 14px">
+            棚卸入力中の商品のうち、<b>バーコード未設定のものに自動でMS番号を割り当て</b>ます。<br>
+            発番後はすぐに印刷できます。
+          </div>
+          <div style="display:flex;flex-direction:column;gap:8px">
+            <button onclick="bcpAutoAssign()"
+              style="padding:12px 24px;background:#1a6ea6;color:#fff;border:none;border-radius:8px;font-size:13px;font-weight:700;cursor:pointer;font-family:inherit">
+              🔢 未発番の商品に番号を割り当て
+            </button>
+            <div id="bcpAssignStatus" style="font-size:12px;color:#1a7a4a;display:none"></div>
+          </div>
+        </div>
+      </div>
+
+      <!-- 印刷リストカード -->
+      <div style="background:#fff;border-radius:10px;border:1px solid #dde3ea;padding:14px 16px;margin-bottom:12px">
+        <h2 style="font-size:14px;font-weight:700;color:#0f2744;margin:0 0 10px;padding-bottom:8px;border-bottom:2px solid #f0f2f5">🏷 バーコードシール印刷
+          <span style="font-size:10px;font-weight:400;color:#6b7a8d;margin-left:8px">A-one 31397　20mm×8mm　8列×25行（A4縦・200面）</span>
+        </h2>
+
+        <!-- 凡例 -->
+        <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:10px;font-size:11px">
+          <span style="padding:2px 8px;border:1.5px solid #dde3ea;border-radius:10px;color:#6b7a8d">白枠＝入荷登録済み</span>
+          <span style="padding:2px 8px;border:1.5px solid #f0c040;border-radius:10px;color:#856404;background:#fffde7">黄枠＝棚卸入力中</span>
+        </div>
 
         <!-- フィルター行 -->
         <div style="display:flex;gap:10px;flex-wrap:wrap;margin-bottom:12px;align-items:flex-end">
@@ -1032,8 +1062,8 @@ svg.trend-chart text{font-family:inherit}
         <div style="font-size:11px;color:#6b7a8d;margin-bottom:6px">
           <span id="bcpCount">0</span>件表示　チェックした商品のシールを印刷します
         </div>
-        <div id="bcpList" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(220px,1fr));gap:8px;max-height:420px;overflow-y:auto;padding:2px"></div>
-        <div id="bcpEmpty" style="display:none;text-align:center;color:#aab;padding:32px;font-size:13px">商品が登録されていません。<br>入荷・商品登録から商品を登録してください。</div>
+        <div id="bcpList" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(220px,1fr));gap:8px;max-height:460px;overflow-y:auto;padding:2px"></div>
+        <div id="bcpEmpty" style="display:none;text-align:center;color:#aab;padding:32px;font-size:13px">商品が見つかりません。</div>
       </div>
     </div>
 
@@ -3224,44 +3254,115 @@ function showTab(name){
 // ============================================================
 // 🏷 バーコード印刷（pgApp内タブ）
 // ============================================================
+// ============================================================
+// 🏷 バーコード印刷（pgApp内タブ）
+// ============================================================
 let _bcpFiltered=[];
 
-// 印刷対象ソースを統合：商品マスタ ＋ 現在のセッション入力行
-function bcpGetAllSources(){
-  // 1) 商品マスタ（入荷登録済み）
-  const masterProds=nkGetProducts();
-  const masterMap={};
-  masterProds.forEach(p=>{ masterMap[p.name]=p; });
+// ── 自動発番：セッション内のバーコード未設定行にMS番号を割り当て ──
+function bcpAutoAssign(){
+  const prods=nkGetProducts();
+  const prodMap={};
+  prods.forEach(p=>{if(p.name)prodMap[p.name]=p;});
 
-  // 2) セッション入力行からバーコードがある商品を収集
-  const sessionItems=[];
-  const seenNames=new Set(masterProds.map(p=>p.name));
+  // 現在の最大MS番号を取得（商品マスタ＋セッション全行）
+  let maxNum=0;
+  prods.forEach(p=>{
+    const m=p.barcode&&p.barcode.match(/^MS(\d+)$/);
+    if(m) maxNum=Math.max(maxNum,parseInt(m[1],10));
+  });
   order.forEach(k=>{
-    const pg=pages[k]||{};
-    (pg.rows||[]).forEach(r=>{
-      const name=(r.n||'').trim();
-      const bc=(r.bc||'').trim();
-      if(!name||!bc) return;           // 商品名かバーコードが空はスキップ
-      if(seenNames.has(name)) return;  // マスタ登録済みは重複しない
-      seenNames.add(name);
-      sessionItems.push({
-        id:'sess_'+name,
-        name,
-        barcode: bc,
-        price: r.p||'',
-        category: r.cat||'',
-        taxRate: r.z||'10',
-        _source:'session'             // セッション由来マーカー
-      });
+    (pages[k]?.rows||[]).forEach(r=>{
+      const m=r.bc&&r.bc.match(/^MS(\d+)$/);
+      if(m) maxNum=Math.max(maxNum,parseInt(m[1],10));
     });
   });
 
-  return [...masterProds, ...sessionItems];
+  let assigned=0;
+  order.forEach(k=>{
+    const pg=pages[k]||{};
+    (pg.rows||[]).forEach((r,ri)=>{
+      const name=(r.n||'').trim();
+      if(!name) return;
+      // すでにバーコードがある場合はスキップ
+      if((r.bc||'').trim()) return;
+      // 商品マスタに登録済みでバーコードがある場合はそちらを使用
+      if(prodMap[name]&&prodMap[name].barcode){
+        pages[k].rows[ri].bc=prodMap[name].barcode;
+        assigned++;
+        return;
+      }
+      // 新規発番
+      maxNum++;
+      const newBc='MS'+String(maxNum).padStart(6,'0');
+      pages[k].rows[ri].bc=newBc;
+      // 商品マスタにも登録
+      if(prodMap[name]){
+        prodMap[name].barcode=newBc;
+      } else {
+        const np={
+          id:'p'+Date.now()+'_'+Math.random().toString(36).slice(2,5),
+          name, barcode:newBc,
+          price:r.p||'', costPrice:r.st||'',
+          taxRate:r.z||'10', unit:r.u||'点',
+          category:r.cat||'', catId:'',
+          supplier:'', createdAt:Date.now()
+        };
+        prods.push(np);
+        prodMap[name]=np;
+      }
+      assigned++;
+    });
+    // Firebase同期
+    if(!offline&&db) db.ref('s/'+sid+'/pages/'+k+'/rows').set(pg.rows);
+  });
+
+  nkSaveProducts(prods);
+
+  // 画面の入力欄も更新
+  renderAllPages();
+
+  const st=document.getElementById('bcpAssignStatus');
+  if(assigned>0){
+    st.style.display='block';
+    st.style.color='#1a7a4a';
+    st.textContent=`✅ ${assigned}件にMS番号を割り当てました`;
+    toast(`${assigned}件に発番しました`);
+  } else {
+    st.style.display='block';
+    st.style.color='#6b7a8d';
+    st.textContent='すべての商品にすでにバーコードが設定されています';
+  }
+  bcpRender();
+}
+
+// ── 全ソースを統合：商品マスタ ＋ セッション入力行 ──
+function bcpGetAllSources(){
+  const masterProds=nkGetProducts();
+  const seenNames=new Set();
+  const result=[];
+
+  masterProds.forEach(p=>{ seenNames.add(p.name); result.push(p); });
+
+  // セッション入力行（マスタにない ＆ バーコードあり）
+  order.forEach(k=>{
+    (pages[k]?.rows||[]).forEach(r=>{
+      const name=(r.n||'').trim();
+      const bc=(r.bc||'').trim();
+      if(!name||!bc||seenNames.has(name)) return;
+      seenNames.add(name);
+      result.push({
+        id:'sess_'+name, name, barcode:bc,
+        price:r.p||'', category:r.cat||'',
+        taxRate:r.z||'10', _source:'session'
+      });
+    });
+  });
+  return result;
 }
 
 function bcpRender(){
   const all=bcpGetAllSources();
-  // カテゴリー一覧を更新
   const catSel=document.getElementById('bcpCatFilter');
   const prevCat=catSel.value;
   const cats=[...new Set(all.map(p=>p.category||'').filter(c=>c))].sort();
@@ -3274,10 +3375,9 @@ function bcpRender(){
 function bcpFilter(){
   const cat=document.getElementById('bcpCatFilter').value;
   const kw=(document.getElementById('bcpSearch').value||'').trim().toLowerCase();
-  const all=bcpGetAllSources();
-  _bcpFiltered=all.filter(p=>{
-    if(cat && (p.category||'')!==cat) return false;
-    if(kw && !(p.name||'').toLowerCase().includes(kw)) return false;
+  _bcpFiltered=bcpGetAllSources().filter(p=>{
+    if(cat&&(p.category||'')!==cat) return false;
+    if(kw&&!(p.name||'').toLowerCase().includes(kw)) return false;
     return true;
   });
   bcpRenderList();
@@ -3287,32 +3387,29 @@ function bcpRenderList(){
   const list=document.getElementById('bcpList');
   const empty=document.getElementById('bcpEmpty');
   document.getElementById('bcpCount').textContent=_bcpFiltered.length;
-  if(!_bcpFiltered.length){
-    list.style.display='none'; empty.style.display='block'; return;
-  }
+  if(!_bcpFiltered.length){ list.style.display='none'; empty.style.display='block'; return; }
   list.style.display='grid'; empty.style.display='none';
   list.innerHTML=_bcpFiltered.map((p,i)=>{
     const isSession=p._source==='session';
+    const hasBc=!!(p.barcode||'').trim();
+    const borderColor=isSession?'#f0c040':'#dde3ea';
+    const bgColor=isSession?'#fffde7':'#fff';
+    const badge=isSession?`<span style="font-size:9px;background:#fffde7;color:#856404;border:1px solid #f0c040;padding:1px 5px;border-radius:8px">入力中</span>`:'';
     const cat=p.category?`<span style="font-size:10px;color:#6b7a8d;background:#f0f2f5;padding:1px 6px;border-radius:10px">${e(p.category)}</span>`:'';
     const price=p.price?`<span style="font-size:11px;color:#1a5c2e">¥${Number(p.price).toLocaleString()}</span>`:'';
-    const badge=isSession?`<span style="font-size:9px;background:#fff3cd;color:#856404;border:1px solid #f0c040;padding:1px 5px;border-radius:8px">入力中</span>`:'';
-    const hasBc=!!(p.barcode||'').trim();
-    return `<label style="display:flex;align-items:flex-start;gap:8px;background:#fff;border:1.5px solid ${isSession?'#f0c040':'#dde3ea'};border-radius:8px;padding:8px 10px;cursor:pointer;transition:.1s;opacity:${hasBc?1:0.5}" id="bcpitem_${i}">
-      <input type="checkbox" value="${e(p.id||p.name)}" id="bcpchk_${i}"
-        ${!hasBc?'disabled title="バーコード未入力のため印刷不可"':''}
+    return `<label style="display:flex;align-items:flex-start;gap:8px;background:${hasBc?bgColor:'#fafafa'};border:1.5px solid ${hasBc?borderColor:'#e8e8e8'};border-radius:8px;padding:8px 10px;cursor:${hasBc?'pointer':'default'};opacity:${hasBc?1:0.5}" id="bcpitem_${i}">
+      <input type="checkbox" id="bcpchk_${i}" ${!hasBc?'disabled':''}
         style="margin-top:3px;flex-shrink:0;width:15px;height:15px;cursor:${hasBc?'pointer':'not-allowed'}"
         onchange="bcpUpdateStyle(${i})">
       <div style="flex:1;min-width:0">
         <div style="font-size:12px;font-weight:700;color:#0f2744;overflow:hidden;white-space:nowrap;text-overflow:ellipsis" title="${e(p.name)}">${e(p.name)}</div>
         <div style="display:flex;gap:6px;align-items:center;flex-wrap:wrap;margin-top:3px">${badge}${cat}${price}</div>
-        <div style="font-size:10px;color:${hasBc?'#aab':'#e74c3c'};font-family:monospace;margin-top:2px">${hasBc?e(p.barcode):'バーコード未入力'}</div>
+        <div style="font-size:10px;color:${hasBc?'#888':'#e74c3c'};font-family:monospace;margin-top:2px">${hasBc?e(p.barcode):'バーコードなし（発番ボタンで割り当て）'}</div>
       </div>
       <div>
         <input type="number" min="1" max="99" value="1" id="bcpqty_${i}"
-          onclick="event.stopPropagation()"
-          ${!hasBc?'disabled':''}
-          style="width:44px;padding:4px;border:1px solid #dde3ea;border-radius:4px;font-size:12px;text-align:center;font-family:inherit"
-          title="印刷枚数">
+          onclick="event.stopPropagation()" ${!hasBc?'disabled':''}
+          style="width:44px;padding:4px;border:1px solid #dde3ea;border-radius:4px;font-size:12px;text-align:center;font-family:inherit">
         <div style="font-size:9px;color:#aab;text-align:center">枚</div>
       </div>
     </label>`;
@@ -3322,29 +3419,40 @@ function bcpRenderList(){
 function bcpUpdateStyle(i){
   const chk=document.getElementById('bcpchk_'+i);
   const item=document.getElementById('bcpitem_'+i);
-  if(item) item.style.borderColor=chk.checked?'#1a6ea6':'#dde3ea';
-  if(item) item.style.background=chk.checked?'#f0f6ff':'#fff';
+  const p=_bcpFiltered[i];
+  if(!item||!chk) return;
+  const isSession=p&&p._source==='session';
+  if(chk.checked){
+    item.style.borderColor='#1a6ea6';
+    item.style.background='#e8f4ff';
+  } else {
+    item.style.borderColor=isSession?'#f0c040':'#dde3ea';
+    item.style.background=isSession?'#fffde7':'#fff';
+  }
 }
 
 function bcpSelectAll(val){
   _bcpFiltered.forEach((_,i)=>{
     const chk=document.getElementById('bcpchk_'+i);
-    if(chk){ chk.checked=val; bcpUpdateStyle(i); }
+    if(chk&&!chk.disabled){ chk.checked=val; bcpUpdateStyle(i); }
   });
 }
 
+// ── 印刷（A-one 31397: 20mm×8mm、8列×25行） ──
 function bcpPrint(){
   const items=[];
   _bcpFiltered.forEach((p,i)=>{
     const chk=document.getElementById('bcpchk_'+i);
-    if(!chk||!chk.checked) return;
-    if(!p.barcode){ return; } // バーコードなしはスキップ
+    if(!chk||!chk.checked||!(p.barcode||'').trim()) return;
     const qty=parseInt((document.getElementById('bcpqty_'+i)||{}).value||1);
     for(let q=0;q<qty;q++) items.push(p);
   });
-  if(!items.length){alert('印刷する商品を選択してください\n（バーコード未登録の商品は印刷できません）');return;}
+  if(!items.length){alert('印刷する商品を選択してください');return;}
 
-  const COLS=8,ROWS=25,PER=COLS*ROWS;
+  // A-one 31397: 20mm×8mm、8列×25行=200面/シート
+  // 上余白9mm 左余白8mm 列gap4.86mm 行gap3.33mm
+  const COLS=8, ROWS=25, PER=200;
+
   let sheets='';
   for(let s=0;s<Math.ceil(items.length/PER);s++){
     const chunk=[...items.slice(s*PER,(s+1)*PER)];
@@ -3352,16 +3460,16 @@ function bcpPrint(){
     let cells='';
     chunk.forEach((p,ci)=>{
       if(!p){cells+='<div></div>';return;}
-      const uid='bcsvg_'+s+'_'+ci;
+      const uid='bcs_'+s+'_'+ci;
       const name=(p.name||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
       const bc=(p.barcode||'').replace(/&/g,'&amp;');
-      cells+=`<div style="width:20mm;height:8mm;overflow:hidden;display:flex;flex-direction:column;align-items:center;justify-content:flex-start;padding:0.3mm 0.5mm 0;box-sizing:border-box;">
-        <div style="font-size:4.5pt;font-weight:700;line-height:1.1;width:100%;text-align:center;overflow:hidden;white-space:nowrap;text-overflow:ellipsis;margin-bottom:0.2mm;flex-shrink:0;">${name}</div>
-        <svg id="${uid}" data-bc="${bc}" style="width:19mm;flex-shrink:0;display:block"></svg>
-        <div style="font-size:3.5pt;font-family:monospace;line-height:1;width:100%;text-align:center;margin-top:0.1mm;flex-shrink:0;letter-spacing:-0.01em;">${bc}</div>
+      cells+=`<div style="width:20mm;height:8mm;overflow:hidden;display:flex;flex-direction:column;align-items:center;justify-content:flex-start;padding:0.3mm 0.4mm 0;box-sizing:border-box;">
+        <div style="font-size:4pt;font-weight:700;line-height:1.1;width:100%;text-align:center;overflow:hidden;white-space:nowrap;text-overflow:ellipsis;flex-shrink:0;">${name}</div>
+        <svg id="${uid}" data-bc="${bc}" style="width:19.2mm;flex-shrink:0;display:block"></svg>
+        <div style="font-size:3.5pt;font-family:monospace;line-height:1;width:100%;text-align:center;flex-shrink:0;">${bc}</div>
       </div>`;
     });
-    sheets+=`<div style="position:relative;width:210mm;height:297mm;padding-top:9mm;padding-left:8mm;box-sizing:border-box;page-break-after:always;overflow:hidden;">
+    sheets+=`<div style="width:210mm;height:297mm;padding-top:9mm;padding-left:8mm;box-sizing:border-box;page-break-after:always;overflow:hidden;">
       <div style="display:grid;grid-template-columns:repeat(${COLS},20mm);grid-template-rows:repeat(${ROWS},8mm);column-gap:4.86mm;row-gap:3.33mm;">${cells}</div>
     </div>`;
   }
@@ -3392,15 +3500,24 @@ function bcpPrint(){
       document.querySelectorAll('[data-bc]').forEach(function(svg){
         var bc=svg.dataset.bc; if(!bc)return;
         try{
-          JsBarcode(svg,bc,{format:'CODE128',width:1.0,height:22,displayValue:false,margin:0,marginLeft:0,marginRight:0,marginTop:0,marginBottom:0});
-          svg.style.maxWidth='19mm';svg.style.height='auto';
-        }catch(e){}
+          JsBarcode(svg,bc,{
+            format:'CODE128',
+            width:1.2,
+            height:26,
+            displayValue:false,
+            margin:0,marginLeft:0,marginRight:0,marginTop:0,marginBottom:0
+          });
+          svg.style.maxWidth='19.2mm';
+          svg.style.height='auto';
+        }catch(err){}
       });
     };
   <\/script>
   </body></html>`);
   win.document.close();
 }
+
+
 
 
 
@@ -4260,8 +4377,8 @@ function nkPrintLabels(){
   });
   if(!items.length){alert('印刷する商品を選択してください');return;}
 
-  // ── A-one 31397 レイアウト仕様 ──────────────────────
-  const COLS=8, ROWS=25, PER=COLS*ROWS;
+  // A-one 31397: 20mm×8mm、8列×25行=200面/シート
+  const COLS=8, ROWS=25, PER=200;
 
   let sheets='';
   for(let s=0;s<Math.ceil(items.length/PER);s++){
@@ -4274,22 +4391,19 @@ function nkPrintLabels(){
       const uid='bcsvg_'+s+'_'+ci;
       const name=(p.name||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
       const bc=(p.barcode||'').replace(/&/g,'&amp;');
-      cells+=`<div style="width:20mm;height:8mm;overflow:hidden;display:flex;flex-direction:column;align-items:center;justify-content:flex-start;padding:0.3mm 0.5mm 0;box-sizing:border-box;">
-        <div style="font-size:4.5pt;font-weight:700;line-height:1.1;width:100%;text-align:center;overflow:hidden;white-space:nowrap;text-overflow:ellipsis;margin-bottom:0.2mm;flex-shrink:0;">${name}</div>
-        <svg id="${uid}" data-bc="${bc}" style="width:19mm;flex-shrink:0;display:block"></svg>
-        <div style="font-size:3.5pt;font-family:monospace;line-height:1;width:100%;text-align:center;margin-top:0.1mm;flex-shrink:0;letter-spacing:-0.01em;">${bc}</div>
+      cells+=`<div style="width:20mm;height:8mm;overflow:hidden;display:flex;flex-direction:column;align-items:center;justify-content:flex-start;padding:0.3mm 0.4mm 0;box-sizing:border-box;">
+        <div style="font-size:4pt;font-weight:700;line-height:1.1;width:100%;text-align:center;overflow:hidden;white-space:nowrap;text-overflow:ellipsis;flex-shrink:0;">${name}</div>
+        <svg id="${uid}" data-bc="${bc}" style="width:19.2mm;flex-shrink:0;display:block"></svg>
+        <div style="font-size:3.5pt;font-family:monospace;line-height:1;width:100%;text-align:center;flex-shrink:0;">${bc}</div>
       </div>`;
     });
 
-    sheets+=`<div style="position:relative;width:210mm;height:297mm;padding-top:9mm;padding-left:8mm;box-sizing:border-box;page-break-after:always;overflow:hidden;">
+    sheets+=`<div style="width:210mm;height:297mm;padding-top:9mm;padding-left:8mm;box-sizing:border-box;page-break-after:always;overflow:hidden;">
       <div style="display:grid;grid-template-columns:repeat(${COLS},20mm);grid-template-rows:repeat(${ROWS},8mm);column-gap:4.86mm;row-gap:3.33mm;">${cells}</div>
     </div>`;
   }
 
-  // JsBarcode CDN URL（現ページから取得）
   const jsbSrc='https://cdnjs.cloudflare.com/ajax/libs/jsbarcode/3.11.5/JsBarcode.all.min.js';
-
-  // 新しいウィンドウでラベルのみ印刷
   const win=window.open('','_blank','width=900,height=700');
   win.document.write(`<!DOCTYPE html><html><head><meta charset="UTF-8">
   <title>バーコードシール印刷</title>
@@ -4300,17 +4414,13 @@ function nkPrintLabels(){
     .no-print{ position:fixed;top:0;left:0;right:0;background:#222;color:#fff;padding:10px 20px;display:flex;gap:12px;align-items:center;z-index:9999 }
     .no-print button{ padding:8px 22px;border:none;border-radius:6px;font-size:13px;font-weight:700;cursor:pointer }
     .sheets{ margin-top:48px }
-    @media print{
-      .no-print{ display:none!important }
-      .sheets{ margin-top:0 }
-    }
-  </style>
-  </head><body>
+    @media print{ .no-print{ display:none!important } .sheets{ margin-top:0 } }
+  </style></head><body>
   <div class="no-print">
     <span style="font-size:13px">A-one 31397 バーコードシール</span>
     <button onclick="window.print()" style="background:#1a7a4a;color:#fff">🖨️ 印刷する</button>
     <button onclick="window.close()" style="background:#555;color:#fff">✕ 閉じる</button>
-    <span style="font-size:11px;color:#aaa">※印刷設定：余白なし・倍率100%</span>
+    <span style="font-size:11px;color:#aaa">印刷設定：余白なし・倍率100%</span>
   </div>
   <div class="sheets">${sheets}</div>
   <script src="${jsbSrc}"><\/script>
@@ -4319,9 +4429,16 @@ function nkPrintLabels(){
       document.querySelectorAll('[data-bc]').forEach(function(svg){
         var bc=svg.dataset.bc; if(!bc)return;
         try{
-          JsBarcode(svg,bc,{format:'CODE128',width:1.0,height:22,displayValue:false,margin:0,marginLeft:0,marginRight:0,marginTop:0,marginBottom:0});
-          svg.style.maxWidth='19mm';svg.style.height='auto';
-        }catch(e){}
+          JsBarcode(svg,bc,{
+            format:'CODE128',
+            width:1.2,
+            height:26,
+            displayValue:false,
+            margin:0,marginLeft:0,marginRight:0,marginTop:0,marginBottom:0
+          });
+          svg.style.maxWidth='19.2mm';
+          svg.style.height='auto';
+        }catch(err){}
       });
     };
   <\/script>
