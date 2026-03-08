@@ -717,6 +717,18 @@ svg.trend-chart text{font-family:inherit}
       </div>
       <div class="mstock-card">
         <h2>📋 商品マスタ <span id="masterDeptLabel" style="font-size:12px;color:#2d7a4f;font-weight:400"></span></h2>
+        <!-- 棚卸データからインポート -->
+        <div id="msImportBox" style="background:#f0faf4;border:1.5px solid #2d7a4f;border-radius:8px;padding:12px 14px;margin-bottom:14px">
+          <div style="font-size:12px;font-weight:700;color:#1a3a2a;margin-bottom:8px">📥 棚卸データから商品をインポート</div>
+          <div style="font-size:11px;color:#4a7a5a;margin-bottom:10px">保存済みの棚卸アーカイブに登録された商品名・単位を自動で読み込みます。</div>
+          <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">
+            <select id="msImportSrcSel" style="flex:1;padding:7px 10px;border:1px solid #b0d0b8;border-radius:6px;font-size:12px;font-family:inherit;min-width:160px">
+              <option value="">― アーカイブを選択 ―</option>
+            </select>
+            <button class="ms-save-btn" onclick="msImportFromArc()" style="padding:9px 16px;font-size:12px;white-space:nowrap">📥 インポート</button>
+          </div>
+          <div id="msImportMsg" style="font-size:11px;color:#1a7a4a;margin-top:6px;display:none"></div>
+        </div>
         <table class="master-tbl">
           <thead><tr>
             <th style="width:40%">商品名</th>
@@ -727,7 +739,7 @@ svg.trend-chart text{font-family:inherit}
           </tr></thead>
           <tbody id="masterTbody"></tbody>
         </table>
-        <div class="ms-add-row-btn" onclick="msAddMasterRow()">＋ 商品を追加</div>
+        <div class="ms-add-row-btn" onclick="msAddMasterRow()">＋ 商品を手動追加</div>
       </div>
     </div>
 
@@ -1510,6 +1522,70 @@ function msRenderMasterTable(){
     <td><input type="number" step="any" value="${e(m.init||'')}" placeholder="0" oninput="msUpdateMaster('${m.id}','init',this.value)" style="text-align:right"></td>
     <td style="text-align:center"><button class="ms-del-btn" onclick="msDeleteMasterRow('${m.id}')">削除</button></td>
   </tr>`).join('');
+
+  // インポート用セレクトを更新
+  const sel=document.getElementById('msImportSrcSel'); if(!sel)return;
+  const arcList=getArcList();
+  // 現在セッション中のデータも選択肢に
+  const hasSession = !!(order&&order.length&&Object.values(pages||{}).some(pg=>(pg.rows||[]).some(r=>r.n)));
+  sel.innerHTML='<option value="">― 読み込み元を選択 ―</option>'
+    +(hasSession?'<option value="__session__">✅ 現在の棚卸セッション（入力中）</option>':'')
+    +arcList.map(a=>`<option value="${a.id}">${a.date} ${a.label}（${a.cnt||0}点）</option>`).join('');
+}
+
+// 棚卸データから商品マスタへインポート
+function msImportFromArc(){
+  if(!msCurDept){alert('先に部門を選択してください');return;}
+  const sel=document.getElementById('msImportSrcSel');
+  const val=sel?sel.value:''; if(!val){alert('読み込み元を選択してください');return;}
+
+  // ページデータを取得
+  let srcPages={};
+  if(val==='__session__'){
+    srcPages=pages||{};
+  } else {
+    const arc=getArcList().find(a=>a.id===val);
+    if(!arc){alert('アーカイブが見つかりません');return;}
+    srcPages=arc.pages||{};
+  }
+
+  // 全商品を重複排除して収集（商品名をキーに単位を保持）
+  const map={};
+  Object.values(srcPages).forEach(pg=>{
+    (pg.rows||[]).forEach(r=>{
+      const name=(r.n||'').trim(); if(!name)return;
+      if(!map[name]) map[name]={name, unit:r.u||'個', memo:''};
+    });
+  });
+  const newItems=Object.values(map);
+  if(!newItems.length){alert('商品データが見つかりませんでした');return;}
+
+  const data=msGetDepts();
+  if(!data.masters[msCurDept]) data.masters[msCurDept]=[];
+  const existing=data.masters[msCurDept];
+  const existingNames=new Set(existing.map(m=>m.name));
+
+  // 既存にないものだけ追加
+  let addedCount=0;
+  newItems.forEach(item=>{
+    if(existingNames.has(item.name))return;
+    existing.push({id:'m'+Date.now()+'_'+Math.random().toString(36).slice(2,5), name:item.name, unit:item.unit, memo:'', init:''});
+    existingNames.add(item.name);
+    addedCount++;
+  });
+
+  msSaveDepts(data);
+  msRenderMasterTable();
+
+  const msg=document.getElementById('msImportMsg');
+  if(msg){
+    msg.style.display='block';
+    msg.textContent=addedCount>0
+      ?`✅ ${addedCount}件の商品を追加しました（重複${newItems.length-addedCount}件はスキップ）`
+      :`ℹ️ すべての商品はすでに登録済みです（${newItems.length}件）`;
+    setTimeout(()=>{msg.style.display='none';},4000);
+  }
+  if(addedCount>0) toast(`${addedCount}件の商品をインポートしました`);
 }
 function msUpdateMaster(id,field,val){
   const data=msGetDepts(); if(!msCurDept)return;
