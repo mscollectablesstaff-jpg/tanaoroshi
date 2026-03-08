@@ -3664,6 +3664,83 @@ function nkSaveProducts(list){ try{localStorage.setItem(PK,JSON.stringify(list))
 function nkGetArrivals(){ try{return JSON.parse(localStorage.getItem(NAK)||'[]');}catch(e){return[];} }
 function nkSaveArrivals(list){ try{localStorage.setItem(NAK,JSON.stringify(list.slice(0,500)));}catch(e){} }
 
+// ── カメラモーダル（getUserMedia） ────────────────
+let nkCameraStream=null;
+let nkCameraFacing='environment'; // 背面カメラから開始
+
+async function nkOpenCamera(){
+  const modal=document.getElementById('nkCameraModal');
+  const video=document.getElementById('nkCameraVideo');
+  modal.style.display='flex';
+
+  // 既存ストリームを停止
+  if(nkCameraStream){ nkCameraStream.getTracks().forEach(t=>t.stop()); nkCameraStream=null; }
+
+  try{
+    nkCameraStream=await navigator.mediaDevices.getUserMedia({
+      video:{ facingMode: nkCameraFacing, width:{ideal:1920}, height:{ideal:1080} },
+      audio:false
+    });
+    video.srcObject=nkCameraStream;
+  }catch(err){
+    modal.style.display='none';
+    // カメラ権限なし or 非対応 → ファイル選択にフォールバック
+    if(err.name==='NotAllowedError'){
+      alert('カメラへのアクセスが拒否されました。\nブラウザのアドレスバー左端の🔒アイコン→カメラを「許可」に変更してください。');
+    } else if(err.name==='NotFoundError'){
+      alert('カメラが見つかりませんでした。\nファイル選択ボタンから写真を選んでください。');
+    } else {
+      alert('カメラを起動できませんでした（'+err.message+'）\nファイル選択ボタンを使ってください。');
+    }
+  }
+}
+
+function nkCloseCamera(){
+  if(nkCameraStream){ nkCameraStream.getTracks().forEach(t=>t.stop()); nkCameraStream=null; }
+  document.getElementById('nkCameraModal').style.display='none';
+}
+
+async function nkCameraFlip(){
+  nkCameraFacing = nkCameraFacing==='environment' ? 'user' : 'environment';
+  // ストリームを再起動
+  if(nkCameraStream){ nkCameraStream.getTracks().forEach(t=>t.stop()); nkCameraStream=null; }
+  const video=document.getElementById('nkCameraVideo');
+  try{
+    nkCameraStream=await navigator.mediaDevices.getUserMedia({
+      video:{ facingMode: nkCameraFacing, width:{ideal:1920}, height:{ideal:1080} },
+      audio:false
+    });
+    video.srcObject=nkCameraStream;
+  }catch(err){ alert('カメラの切り替えに失敗しました'); }
+}
+
+function nkCameraCapture(){
+  const video=document.getElementById('nkCameraVideo');
+  const canvas=document.getElementById('nkCameraCanvas');
+  if(!video.videoWidth){ alert('カメラ映像を取得中です。少し待ってから撮影してください。'); return; }
+
+  // videoの実解像度でキャプチャ
+  canvas.width=video.videoWidth;
+  canvas.height=video.videoHeight;
+  canvas.getContext('2d').drawImage(video,0,0);
+
+  const dataUrl=canvas.toDataURL('image/jpeg', 0.92);
+  const base64=dataUrl.split(',')[1];
+  nkOcrFileData={base64, mediaType:'image/jpeg', name:'camera_capture.jpg'};
+
+  // プレビュー表示
+  const img=document.getElementById('nkOcrPreviewImg');
+  const pdfDiv=document.getElementById('nkOcrPreviewPdf');
+  img.src=dataUrl; img.style.display='block';
+  pdfDiv.style.display='none';
+  document.getElementById('nkOcrPreviewArea').style.display='block';
+  document.getElementById('nkOcrStatus').style.display='none';
+
+  // カメラを閉じる
+  nkCloseCamera();
+  toast('撮影しました。「AIで読み取る」を押してください');
+}
+
 // ── 納品書OCR ─────────────────────────────────
 let nkOcrFileData=null; // {base64, mediaType}
 
@@ -4178,7 +4255,7 @@ function nkRenderHistory(){
 
         <!-- 撮影 / ファイル選択 ボタン -->
         <div style="display:flex;gap:10px;margin-bottom:12px;flex-wrap:wrap">
-          <button onclick="document.getElementById('nkOcrCamera').click()"
+          <button onclick="nkOpenCamera()"
             style="flex:1;min-width:130px;padding:16px 12px;background:#0f2744;color:#fff;border:none;border-radius:10px;font-size:14px;font-weight:700;cursor:pointer;font-family:inherit;display:flex;align-items:center;justify-content:center;gap:8px">
             📷 カメラで撮影
           </button>
@@ -4198,9 +4275,7 @@ function nkRenderHistory(){
           またはここにファイルをドロップ（PC）
         </div>
 
-        <!-- カメラ用input（capture=environment で背面カメラ直接起動） -->
-        <input type="file" id="nkOcrCamera" accept="image/*" capture="environment" style="display:none" onchange="nkOcrFileSelected(this)">
-        <!-- ファイル選択用input（カメラロールや各種ファイルを選択） -->
+        <!-- ファイル選択用input -->
         <input type="file" id="nkOcrFile" accept="image/*,application/pdf" style="display:none" onchange="nkOcrFileSelected(this)">
 
         <!-- プレビュー＋実行 -->
@@ -4211,8 +4286,7 @@ function nkRenderHistory(){
               <div id="nkOcrPreviewPdf" style="display:none;background:#f0f2f5;border-radius:8px;padding:16px;text-align:center;font-size:13px;color:#6b7a8d">
                 📄 <span id="nkOcrPdfName"></span>
               </div>
-              <!-- 撮り直しボタン -->
-              <button onclick="document.getElementById('nkOcrCamera').click()"
+              <button onclick="nkOpenCamera()"
                 style="margin-top:8px;width:100%;padding:8px;background:#f0f2f5;color:#0f2744;border:1px solid #dde3ea;border-radius:6px;font-size:12px;font-weight:700;cursor:pointer;font-family:inherit">
                 📷 撮り直す
               </button>
@@ -4227,6 +4301,35 @@ function nkRenderHistory(){
             </div>
           </div>
           <div id="nkOcrStatus" style="margin-top:10px;font-size:12px;color:#1a6ea6;display:none"></div>
+        </div>
+      </div>
+
+      <!-- カメラモーダル（getUserMedia） -->
+      <div id="nkCameraModal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.85);z-index:9000;flex-direction:column;align-items:center;justify-content:center">
+        <div style="position:relative;width:100%;max-width:680px;padding:12px">
+          <div style="font-size:13px;color:#fff;font-weight:700;text-align:center;margin-bottom:10px">
+            📷 納品書をカメラに向けてください
+          </div>
+          <video id="nkCameraVideo" autoplay playsinline
+            style="width:100%;border-radius:10px;background:#000;display:block;max-height:65vh;object-fit:cover"></video>
+          <!-- 撮影ガイド枠 -->
+          <div style="position:absolute;top:42px;left:24px;right:24px;bottom:0;pointer-events:none;border:2px dashed rgba(255,255,255,.35);border-radius:8px"></div>
+          <canvas id="nkCameraCanvas" style="display:none"></canvas>
+          <!-- ボタン群 -->
+          <div style="display:flex;gap:12px;margin-top:14px;justify-content:center;flex-wrap:wrap">
+            <button onclick="nkCameraFlip()"
+              style="padding:12px 20px;background:rgba(255,255,255,.18);color:#fff;border:1.5px solid rgba(255,255,255,.4);border-radius:10px;font-size:13px;font-weight:700;cursor:pointer;font-family:inherit">
+              🔄 前面/背面
+            </button>
+            <button onclick="nkCameraCapture()"
+              style="padding:14px 40px;background:#fff;color:#0f2744;border:none;border-radius:50px;font-size:16px;font-weight:900;cursor:pointer;font-family:inherit;box-shadow:0 4px 16px rgba(0,0,0,.3)">
+              ⚪ 撮影
+            </button>
+            <button onclick="nkCloseCamera()"
+              style="padding:12px 20px;background:rgba(255,255,255,.18);color:#fff;border:1.5px solid rgba(255,255,255,.4);border-radius:10px;font-size:13px;font-weight:700;cursor:pointer;font-family:inherit">
+              ✕ キャンセル
+            </button>
+          </div>
         </div>
       </div>
 
