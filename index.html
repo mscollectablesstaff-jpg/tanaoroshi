@@ -4174,32 +4174,54 @@ function nkRenderHistory(){
 
       <!-- OCR取り込みカード -->
       <div class="nk-card" id="nkOcrCard">
-        <h2>📄 納品書をOCRで読み取る <span style="font-size:11px;font-weight:400;color:#6b7a8d">写真・PDFをアップロードすると商品リストを自動入力</span></h2>
+        <h2>📄 納品書を読み取る <span style="font-size:11px;font-weight:400;color:#6b7a8d">カメラ撮影またはファイル選択 → AIが商品リストを自動入力</span></h2>
+
+        <!-- 撮影 / ファイル選択 ボタン -->
+        <div style="display:flex;gap:10px;margin-bottom:12px;flex-wrap:wrap">
+          <button onclick="document.getElementById('nkOcrCamera').click()"
+            style="flex:1;min-width:130px;padding:16px 12px;background:#0f2744;color:#fff;border:none;border-radius:10px;font-size:14px;font-weight:700;cursor:pointer;font-family:inherit;display:flex;align-items:center;justify-content:center;gap:8px">
+            📷 カメラで撮影
+          </button>
+          <button onclick="document.getElementById('nkOcrFile').click()"
+            style="flex:1;min-width:130px;padding:16px 12px;background:#fff;color:#1a6ea6;border:2px solid #1a6ea6;border-radius:10px;font-size:14px;font-weight:700;cursor:pointer;font-family:inherit;display:flex;align-items:center;justify-content:center;gap:8px">
+            🖼 ファイルを選択
+          </button>
+        </div>
+        <div style="font-size:11px;color:#aab;text-align:center;margin-bottom:4px">JPG / PNG / PDF 対応 ・ ファイルは外部に送信されません</div>
+
+        <!-- ドラッグ&ドロップエリア（PC向け） -->
         <div id="nkOcrDrop"
           ondragover="event.preventDefault();this.classList.add('drag-on')"
           ondragleave="this.classList.remove('drag-on')"
           ondrop="nkOcrDrop(event)"
-          onclick="document.getElementById('nkOcrFile').click()"
-          style="border:2px dashed #c8d4f0;border-radius:10px;padding:28px;text-align:center;cursor:pointer;transition:.2s;background:#f8faff">
-          <div style="font-size:32px;margin-bottom:8px">📷</div>
-          <div style="font-size:13px;font-weight:700;color:#1a6ea6;margin-bottom:4px">写真またはPDFをドロップ・タップして選択</div>
-          <div style="font-size:11px;color:#aab">JPG / PNG / PDF 対応 ・ ファイルは外部に送信されません</div>
+          style="border:1.5px dashed #c8d4f0;border-radius:8px;padding:12px;text-align:center;color:#aab;font-size:11px;cursor:default;margin-top:4px">
+          またはここにファイルをドロップ（PC）
         </div>
+
+        <!-- カメラ用input（capture=environment で背面カメラ直接起動） -->
+        <input type="file" id="nkOcrCamera" accept="image/*" capture="environment" style="display:none" onchange="nkOcrFileSelected(this)">
+        <!-- ファイル選択用input（カメラロールや各種ファイルを選択） -->
         <input type="file" id="nkOcrFile" accept="image/*,application/pdf" style="display:none" onchange="nkOcrFileSelected(this)">
+
         <!-- プレビュー＋実行 -->
-        <div id="nkOcrPreviewArea" style="display:none;margin-top:12px">
+        <div id="nkOcrPreviewArea" style="display:none;margin-top:14px">
           <div style="display:flex;align-items:flex-start;gap:12px;flex-wrap:wrap">
             <div style="flex:1;min-width:180px">
-              <img id="nkOcrPreviewImg" style="max-width:100%;max-height:220px;border-radius:6px;border:1px solid #dde3ea;display:none">
-              <div id="nkOcrPreviewPdf" style="display:none;background:#f0f2f5;border-radius:6px;padding:16px;text-align:center;font-size:13px;color:#6b7a8d">
+              <img id="nkOcrPreviewImg" style="max-width:100%;max-height:220px;border-radius:8px;border:1px solid #dde3ea;display:none">
+              <div id="nkOcrPreviewPdf" style="display:none;background:#f0f2f5;border-radius:8px;padding:16px;text-align:center;font-size:13px;color:#6b7a8d">
                 📄 <span id="nkOcrPdfName"></span>
               </div>
+              <!-- 撮り直しボタン -->
+              <button onclick="document.getElementById('nkOcrCamera').click()"
+                style="margin-top:8px;width:100%;padding:8px;background:#f0f2f5;color:#0f2744;border:1px solid #dde3ea;border-radius:6px;font-size:12px;font-weight:700;cursor:pointer;font-family:inherit">
+                📷 撮り直す
+              </button>
             </div>
             <div style="flex:1;min-width:200px;display:flex;flex-direction:column;gap:8px">
               <div style="font-size:12px;font-weight:700;color:#0f2744">AIへの補足指示（任意）</div>
               <textarea id="nkOcrHint" rows="3" placeholder="例：「税率はすべて10%」「単位は個で統一」など" style="width:100%;padding:8px;border:1px solid #dde3ea;border-radius:6px;font-size:12px;font-family:inherit;resize:vertical;box-sizing:border-box"></textarea>
               <button onclick="nkRunOcr()" id="nkOcrRunBtn"
-                style="padding:12px;background:#1a6ea6;color:#fff;border:none;border-radius:8px;font-size:13px;font-weight:700;cursor:pointer;font-family:inherit">
+                style="padding:14px;background:#1a6ea6;color:#fff;border:none;border-radius:8px;font-size:14px;font-weight:700;cursor:pointer;font-family:inherit">
                 🤖 AIで読み取る
               </button>
             </div>
