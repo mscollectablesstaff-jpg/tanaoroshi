@@ -468,28 +468,7 @@ tbody tr:hover td.sticky-name{background:#e8f0f8}
 
 
 /* バーコードスキャナー */
-.scan-modal{display:none;position:fixed;inset:0;z-index:9000;background:rgba(0,0,0,.85);align-items:center;justify-content:center;flex-direction:column}
-.scan-modal.show{display:flex}
-.scan-box{background:#111;border-radius:14px;padding:20px;width:min(95vw,440px);text-align:center}
-.scan-title{color:#fff;font-size:16px;font-weight:700;margin-bottom:14px}
-.scan-video-wrap{position:relative;width:100%;border-radius:10px;overflow:hidden;background:#000;aspect-ratio:4/3}
-#scanVideo{width:100%;height:100%;object-fit:cover;display:block}
-.scan-overlay{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;pointer-events:none}
-.scan-finder{width:70%;aspect-ratio:3/1;border:3px solid #1a6ea6;border-radius:6px;box-shadow:0 0 0 9999px rgba(0,0,0,.45)}
-.scan-line{position:absolute;width:66%;height:2px;background:linear-gradient(90deg,transparent,#1a6ea6,transparent);animation:scanline 2s ease-in-out infinite}
-@keyframes scanline{0%,100%{top:20%}50%{top:75%}}
-.scan-result{margin-top:14px;padding:12px;background:#1a2332;border-radius:8px;color:#fff;font-size:14px;min-height:44px;display:flex;align-items:center;justify-content:center;gap:10px}
-.scan-result-val{font-family:monospace;font-size:18px;font-weight:700;color:#2ecc71;letter-spacing:2px}
-.scan-btns{display:flex;gap:10px;margin-top:14px}
-.scan-btn{flex:1;padding:11px;border:none;border-radius:8px;font-size:13px;font-weight:700;cursor:pointer;font-family:inherit}
-.scan-btn-ok{background:#1a6ea6;color:#fff}
-.scan-btn-cancel{background:#333;color:#aaa}
-.scan-cam-btn{display:inline-flex;align-items:center;gap:4px;border:1px solid rgba(255,102,0,.4);background:rgba(255,102,0,.08);color:#FF6600;border-radius:4px;padding:3px 8px;font-size:11px;font-weight:700;cursor:pointer;white-space:nowrap;vertical-align:middle}
-.scan-cam-btn:hover{background:#FF6600;color:#fff}
-.scan-status{font-size:12px;color:#aaa;margin-top:8px}
-.scan-manual{margin-top:10px}
-.scan-manual input{width:100%;padding:10px;border-radius:6px;border:1.5px solid #333;background:#222;color:#fff;font-size:16px;text-align:center;font-family:monospace;letter-spacing:2px}
-.scan-manual input:focus{outline:none;border-color:#1a6ea6}
+
 
 /* ===== 月次在庫管理 ===== */
 .mstock-page{background:#f0f4f8;min-height:100vh}
@@ -633,6 +612,25 @@ svg.trend-chart text{font-family:inherit}
   .nk-grid{grid-template-columns:1fr}
 }
 #nkOcrDrop.drag-on{background:#deeeff;border-color:#1a6ea6}
+
+/* ===== ホーム画面 ===== */
+#pgHome.show{display:flex;flex-direction:column;align-items:center;min-height:100vh;background:linear-gradient(160deg,#0f2744 0%,#1a3a5c 100%);padding:0 0 40px}
+.hm-top{text-align:center;color:#fff;padding:40px 20px 20px;width:100%}
+.hm-top h1{font-size:22px;font-weight:900;margin:8px 0 4px}
+.hm-top .hm-sub{font-size:12px;opacity:.65;margin:0}
+.hm-status{font-size:11px;margin-top:6px;opacity:.8}
+.hm-cards{display:grid;gap:14px;padding:4px 20px 0;width:100%;max-width:480px}
+.hm-card{background:#fff;border-radius:16px;padding:22px 20px;cursor:pointer;transition:.15s;box-shadow:0 4px 20px rgba(0,0,0,.2);display:flex;align-items:center;gap:16px}
+.hm-card:hover{transform:translateY(-2px);box-shadow:0 8px 28px rgba(0,0,0,.25)}
+.hm-card:active{transform:scale(.98)}
+.hm-card-icon{font-size:36px;flex-shrink:0}
+.hm-card-body{flex:1}
+.hm-card-title{font-size:16px;font-weight:900;color:#0f2744;margin-bottom:4px}
+.hm-card-desc{font-size:11px;color:#6b7a8d;line-height:1.7}
+.hm-card-arr{color:#ccc;font-size:22px}
+.hm-foot{margin-top:24px;display:flex;gap:10px;flex-wrap:wrap;justify-content:center}
+.hm-foot button{background:rgba(255,255,255,.1);color:rgba(255,255,255,.7);border:1px solid rgba(255,255,255,.2);padding:9px 18px;border-radius:20px;font-size:12px;font-weight:700;cursor:pointer;font-family:inherit}
+.hm-foot button:hover{background:rgba(255,255,255,.2)}
 </style>
 </head>
 <body>
@@ -645,6 +643,46 @@ svg.trend-chart text{font-family:inherit}
     <span style="font-size:12px;opacity:.7;margin-left:8px">印刷ダイアログで「用紙サイズ：A4」「余白：なし」に設定してください</span>
   </div>
   <div class="print-doc" id="printDoc"></div>
+</div>
+
+<!-- ===== HOME PAGE ===== -->
+<div class="page" id="pgHome">
+  <div class="hm-top">
+    <div style="font-size:36px">📦</div>
+    <h1>MS在庫管理システム</h1>
+    <p class="hm-sub" id="hmDate"></p>
+    <p class="hm-status" id="hmStatus">接続中...</p>
+  </div>
+  <div class="hm-cards">
+    <div class="hm-card" onclick="hmGoTana()">
+      <div class="hm-card-icon">📋</div>
+      <div class="hm-card-body">
+        <div class="hm-card-title">棚卸をする</div>
+        <div class="hm-card-desc">カテゴリーごとにページを分けて入力<br>前回の構成を引き継いで数えるだけ</div>
+      </div>
+      <div class="hm-card-arr">›</div>
+    </div>
+    <div class="hm-card" onclick="hmGoNyuuka()">
+      <div class="hm-card-icon">📥</div>
+      <div class="hm-card-body">
+        <div class="hm-card-title">入荷・商品登録</div>
+        <div class="hm-card-desc">納品書から商品を登録<br>バーコード発番・シール印刷・エアレジCSV出力</div>
+      </div>
+      <div class="hm-card-arr">›</div>
+    </div>
+    <div class="hm-card" onclick="hmGoMstock()">
+      <div class="hm-card-icon">📊</div>
+      <div class="hm-card-body">
+        <div class="hm-card-title">月次・集計・アーカイブ</div>
+        <div class="hm-card-desc">棚卸履歴の確認・前回比較<br>月次在庫記録</div>
+      </div>
+      <div class="hm-card-arr">›</div>
+    </div>
+  </div>
+  <div class="hm-foot">
+    <button onclick="showPage('pgSession')">🔗 セッション画面</button>
+    <button onclick="showPage('pgSetup')">⚙️ Firebase設定</button>
+  </div>
 </div>
 
 <!-- ===== SETUP PAGE ===== -->
@@ -704,6 +742,7 @@ svg.trend-chart text{font-family:inherit}
     <input class="inp inp-code" id="joinCodeInp" placeholder="XXXXXX" maxlength="6">
     <button class="btn btn-green" onclick="doJoin()">🔗 参加する</button>
     <button class="btn btn-gray" style="margin-top:6px" onclick="showPage('pgSetup')">⚙ Firebase設定を変更</button>
+    <button class="btn btn-gray" style="margin-top:6px" onclick="showPage('pgHome')">🏠 ホームへ戻る</button>
 
     <div id="recentList" style="margin-top:18px"></div>
 
@@ -1012,13 +1051,17 @@ svg.trend-chart text{font-family:inherit}
         </h2>
         <div style="display:flex;gap:12px;align-items:center;flex-wrap:wrap">
           <div style="flex:1;min-width:220px;font-size:12px;color:#555;line-height:1.8;background:#f8faff;border:1px solid #c8d4f0;border-radius:8px;padding:10px 14px">
-            棚卸入力中の商品のうち、<b>バーコード未設定のものに自動でMS番号を割り当て</b>ます。<br>
+            棚卸入力中の商品のうち、<b>バーコード未設定のものに自動で8桁の数字を割り当て</b>ます。<br>
             発番後はすぐに印刷できます。
           </div>
           <div style="display:flex;flex-direction:column;gap:8px">
             <button onclick="bcpAutoAssign()"
               style="padding:12px 24px;background:#1a6ea6;color:#fff;border:none;border-radius:8px;font-size:13px;font-weight:700;cursor:pointer;font-family:inherit">
               🔢 未発番の商品に番号を割り当て
+            </button>
+            <button onclick="bcpClearAllBarcodes()"
+              style="padding:8px 16px;background:#fff;color:#c0392b;border:1.5px solid #e0b4b4;border-radius:8px;font-size:12px;font-weight:700;cursor:pointer;font-family:inherit">
+              🗑️ 既存のバーコードをすべて削除
             </button>
             <div id="bcpAssignStatus" style="font-size:12px;color:#1a7a4a;display:none"></div>
           </div>
@@ -1071,28 +1114,6 @@ svg.trend-chart text{font-family:inherit}
 </div><!-- /pgApp -->
 
 <!-- バーコードスキャナーモーダル -->
-<div class="scan-modal" id="scanModal">
-  <div class="scan-box">
-    <div class="scan-title">📷 バーコードスキャン</div>
-    <div class="scan-video-wrap" id="scanVideoWrap">
-      <div id="qrReader" style="width:100%;border-radius:10px;overflow:hidden"></div>
-    </div>
-    <div class="scan-status" id="scanStatus">カメラを起動中...</div>
-    <div style="text-align:right;margin-top:6px">
-      <button class="scan-cam-btn" id="switchCamBtn" onclick="switchCamera()" style="font-size:12px;padding:5px 12px;display:none">🔄 カメラ切替</button>
-    </div>
-    <div class="scan-result" id="scanResult">
-      <span id="scanResultText" style="color:#aaa">バーコードをフレームに合わせてください</span>
-    </div>
-    <div class="scan-manual">
-      <input type="text" id="scanManualInp" inputmode="numeric" placeholder="手動入力も可能" oninput="onManualScan(this.value)">
-    </div>
-    <div class="scan-btns">
-      <button class="scan-btn scan-btn-ok" id="scanOkBtn" onclick="confirmScan()" disabled>✅ この値で入力</button>
-      <button class="scan-btn scan-btn-cancel" onclick="closeScan()">キャンセル</button>
-    </div>
-  </div>
-</div>
 
 <div class="toast" id="toast"></div>
 <div class="tscroll-fixed" id="fixedScrollbar">
@@ -1148,12 +1169,28 @@ function mkRows(){
 // 画面切替
 // ============================================================
 function showPage(id){
-  ['pgSetup','pgSession','pgApp','pgMstock','pgNyuuka'].forEach(p=>{
+  ['pgHome','pgSetup','pgSession','pgApp','pgMstock','pgNyuuka'].forEach(p=>{
     const el=document.getElementById(p);
     if(el) el.classList.remove('show');
   });
   const target=document.getElementById(id);
   if(target) target.classList.add('show');
+}
+
+// ホーム画面ナビゲーション
+function hmGoTana(){
+  // セッション画面へ（既存の棚卸開始フロー）
+  showPage('pgSession');
+}
+function hmGoNyuuka(){
+  doNyuuka();
+}
+function hmGoMstock(){
+  doMstock();
+}
+function hmUpdateStatus(msg){
+  const el=document.getElementById('hmStatus');
+  if(el) el.textContent=msg;
 }
 
 // ============================================================
@@ -1216,7 +1253,7 @@ function doSave(){
 function doOffline(){
   offline=true; db=null;
   document.getElementById('modeLabel').textContent='📴 オフラインモード';
-  showPage('pgSession');
+  showPage('pgHome');
   renderRecent();
 }
 
@@ -1247,10 +1284,11 @@ function initFB(cfg,btn){
     offline=false;
     if(btn){btn.textContent='💾 保存して続ける';btn.disabled=false}
     document.getElementById('modeLabel').textContent='🔴 リアルタイム同期モード';
-    // Firebaseからアーカイブ・月次データを同期してからセッション画面へ
+    // Firebaseからアーカイブ・月次データを同期してからホーム画面へ
     syncFromFirebase(()=>{
-      showPage('pgSession');
+      showPage('pgHome');
       renderRecent();
+      hmUpdateStatus('🟢 Firebase接続済み');
     });
   }catch(e){
     if(btn){btn.textContent='💾 保存して続ける';btn.disabled=false}
@@ -2878,7 +2916,7 @@ function renderTable(){
       <td class="sp-hide"><div class="ac-wrap"><input class="ci r" type="text" inputmode="decimal" value="${r.sr}" ${d} data-ac="sr" onchange="upd('${curKey}',${ri},'sr',this.value);acAdd('sr',this.value)" onfocus="showAcList(this,'sr',${ri},'${curKey}')" oninput="showAcList(this,'sr',${ri},'${curKey}')" placeholder="%"></div></td>
       <td class="sp-hide"><div class="ac-wrap"><input class="ci r" type="text" inputmode="decimal" value="${r.st}" ${d} data-ac="st" onchange="upd('${curKey}',${ri},'st',this.value);acAdd('st',this.value)" onfocus="showAcList(this,'st',${ri},'${curKey}')" oninput="showAcList(this,'st',${ri},'${curKey}')" placeholder="${c.st&&!r.st?c.st:''}" title="${c.st&&!r.st?'自動計算: ¥'+fm(c.st):'手入力'}"></div></td>
       <td style="${bz}"><span class="cc g">${c.zk?fy(c.zk):''}</span>${c.st&&!r.st&&c.zk?`<br><span style="font-size:9px;color:#888">自動計算</span>`:''}</td>
-      <td style="white-space:nowrap" class="sp-hide"><input class="ci" style="border:1px solid rgba(255,102,0,.2);width:calc(100% - 30px)" value="${e(r.bc)}" ${d} id="bc_${ri}" onchange="upd('${curKey}',${ri},'bc',this.value)" placeholder="バーコード">${d?'':'<button class="scan-cam-btn" onclick="openScan(\''+curKey+'\','+ri+')" title="カメラで読み取り">📷</button>'}</td>
+      <td style="white-space:nowrap" class="sp-hide"><input class="ci" style="border:1px solid rgba(255,102,0,.2);width:100%" value="${e(r.bc)}" ${d} id="bc_${ri}" onchange="upd('${curKey}',${ri},'bc',this.value)" placeholder="バーコード"></td>
       <td class="sp-hide"><select class="ci c" ${d} onchange="upd('${curKey}',${ri},'pt',this.value)">
         <option value="通常"${r.pt==='通常'?' selected':''}>通常</option>
         <option value="部門打ち"${r.pt==='部門打ち'?' selected':''}>部門打ち</option>
@@ -3259,21 +3297,23 @@ function showTab(name){
 // ============================================================
 let _bcpFiltered=[];
 
-// ── 自動発番：セッション内のバーコード未設定行にMS番号を割り当て ──
+// ── 自動発番：セッション内のバーコード未設定行に8桁数字を割り当て ──
 function bcpAutoAssign(){
   const prods=nkGetProducts();
   const prodMap={};
   prods.forEach(p=>{if(p.name)prodMap[p.name]=p;});
 
-  // 現在の最大MS番号を取得（商品マスタ＋セッション全行）
-  let maxNum=0;
+  // 現在の最大番号を取得（商品マスタ＋セッション全行）
+  // 形式: 8桁純数字 10000001〜
+  let maxNum=10000000;
+  const numPat=/^(\d{8,})$/;
   prods.forEach(p=>{
-    const m=p.barcode&&p.barcode.match(/^MS(\d+)$/);
+    const m=p.barcode&&p.barcode.match(numPat);
     if(m) maxNum=Math.max(maxNum,parseInt(m[1],10));
   });
   order.forEach(k=>{
     (pages[k]?.rows||[]).forEach(r=>{
-      const m=r.bc&&r.bc.match(/^MS(\d+)$/);
+      const m=r.bc&&r.bc.match(numPat);
       if(m) maxNum=Math.max(maxNum,parseInt(m[1],10));
     });
   });
@@ -3284,19 +3324,16 @@ function bcpAutoAssign(){
     (pg.rows||[]).forEach((r,ri)=>{
       const name=(r.n||'').trim();
       if(!name) return;
-      // すでにバーコードがある場合はスキップ
       if((r.bc||'').trim()) return;
-      // 商品マスタに登録済みでバーコードがある場合はそちらを使用
-      if(prodMap[name]&&prodMap[name].barcode){
+      // 商品マスタに登録済みでバーコードがあればそちらを使用
+      if(prodMap[name]&&(prodMap[name].barcode||'').trim()){
         pages[k].rows[ri].bc=prodMap[name].barcode;
-        assigned++;
-        return;
+        assigned++; return;
       }
-      // 新規発番
+      // 新規発番（8桁純数字）
       maxNum++;
-      const newBc='MS'+String(maxNum).padStart(6,'0');
+      const newBc=String(maxNum);
       pages[k].rows[ri].bc=newBc;
-      // 商品マスタにも登録
       if(prodMap[name]){
         prodMap[name].barcode=newBc;
       } else {
@@ -3313,30 +3350,51 @@ function bcpAutoAssign(){
       }
       assigned++;
     });
-    // Firebase同期
     if(!offline&&db) db.ref('s/'+sid+'/pages/'+k+'/rows').set(pg.rows);
   });
 
   nkSaveProducts(prods);
-
-  // 画面の入力欄も更新
   renderAllPages();
 
   const st=document.getElementById('bcpAssignStatus');
   if(assigned>0){
-    st.style.display='block';
-    st.style.color='#1a7a4a';
-    st.textContent=`✅ ${assigned}件にMS番号を割り当てました`;
+    st.style.display='block'; st.style.color='#1a7a4a';
+    st.textContent=`✅ ${assigned}件に番号を割り当てました`;
     toast(`${assigned}件に発番しました`);
   } else {
-    st.style.display='block';
-    st.style.color='#6b7a8d';
+    st.style.display='block'; st.style.color='#6b7a8d';
     st.textContent='すべての商品にすでにバーコードが設定されています';
   }
   bcpRender();
 }
 
-// ── 全ソースを統合：商品マスタ ＋ セッション入力行 ──
+// ── 既存バーコードを全クリア（商品マスタ＋セッション全行） ──
+function bcpClearAllBarcodes(){
+  if(!confirm('商品マスタおよび現在のセッション入力行のバーコードをすべて削除します。\nよろしいですか？')) return;
+
+  // 商品マスタのバーコードをクリア
+  const prods=nkGetProducts();
+  prods.forEach(p=>{ p.barcode=''; });
+  nkSaveProducts(prods);
+
+  // セッション入力行のバーコードをクリア
+  order.forEach(k=>{
+    const pg=pages[k]||{};
+    let changed=false;
+    (pg.rows||[]).forEach(r=>{ if(r.bc){r.bc=''; changed=true;} });
+    if(changed&&!offline&&db) db.ref('s/'+sid+'/pages/'+k+'/rows').set(pg.rows);
+  });
+
+  renderAllPages();
+  bcpRender();
+
+  const st=document.getElementById('bcpAssignStatus');
+  st.style.display='block'; st.style.color='#c0392b';
+  st.textContent='🗑️ すべてのバーコードを削除しました';
+  toast('バーコードをすべて削除しました');
+}
+
+
 function bcpGetAllSources(){
   const masterProds=nkGetProducts();
   const seenNames=new Set();
@@ -3878,159 +3936,12 @@ function initFixedScrollbar() {
 // ============================================================
 // バーコードスキャナー（html5-qrcode）
 // ============================================================
-let scanPageKey = null, scanRi = null, scanResult = null;
-let html5Qr = null;
 
-function loadHtml5Qr(cb) {
-  if (window.Html5Qrcode) { cb(); return; }
-  const s = document.createElement('script');
-  s.src = 'https://unpkg.com/html5-qrcode@2.3.8/html5-qrcode.min.js';
-  s.onload = cb;
-  s.onerror = () => {
-    document.getElementById('scanStatus').textContent = 'ライブラリ読み込み失敗。手動入力をご利用ください。';
-  };
-  document.head.appendChild(s);
-}
-
-function openScan(pageKey, ri) {
-  scanPageKey = pageKey; scanRi = ri; scanResult = null;
-  document.getElementById('scanModal').classList.add('show');
-  document.getElementById('scanResult').innerHTML = '<span style="color:#aaa">バーコードをフレームに合わせてください</span>';
-  document.getElementById('scanOkBtn').disabled = true;
-  document.getElementById('scanManualInp').value = '';
-  document.getElementById('scanStatus').textContent = 'ライブラリ読み込み中...';
-  document.getElementById('switchCamBtn').style.display = 'none';
-  loadHtml5Qr(startScanner);
-}
-
-function startScanner() {
-  stopScanner().then(() => {
-    document.getElementById('scanStatus').textContent = 'カメラを起動中...';
-    const wrap = document.getElementById('scanVideoWrap');
-    wrap.innerHTML = '<div id="qrReader" style="width:100%;border-radius:10px;overflow:hidden"></div>';
-    html5Qr = new Html5Qrcode('qrReader');
-    Html5Qrcode.getCameras().then(cameras => {
-      if (!cameras || cameras.length === 0) {
-        document.getElementById('scanStatus').textContent = '⚠️ カメラが見つかりません。手動入力をご利用ください。';
-        return;
-      }
-      let camId = cameras[cameras.length - 1].id;
-      const back = cameras.find(c => /back|rear|environment|後|背面/i.test(c.label));
-      if (back) camId = back.id;
-      if (cameras.length > 1) {
-        const btn = document.getElementById('switchCamBtn');
-        btn.style.display = 'inline-flex';
-        btn.dataset.cameras = JSON.stringify(cameras.map(c => c.id));
-        btn.dataset.current = camId;
-      }
-      launchCam(camId);
-    }).catch(() => launchByFacing());
-  });
-}
-
-function launchCam(camId) {
-  const cfg = {
-    fps: 15,
-    qrbox: { width: 280, height: 100 },
-    aspectRatio: 1.5,
-    formatsToSupport: [
-      Html5QrcodeSupportedFormats.EAN_13,
-      Html5QrcodeSupportedFormats.EAN_8,
-      Html5QrcodeSupportedFormats.CODE_128,
-      Html5QrcodeSupportedFormats.CODE_39,
-      Html5QrcodeSupportedFormats.UPC_A,
-      Html5QrcodeSupportedFormats.UPC_E,
-      Html5QrcodeSupportedFormats.ITF,
-    ]
-  };
-  html5Qr.start(camId, cfg, onScanSuccess, () => {}).then(() => {
-    document.getElementById('scanStatus').textContent = '📷 スキャン中… バーコードを枠に合わせてください';
-  }).catch(err => {
-    document.getElementById('scanStatus').textContent = '⚠️ カメラ起動失敗。手動入力をご利用ください。';
-    console.warn(err);
-  });
-}
-
-function launchByFacing() {
-  const cfg = { fps: 15, qrbox: { width: 280, height: 100 }, aspectRatio: 1.5 };
-  html5Qr.start({ facingMode: 'environment' }, cfg, onScanSuccess, () => {}).then(() => {
-    document.getElementById('scanStatus').textContent = '📷 スキャン中… バーコードを枠に合わせてください';
-  }).catch(() => {
-    html5Qr.start({ facingMode: 'user' }, cfg, onScanSuccess, () => {}).then(() => {
-      document.getElementById('scanStatus').textContent = '📷 スキャン中（フロントカメラ）';
-    }).catch(() => {
-      document.getElementById('scanStatus').textContent = '⚠️ カメラが使えません。手動入力をご利用ください。';
-    });
-  });
-}
-
-function switchCamera() {
-  const btn = document.getElementById('switchCamBtn');
-  const cameras = JSON.parse(btn.dataset.cameras || '[]');
-  if (cameras.length <= 1) return;
-  const idx = cameras.indexOf(btn.dataset.current);
-  const next = cameras[(idx + 1) % cameras.length];
-  btn.dataset.current = next;
-  stopScanner().then(() => {
-    const wrap = document.getElementById('scanVideoWrap');
-    wrap.innerHTML = '<div id="qrReader" style="width:100%;border-radius:10px;overflow:hidden"></div>';
-    html5Qr = new Html5Qrcode('qrReader');
-    launchCam(next);
-  });
-}
-
-function stopScanner() {
-  if (html5Qr) {
-    return html5Qr.stop().catch(() => {}).finally(() => { html5Qr = null; });
-  }
-  return Promise.resolve();
-}
-
-function onScanSuccess(code) {
-  scanResult = code;
-  document.getElementById('scanResult').innerHTML =
-    '<span>読み取り完了！</span><span class="scan-result-val">' + code + '</span>';
-  document.getElementById('scanOkBtn').disabled = false;
-  document.getElementById('scanManualInp').value = code;
-  document.getElementById('scanStatus').textContent = '✅ 読み取り成功！「この値で入力」を押してください';
-  if (navigator.vibrate) navigator.vibrate([80, 40, 80]);
-  try { html5Qr.pause(); } catch(e) {}
-}
-
-function onManualScan(val) {
-  if (val.length >= 8) {
-    scanResult = val;
-    document.getElementById('scanResult').innerHTML =
-      '<span>入力中：</span><span class="scan-result-val">' + val + '</span>';
-    document.getElementById('scanOkBtn').disabled = false;
-  } else {
-    scanResult = null;
-    document.getElementById('scanOkBtn').disabled = true;
-    document.getElementById('scanResult').innerHTML = '<span style="color:#aaa">8桁以上で確定できます</span>';
-  }
-}
-
-function confirmScan() {
-  if (!scanResult) return;
-  upd(scanPageKey, scanRi, 'bc', scanResult);
-  const inp = document.getElementById('bc_' + scanRi);
-  if (inp) inp.value = scanResult;
-  toast('バーコード「' + scanResult + '」を入力しました');
-  closeScan();
-}
-
-function closeScan() {
-  stopScanner().then(() => {
-    document.getElementById('scanModal').classList.remove('show');
-    document.getElementById('scanVideoWrap').innerHTML =
-      '<div id="qrReader" style="width:100%;border-radius:10px;overflow:hidden"></div>';
-  });
-}
-
-document.getElementById('scanModal').addEventListener('click', function(e) {
-  if (e.target === this) closeScan();
-});
 window.addEventListener('DOMContentLoaded',()=>{
+  // ホーム日付
+  const hd=document.getElementById('hmDate');
+  if(hd) hd.textContent=new Date().toLocaleDateString('ja-JP',{year:'numeric',month:'long',day:'numeric',weekday:'short'})+'　今日は何をしますか？';
+
   // 保存済み設定があれば自動接続
   const saved=localStorage.getItem(FK);
   if(saved){
@@ -4040,6 +3951,7 @@ window.addEventListener('DOMContentLoaded',()=>{
         document.getElementById('sDbUrl').value=cfg.databaseURL;
         document.getElementById('sApiKey').value=cfg.apiKey;
         document.getElementById('sProjId').value=cfg.projectId;
+        hmUpdateStatus('Firebase接続中...');
         loadFB(()=>initFB(cfg,null));
         return;
       }
@@ -4140,9 +4052,10 @@ function nkImportPaste(){
 
 
 function nkNextBarcode(){
-  const prods=nkGetProducts(); let maxNum=0;
-  prods.forEach(p=>{ const m=p.barcode&&p.barcode.match(/^MS(\d+)$/); if(m) maxNum=Math.max(maxNum,parseInt(m[1],10)); });
-  return 'MS'+String(maxNum+1).padStart(6,'0');
+  const prods=nkGetProducts(); let maxNum=10000000;
+  const numPat=/^(\d{8,})$/;
+  prods.forEach(p=>{ const m=p.barcode&&p.barcode.match(numPat); if(m) maxNum=Math.max(maxNum,parseInt(m[1],10)); });
+  return String(maxNum+1);
 }
 
 function doNyuuka(){
