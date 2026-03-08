@@ -544,6 +544,8 @@ tbody tr:hover td.sticky-name{background:#e8f0f8}
 .ms-save-btn{background:#2d7a4f;color:#fff;border:none;border-radius:8px;padding:11px 24px;font-size:14px;font-weight:700;cursor:pointer;font-family:inherit;transition:.15s}
 .ms-save-btn:hover{background:#1a5c3a}
 .ms-del-btn{background:#fee;color:#e74c3c;border:1px solid #fcc;border-radius:5px;padding:4px 10px;font-size:11px;cursor:pointer;font-family:inherit}
+.ms-drag-handle:hover{color:#2d7a4f}
+#masterTbody tr.ms-drag-over{background:#e8f5e9;outline:2px dashed #2d7a4f}
 
 .hist-card{background:#fff;border-radius:10px;padding:18px;box-shadow:0 1px 4px rgba(0,0,0,.08);margin-bottom:12px}
 .hist-card h2{font-size:15px;color:#0f2744;margin-bottom:14px;padding-bottom:8px;border-bottom:2px solid #1a6ea6;display:flex;align-items:center;gap:8px}
@@ -784,10 +786,11 @@ svg.trend-chart text{font-family:inherit}
         </div>
         <table class="master-tbl">
           <thead><tr>
-            <th style="width:40%">商品名</th>
-            <th style="width:15%">単位</th>
-            <th style="width:20%">規格・メモ</th>
-            <th style="width:15%">初期在庫数</th>
+            <th style="width:28px"></th>
+            <th style="width:38%">商品名</th>
+            <th style="width:14%">単位</th>
+            <th style="width:19%">規格・メモ</th>
+            <th style="width:14%">初期在庫数</th>
             <th style="width:10%"></th>
           </tr></thead>
           <tbody id="masterTbody"></tbody>
@@ -1576,10 +1579,11 @@ function msDeleteDept(id){
 }
 function msRenderMasterTable(){
   const el=document.getElementById('masterTbody'); if(!el)return;
-  if(!msCurDept){el.innerHTML='<tr><td colspan="5" style="text-align:center;color:#aab;padding:16px">部門を選択してください</td></tr>';return;}
+  if(!msCurDept){el.innerHTML='<tr><td colspan="6" style="text-align:center;color:#aab;padding:16px">部門を選択してください</td></tr>';return;}
   const data=msGetDepts();
   const masters=data.masters[msCurDept]||[];
-  el.innerHTML=masters.map((m,i)=>`<tr>
+  el.innerHTML=masters.map((m,i)=>`<tr draggable="true" data-mid="${m.id}" style="cursor:default">
+    <td style="text-align:center;cursor:grab;color:#bbb;font-size:16px;padding:4px 2px;user-select:none" class="ms-drag-handle" title="ドラッグして並び替え">⠿</td>
     <td><input value="${e(m.name)}" placeholder="商品名" oninput="msUpdateMaster('${m.id}','name',this.value)"></td>
     <td><select oninput="msUpdateMaster('${m.id}','unit',this.value)">
       ${['kg','g','L','ml','本','袋','個','枚','缶','箱','パック','種'].map(u=>`<option${m.unit===u?' selected':''}>${u}</option>`).join('')}
@@ -1588,6 +1592,59 @@ function msRenderMasterTable(){
     <td><input type="number" step="any" value="${e(m.init||'')}" placeholder="0" oninput="msUpdateMaster('${m.id}','init',this.value)" style="text-align:right"></td>
     <td style="text-align:center"><button class="ms-del-btn" onclick="msDeleteMasterRow('${m.id}')">削除</button></td>
   </tr>`).join('');
+  msBindMasterDrag(el);
+}
+
+// ── マスタ行ドラッグ並び替え ────────────────────────
+let _msDragSrc=null;
+function msBindMasterDrag(tbody){
+  let dragSrcEl=null;
+
+  Array.from(tbody.querySelectorAll('tr')).forEach(tr=>{
+    tr.addEventListener('dragstart',ev=>{
+      // ハンドル列以外からのドラッグは無効
+      if(!ev.target.classList.contains('ms-drag-handle')&&!ev.target.closest('tr').querySelector('.ms-drag-handle').contains(ev.target)){
+        // inputやselectからは開始させない
+        if(['INPUT','SELECT','BUTTON'].includes(ev.target.tagName)){ ev.preventDefault(); return; }
+      }
+      dragSrcEl=tr;
+      tr.style.opacity='0.4';
+      ev.dataTransfer.effectAllowed='move';
+    });
+    tr.addEventListener('dragend',()=>{
+      tr.style.opacity='';
+      tbody.querySelectorAll('tr').forEach(r=>r.classList.remove('ms-drag-over'));
+    });
+    tr.addEventListener('dragover',ev=>{
+      ev.preventDefault();
+      ev.dataTransfer.dropEffect='move';
+      tbody.querySelectorAll('tr').forEach(r=>r.classList.remove('ms-drag-over'));
+      if(tr!==dragSrcEl) tr.classList.add('ms-drag-over');
+    });
+    tr.addEventListener('dragleave',()=>tr.classList.remove('ms-drag-over'));
+    tr.addEventListener('drop',ev=>{
+      ev.preventDefault();
+      if(!dragSrcEl||dragSrcEl===tr) return;
+      tr.classList.remove('ms-drag-over');
+
+      // DOM上の順番からID順を取得して保存
+      const srcId=dragSrcEl.dataset.mid;
+      const dstId=tr.dataset.mid;
+
+      const data=msGetDepts();
+      const masters=data.masters[msCurDept]||[];
+      const srcIdx=masters.findIndex(m=>m.id===srcId);
+      const dstIdx=masters.findIndex(m=>m.id===dstId);
+      if(srcIdx<0||dstIdx<0) return;
+
+      const [moved]=masters.splice(srcIdx,1);
+      masters.splice(dstIdx,0,moved);
+      data.masters[msCurDept]=masters;
+      msSaveDepts(data);
+      msRenderMasterTable();
+      toast('順番を変更しました');
+    });
+  });
 }
 
 // インポート用セレクトをFirebase同期してから更新
@@ -3791,7 +3848,7 @@ function nkRenderArrival(){
       <option value="10"${r.z==='10'?' selected':''}>10%</option>
       <option value="8"${r.z==='8'?' selected':''}>8%</option>
     </select></td>
-    <td><input class="nk-ci" type="number" min="1" value="${r.qty}" oninput="nkArrivalRows[${i}].qty=this.value" style="text-align:right"></td>
+    <td><input class="nk-ci" type="number" min="0" value="${r.qty}" oninput="nkArrivalRows[${i}].qty=this.value" style="text-align:right"></td>
     <td><input class="nk-ci" type="number" value="${r.cost}" placeholder="原価" oninput="nkArrivalRows[${i}].cost=this.value" style="text-align:right"></td>
     <td style="background:#e8faf0">
       <input class="nk-ci" type="number" value="${r.p}" placeholder="売価"
@@ -3875,7 +3932,7 @@ function nkSaveArrival(){
       r.bc=bc;
       newCount++;
     }
-    savedItems.push({name,barcode:r.bc,qty:parseInt(r.qty)||1,cost:r.cost,price:r.p});
+    savedItems.push({name,barcode:r.bc,qty:isNaN(parseInt(r.qty))?1:parseInt(r.qty),cost:r.cost,price:r.p});
   });
 
   nkSaveProducts(prods);
