@@ -3658,6 +3658,7 @@ window.addEventListener('DOMContentLoaded',()=>{
 // ============================================================
 const PK  = 'tb_products_v1';
 const NAK = 'tb_arrivals_v1';
+const AIKK = 'tb_aikey_v1'; // Anthropic APIキー
 
 function nkGetProducts(){ try{return JSON.parse(localStorage.getItem(PK)||'[]');}catch(e){return[];} }
 function nkSaveProducts(list){ try{localStorage.setItem(PK,JSON.stringify(list));}catch(e){} }
@@ -3748,6 +3749,28 @@ function nkCameraCapture(){
 // ── 納品書OCR ─────────────────────────────────
 let nkOcrFileData=null; // {base64, mediaType}
 
+function nkGetApiKey(){ return localStorage.getItem(AIKK)||''; }
+function nkSaveApiKey(){
+  const val=(document.getElementById('nkApiKeyInput').value||'').trim();
+  if(!val){ alert('APIキーを入力してください'); return; }
+  if(!val.startsWith('sk-ant-')){ alert('APIキーは sk-ant- で始まる文字列です。\nAnthropicコンソールで確認してください。'); return; }
+  localStorage.setItem(AIKK, val);
+  document.getElementById('nkApiKeyInput').value='';
+  document.getElementById('nkApiKeySaved').style.display='inline';
+  document.getElementById('nkApiKeyBox').style.borderColor='#4caf50';
+  document.getElementById('nkApiKeyBox').style.background='#f0fff4';
+  toast('APIキーを保存しました');
+}
+
+// 起動時にAPIキー保存済みなら表示を更新
+function nkInitApiKey(){
+  if(nkGetApiKey()){
+    document.getElementById('nkApiKeySaved').style.display='inline';
+    document.getElementById('nkApiKeyBox').style.borderColor='#4caf50';
+    document.getElementById('nkApiKeyBox').style.background='#f0fff4';
+  }
+}
+
 function nkOcrDrop(ev){
   ev.preventDefault();
   document.getElementById('nkOcrDrop').classList.remove('drag-on');
@@ -3787,10 +3810,16 @@ function nkOcrLoadFile(file){
 
 async function nkRunOcr(){
   if(!nkOcrFileData){alert('ファイルを選択してください');return;}
+  const apiKey=nkGetApiKey();
+  if(!apiKey){
+    alert('APIキーが設定されていません。\n上の「🔑 Anthropic APIキー」欄に入力して保存してください。');
+    return;
+  }
   const btn=document.getElementById('nkOcrRunBtn');
   const status=document.getElementById('nkOcrStatus');
   btn.disabled=true; btn.textContent='🤖 読み取り中...';
-  status.style.display='block'; status.textContent='AIが納品書を解析しています...';
+  status.style.display='block'; status.style.color='#1a6ea6';
+  status.textContent='AIが納品書を解析しています...';
 
   const hint=(document.getElementById('nkOcrHint').value||'').trim();
   const hintText=hint?`\n\n補足指示：${hint}`:'';
@@ -3810,7 +3839,6 @@ async function nkRunOcr(){
 }${hintText}`;
 
   try{
-    // PDF は document タイプ、画像は image タイプで送る
     const contentBlock = nkOcrFileData.mediaType==='application/pdf'
       ? {type:'document', source:{type:'base64', media_type:'application/pdf', data:nkOcrFileData.base64}}
       : {type:'image',    source:{type:'base64', media_type:nkOcrFileData.mediaType, data:nkOcrFileData.base64}};
@@ -3819,23 +3847,29 @@ async function nkRunOcr(){
       method:'POST',
       headers:{
         'Content-Type':'application/json',
-        'anthropic-dangerous-direct-browser-access':'true'
+        'x-api-key': apiKey,
+        'anthropic-version': '2023-06-01',
+        'anthropic-dangerous-direct-browser-access': 'true'
       },
       body:JSON.stringify({
-        model:'claude-sonnet-4-5-20251001',
-        max_tokens:1000,
+        model:'claude-haiku-4-5-20251001',
+        max_tokens:1500,
         messages:[{role:'user', content:[contentBlock,{type:'text',text:prompt}]}]
       })
     });
     const data=await resp.json();
-    const text=(data.content||[]).map(b=>b.text||'').join('');
 
-    // JSONを抽出してパース
+    // エラーレスポンスのチェック
+    if(!resp.ok || data.type==='error'){
+      const errMsg=data.error?.message || JSON.stringify(data);
+      throw new Error(`APIエラー(${resp.status}): ${errMsg}`);
+    }
+
+    const text=(data.content||[]).map(b=>b.text||'').join('');
     const jsonMatch=text.match(/\{[\s\S]*\}/);
-    if(!jsonMatch) throw new Error('JSONが見つかりませんでした');
+    if(!jsonMatch) throw new Error('JSONが見つかりませんでした。モデルの応答: '+text.slice(0,200));
     const parsed=JSON.parse(jsonMatch[0]);
 
-    // 仕入先・日付を自動入力
     if(parsed.supplier){
       const sup=document.getElementById('nkSupplier');
       if(sup&&!sup.value) sup.value=parsed.supplier;
@@ -3845,11 +3879,9 @@ async function nkRunOcr(){
       if(dt&&!dt.value) dt.value=parsed.date;
     }
 
-    // 商品リストに追加
     const items=parsed.items||[];
     if(!items.length) throw new Error('商品が読み取れませんでした');
 
-    // 既存の空行をクリアして差し替え
     nkArrivalRows=nkArrivalRows.filter(r=>r.n.trim());
     items.forEach(it=>{
       nkArrivalRows.push({
@@ -3871,7 +3903,7 @@ async function nkRunOcr(){
     status.textContent='❌ 読み取りエラー：'+err.message;
     status.style.color='#e74c3c';
     btn.textContent='🤖 AIで読み取る';
-    console.error(err);
+    console.error('OCR error:', err);
   }
   btn.disabled=false;
 }
@@ -3889,6 +3921,7 @@ function doNyuuka(){
   nkArrivalRows=[];
   nkAddRow();
   nkShowTab('arrival');
+  nkInitApiKey();
 }
 
 function nkShowTab(name){
@@ -4259,6 +4292,21 @@ function nkRenderHistory(){
       <!-- OCR取り込みカード -->
       <div class="nk-card" id="nkOcrCard">
         <h2>📄 納品書を読み取る <span style="font-size:11px;font-weight:400;color:#6b7a8d">カメラ撮影またはファイル選択 → AIが商品リストを自動入力</span></h2>
+
+        <!-- Anthropic APIキー入力 -->
+        <div id="nkApiKeyBox" style="background:#fffbe6;border:1.5px solid #f5c518;border-radius:8px;padding:10px 14px;margin-bottom:14px">
+          <div style="font-size:12px;font-weight:700;color:#7a5800;margin-bottom:6px">🔑 Anthropic APIキー（AI読み取りに必要）</div>
+          <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">
+            <input type="password" id="nkApiKeyInput" placeholder="sk-ant-..." autocomplete="off"
+              style="flex:1;min-width:200px;padding:8px 10px;border:1px solid #e0c060;border-radius:6px;font-size:13px;font-family:monospace;background:#fff;box-sizing:border-box">
+            <button onclick="nkSaveApiKey()"
+              style="padding:8px 16px;background:#e8a000;color:#fff;border:none;border-radius:6px;font-size:12px;font-weight:700;cursor:pointer;font-family:inherit;white-space:nowrap">
+              保存
+            </button>
+            <span id="nkApiKeySaved" style="font-size:11px;color:#1a7a4a;display:none;font-weight:700">✅ 保存済み</span>
+          </div>
+          <div style="font-size:10px;color:#999;margin-top:5px">キーはこのブラウザのみに保存されます。<a href="https://console.anthropic.com/settings/keys" target="_blank" style="color:#1a6ea6">APIキーの取得はこちら</a></div>
+        </div>
 
         <!-- 撮影 / ファイル選択 ボタン -->
         <div style="display:flex;gap:10px;margin-bottom:12px;flex-wrap:wrap">
