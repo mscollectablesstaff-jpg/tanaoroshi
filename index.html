@@ -190,6 +190,114 @@ tbody tr:hover td.sticky-name{background:#e8f0f8}
 
 @media(max-width:768px){.hcard{grid-template-columns:1fr 1fr}.tbtn span{display:none}}
 
+/* ============================================================
+   スマホ専用レイアウト（max-width: 600px）
+   PC・タブレットには影響なし
+   ============================================================ */
+@media(max-width:600px){
+
+  /* ── トップバー ── */
+  .topbar{
+    height:auto;padding:6px 10px;flex-wrap:wrap;gap:4px;
+  }
+  .topbar-left{gap:6px;flex:1;min-width:0}
+  .top-logo{font-size:13px}
+  .top-session{padding:3px 8px;font-size:10px}
+  .top-code{font-size:12px;letter-spacing:1px}
+  .topbar-right{gap:4px}
+  .tbtn{padding:5px 8px;font-size:11px}
+  /* スマホでは「完了保存」「印刷」のテキストを短縮 */
+  .tbtn span{display:none}
+
+  /* ── タブ ── */
+  .tabs{padding:0 6px;overflow-x:auto;-webkit-overflow-scrolling:touch}
+  .tab{padding:10px 12px;font-size:12px}
+
+  /* ── ヘッダーカード（棚卸日・場所など） ── */
+  .hcard{
+    grid-template-columns:1fr 1fr;
+    padding:10px;gap:8px;
+  }
+  .hi{font-size:14px;padding:9px 10px} /* タップしやすく */
+
+  /* ── オンラインバー ── */
+  .online-bar{padding:4px 10px;font-size:10px}
+
+  /* ── ページタブ ── */
+  .ptabs{
+    display:flex;flex-wrap:nowrap;
+    overflow-x:auto;-webkit-overflow-scrolling:touch;
+    gap:6px;padding-bottom:4px;
+    /* スクロールバー非表示 */
+    scrollbar-width:none;
+  }
+  .ptabs::-webkit-scrollbar{display:none}
+  .ptab{flex-shrink:0}
+  .ptab-top{padding:5px 10px;font-size:11px}
+  .ptab-bot{padding:3px 5px}
+  .ptinp{width:65px;font-size:10px}
+  .ptadd{padding:6px 10px;font-size:11px}
+
+  /* ── テーブル全体 ── */
+  .twrap{border-radius:6px}
+  .tscroll{overflow-x:auto;-webkit-overflow-scrolling:touch}
+  table{font-size:11px}
+  th{padding:7px 4px;font-size:10px}
+  td{padding:3px 3px;font-size:11px}
+
+  /* ── スマホでは不要な列を隠す ── */
+  /* 仕入先・仕入率・仕入単価・バーコード・価格設定 は隠す */
+  th.sp-hide, td.sp-hide{display:none}
+
+  /* 商品名列を広めに */
+  .sticky-name{min-width:120px!important}
+
+  /* ── 小計バー ── */
+  .qbar{padding:8px 10px;gap:12px}
+  .qsv{font-size:13px}
+
+  /* ── 集計・合計パネル ── */
+  .scard{padding:14px}
+  .stbl{font-size:11px}
+  .stbl th,.stbl td{padding:6px 8px}
+  .ggrid{grid-template-columns:1fr 1fr}
+  .gi-v{font-size:15px}
+  .gi.big .gi-v{font-size:20px}
+
+  /* ── セッション画面 ── */
+  .card{padding:24px 16px}
+  .card-logo{font-size:20px}
+  .inp{font-size:15px}
+  .btn{font-size:14px;padding:14px}
+  .inp-code{font-size:22px;letter-spacing:8px}
+
+  /* ── アーカイブ・履歴 ── */
+  .arc-item{flex-wrap:wrap;gap:6px}
+  .arc-date{min-width:auto;font-size:12px}
+  .arc-btns{width:100%;justify-content:flex-end}
+  .arc-mini{flex-wrap:wrap;gap:4px}
+  .arc-mini-btn{font-size:10px;padding:4px 8px}
+
+  /* ── 月次在庫 ── */
+  .mstock-main{padding:10px}
+  .mstock-topbar{padding:8px 10px;gap:6px}
+  .ms-dept-tabs{gap:4px}
+  .ms-dept-tab{padding:6px 12px;font-size:11px}
+  .count-tbl{font-size:12px}
+  .count-tbl th,.count-tbl td{padding:5px 6px}
+  .count-inp{width:75px;font-size:13px}
+  .master-tbl{font-size:12px}
+  .master-tbl th,.master-tbl td{padding:5px 6px}
+
+  /* ── Airレジパネル ── */
+  .airpanel{padding:14px}
+  .atbl{font-size:11px}
+  .atbl th,.atbl td{padding:5px 6px}
+
+  /* ── トースト通知 ── */
+  .toast{bottom:70px;right:10px;left:10px;text-align:center;font-size:12px}
+}
+
 /* ===== 印刷メディア（横向きA4） ===== */
 @media print{
   @page{ size:A4 landscape; margin:8mm 10mm 8mm 14mm }
@@ -704,16 +812,16 @@ svg.trend-chart text{font-family:inherit}
               <th style="width:58px"><span class="th-label">個数</span><div class="col-resizer"></div></th>
               <th style="width:50px"><span class="th-label">単位</span><div class="col-resizer"></div></th>
               <th style="width:100px;background:#1a5c2e"><span class="th-label">税込単価✏️</span><div class="col-resizer"></div></th>
-              <th style="width:95px"><span class="th-label">税抜単価(自動)</span><div class="col-resizer"></div></th>
-              <th style="width:90px"><span class="th-label">10%仕入計</span><div class="col-resizer"></div></th>
-              <th style="width:90px"><span class="th-label">8%仕入計</span><div class="col-resizer"></div></th>
-              <th style="width:90px"><span class="th-label">仕入先</span><div class="col-resizer"></div></th>
-              <th style="width:58px"><span class="th-label">仕入率%</span><div class="col-resizer"></div></th>
-              <th style="width:90px"><span class="th-label">仕入単価</span><div class="col-resizer"></div></th>
+              <th style="width:95px" class="sp-hide"><span class="th-label">税抜単価(自動)</span><div class="col-resizer"></div></th>
+              <th style="width:90px" class="sp-hide"><span class="th-label">10%仕入計</span><div class="col-resizer"></div></th>
+              <th style="width:90px" class="sp-hide"><span class="th-label">8%仕入計</span><div class="col-resizer"></div></th>
+              <th style="width:90px" class="sp-hide"><span class="th-label">仕入先</span><div class="col-resizer"></div></th>
+              <th style="width:58px" class="sp-hide"><span class="th-label">仕入率%</span><div class="col-resizer"></div></th>
+              <th style="width:90px" class="sp-hide"><span class="th-label">仕入単価</span><div class="col-resizer"></div></th>
               <th style="width:95px"><span class="th-label">在庫価格</span><div class="col-resizer"></div></th>
-              <th style="width:110px" class="air"><span class="th-label">🏷バーコード</span><div class="col-resizer"></div></th>
-              <th style="width:88px" class="air"><span class="th-label">🏷価格設定</span><div class="col-resizer"></div></th>
-              <th style="width:120px"><span class="th-label">備考</span><div class="col-resizer"></div></th>
+              <th style="width:110px" class="air sp-hide"><span class="th-label">🏷バーコード</span><div class="col-resizer"></div></th>
+              <th style="width:88px" class="air sp-hide"><span class="th-label">🏷価格設定</span><div class="col-resizer"></div></th>
+              <th style="width:120px" class="sp-hide"><span class="th-label">備考</span><div class="col-resizer"></div></th>
             </tr></thead>
             <tbody id="tbody"></tbody>
             <tfoot id="tfoot"></tfoot>
@@ -2227,19 +2335,19 @@ function renderTable(){
       <td style="background:${ro?'#f8f4ff':'#e8faf0'}">
         <input class="ci r" type="number" value="${r.p}" ${d} onchange="upd('${curKey}',${ri},'p',this.value)" placeholder="税込価格" style="font-weight:700;color:#1a5c2e">
       </td>
-      <td style="background:#f5f5f5"><span class="cc" style="color:#666;font-size:11px">${c.ok?fy(c.zt):''}</span></td>
-      <td style="${bj}"><span class="cc">${(!is8&&c.ok)?fy(c.j):''}</span></td>
-      <td style="${bh}"><span class="cc" style="color:#d4a017">${(is8&&c.ok)?fy(c.h):''}</span></td>
-      <td><div class="ac-wrap"><input class="ci" value="${e(r.ss)}" ${d} data-ac="ss" onchange="upd('${curKey}',${ri},'ss',this.value);acAdd('ss',this.value)" onfocus="showAcList(this,'ss',${ri},'${curKey}')" oninput="showAcList(this,'ss',${ri},'${curKey}')" placeholder="仕入先"></div></td>
-      <td><div class="ac-wrap"><input class="ci r" type="text" inputmode="decimal" value="${r.sr}" ${d} data-ac="sr" onchange="upd('${curKey}',${ri},'sr',this.value);acAdd('sr',this.value)" onfocus="showAcList(this,'sr',${ri},'${curKey}')" oninput="showAcList(this,'sr',${ri},'${curKey}')" placeholder="%"></div></td>
-      <td><div class="ac-wrap"><input class="ci r" type="text" inputmode="decimal" value="${r.st}" ${d} data-ac="st" onchange="upd('${curKey}',${ri},'st',this.value);acAdd('st',this.value)" onfocus="showAcList(this,'st',${ri},'${curKey}')" oninput="showAcList(this,'st',${ri},'${curKey}')" placeholder="${c.st&&!r.st?c.st:''}" title="${c.st&&!r.st?'自動計算: ¥'+fm(c.st):'手入力'}"></div></td>
+      <td style="background:#f5f5f5" class="sp-hide"><span class="cc" style="color:#666;font-size:11px">${c.ok?fy(c.zt):''}</span></td>
+      <td style="${bj}" class="sp-hide"><span class="cc">${(!is8&&c.ok)?fy(c.j):''}</span></td>
+      <td style="${bh}" class="sp-hide"><span class="cc" style="color:#d4a017">${(is8&&c.ok)?fy(c.h):''}</span></td>
+      <td class="sp-hide"><div class="ac-wrap"><input class="ci" value="${e(r.ss)}" ${d} data-ac="ss" onchange="upd('${curKey}',${ri},'ss',this.value);acAdd('ss',this.value)" onfocus="showAcList(this,'ss',${ri},'${curKey}')" oninput="showAcList(this,'ss',${ri},'${curKey}')" placeholder="仕入先"></div></td>
+      <td class="sp-hide"><div class="ac-wrap"><input class="ci r" type="text" inputmode="decimal" value="${r.sr}" ${d} data-ac="sr" onchange="upd('${curKey}',${ri},'sr',this.value);acAdd('sr',this.value)" onfocus="showAcList(this,'sr',${ri},'${curKey}')" oninput="showAcList(this,'sr',${ri},'${curKey}')" placeholder="%"></div></td>
+      <td class="sp-hide"><div class="ac-wrap"><input class="ci r" type="text" inputmode="decimal" value="${r.st}" ${d} data-ac="st" onchange="upd('${curKey}',${ri},'st',this.value);acAdd('st',this.value)" onfocus="showAcList(this,'st',${ri},'${curKey}')" oninput="showAcList(this,'st',${ri},'${curKey}')" placeholder="${c.st&&!r.st?c.st:''}" title="${c.st&&!r.st?'自動計算: ¥'+fm(c.st):'手入力'}"></div></td>
       <td style="${bz}"><span class="cc g">${c.zk?fy(c.zk):''}</span>${c.st&&!r.st&&c.zk?`<br><span style="font-size:9px;color:#888">自動計算</span>`:''}</td>
-      <td style="white-space:nowrap"><input class="ci" style="border:1px solid rgba(255,102,0,.2);width:calc(100% - 30px)" value="${e(r.bc)}" ${d} id="bc_${ri}" onchange="upd('${curKey}',${ri},'bc',this.value)" placeholder="バーコード">${d?'':'<button class="scan-cam-btn" onclick="openScan(\''+curKey+'\','+ri+')" title="カメラで読み取り">📷</button>'}</td>
-      <td><select class="ci c" ${d} onchange="upd('${curKey}',${ri},'pt',this.value)">
+      <td style="white-space:nowrap" class="sp-hide"><input class="ci" style="border:1px solid rgba(255,102,0,.2);width:calc(100% - 30px)" value="${e(r.bc)}" ${d} id="bc_${ri}" onchange="upd('${curKey}',${ri},'bc',this.value)" placeholder="バーコード">${d?'':'<button class="scan-cam-btn" onclick="openScan(\''+curKey+'\','+ri+')" title="カメラで読み取り">📷</button>'}</td>
+      <td class="sp-hide"><select class="ci c" ${d} onchange="upd('${curKey}',${ri},'pt',this.value)">
         <option value="通常"${r.pt==='通常'?' selected':''}>通常</option>
         <option value="部門打ち"${r.pt==='部門打ち'?' selected':''}>部門打ち</option>
       </select></td>
-      <td><div class="ac-wrap"><input class="ci" value="${e(r.b)}" ${d} data-ac="b" onchange="upd('${curKey}',${ri},'b',this.value);acAdd('b',this.value)" onfocus="showAcList(this,'b',${ri},'${curKey}')" oninput="showAcList(this,'b',${ri},'${curKey}')" placeholder="備考"></div></td>
+      <td class="sp-hide"><div class="ac-wrap"><input class="ci" value="${e(r.b)}" ${d} data-ac="b" onchange="upd('${curKey}',${ri},'b',this.value);acAdd('b',this.value)" onfocus="showAcList(this,'b',${ri},'${curKey}')" oninput="showAcList(this,'b',${ri},'${curKey}')" placeholder="備考"></div></td>
     </tr>`;
   });
   tbody.innerHTML=h;
@@ -2249,11 +2357,11 @@ function renderTable(){
     <td class="sticky-col sticky-no" style="background:#0f2744"></td>
     <td class="sticky-col sticky-del" style="background:#0f2744"></td>
     <td class="sticky-col sticky-name" colspan="6" style="background:#0f2744;color:#fff;font-weight:700;text-align:right">頁　小計</td>
-    <td class="tfn">${sub.p10?fm(sub.p10):''}</td>
-    <td class="tfn" style="color:#ffd97d">${sub.p8?fm(sub.p8):''}</td>
-    <td colspan="3" class="tfl">在庫合計</td>
+    <td class="tfn sp-hide">${sub.p10?fm(sub.p10):''}</td>
+    <td class="tfn sp-hide" style="color:#ffd97d">${sub.p8?fm(sub.p8):''}</td>
+    <td colspan="3" class="tfl sp-hide">在庫合計</td>
     <td class="tfn" style="color:#7fffb0">${sub.z?fm(sub.z):''}</td>
-    <td colspan="3"></td>
+    <td colspan="3" class="sp-hide"></td>
   </tr>`;
   document.getElementById('roNote').innerHTML='';
   initColResize();
