@@ -518,17 +518,15 @@ function showPage(id){
 // ============================================================
 function parsePaste(){
   const t=document.getElementById('fcPaste').value;
-  // キー: "値" または キー: '値' の両パターンに対応
-  function g(key){
-    const patterns=[
-      new RegExp(key+'\\s*:\\s*"([^"]+)"'),
-      new RegExp(key+"\\s*:\\s*'([^']+)'"),
-      new RegExp(key+'\\s*:\\s*([^,\'"\\s}]+)')
-    ];
-    for(const p of patterns){const m=t.match(p);if(m&&m[1])return m[1].trim();}
-    return '';
-  }
-  const url=g('databaseURL'), api=g('apiKey'), proj=g('projectId');
+  // 1行ずつスキャンしてキー: "値" を抽出
+  const map={};
+  t.split('\n').forEach(line=>{
+    const m=line.match(/^\s*(\w+)\s*:\s*["']?([^"',\s}]+)/);
+    if(m) map[m[1]]=m[2].trim();
+  });
+  const url=map['databaseURL']||'';
+  const api=map['apiKey']||'';
+  const proj=map['projectId']||'';
   if(url) document.getElementById('sDbUrl').value=url;
   if(api) document.getElementById('sApiKey').value=api;
   if(proj) document.getElementById('sProjId').value=proj;
