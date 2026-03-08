@@ -373,15 +373,12 @@ tbody tr:hover td.sticky-name{background:#e8f0f8}
 
     <!-- Airレジパネル -->
     <div class="panel" id="pnl-air">
-
-      <!-- 手順ガイド -->
       <div class="airpanel" style="background:#fff8f0;border:1.5px solid #FF6600;border-radius:10px;padding:14px;margin-bottom:12px">
         <div style="font-weight:700;color:#FF6600;font-size:13px;margin-bottom:8px">📋 エアレジへの登録手順</div>
         <div style="font-size:12px;color:#5a3000;line-height:2">
           <b>① エアレジ バックオフィス「商品設定」→「カテゴリー設定画面」</b>でブランド名をカテゴリー登録<br>
-          <b>② 「商品をCSVで編集する」→「カテゴリーID確認用ファイル」をDL</b>して下にアップロード<br>
-          <b>③ 同じく「商品一括編集用CSVファイル」もDL</b>して下にアップロード<br>
-          <b>④ ページとカテゴリーを対応づけ</b> → 商品CSVをダウンロード → エアレジにアップロード
+          <b>②「商品をCSVで編集する」→「カテゴリーID確認用ファイルをダウンロード」</b>→ 下にアップロード<br>
+          <b>③ ページとカテゴリーを対応づけ</b>してから商品CSVをダウンロード → エアレジにアップロード
         </div>
       </div>
 
@@ -390,44 +387,24 @@ tbody tr:hover td.sticky-name{background:#e8f0f8}
           <div class="airpt">商品登録CSV <span class="airbadge">商品一括編集</span></div>
           <button class="tbtn tbtn-air" onclick="dlAir()">💾 ダウンロード</button>
         </div>
+        <div class="ibox">バックオフィス →「商品設定」→「商品をCSVで編集する」からアップロード</div>
 
-        <!-- STEP A: カテゴリーID確認用ファイル -->
-        <div style="background:#f0f4ff;border:1.5px solid #4a6fa5;border-radius:8px;padding:12px;margin-bottom:10px">
-          <div style="font-weight:700;color:#1a3a6e;font-size:12px;margin-bottom:8px">
-            STEP A｜カテゴリーID確認用ファイルをアップロード
-            <span style="font-weight:400;color:#888;margin-left:8px">バックオフィス →「商品をCSVで編集する」→「カテゴリーID確認用ファイルをダウンロード」</span>
-          </div>
-          <div class="uarea" style="padding:12px;margin:0" onclick="document.getElementById('catIdFile').click()">
-            <div class="ui" style="font-size:20px">🗂</div>
-            <p style="margin:4px 0 0">カテゴリーID確認用ファイル（CSV）</p>
-            <input type="file" id="catIdFile" accept=".csv" style="display:none">
-          </div>
-          <div class="minfo" id="catFileInfo"></div>
+        <div class="uarea" onclick="document.getElementById('airFile').click()">
+          <div class="ui">📁</div>
+          <p><b>カテゴリーID確認用ファイル</b> または <b>既存商品CSV</b> をアップロード<br>
+          <span style="font-size:11px;color:#aaa">どちらでも自動で判別します</span></p>
+          <input type="file" id="airFile" accept=".csv" style="display:none">
         </div>
+        <div class="minfo" id="airMergeInfo"></div>
 
-        <!-- STEP B: 商品CSV -->
-        <div style="background:#f5f5f5;border:1.5px solid #c0ccd8;border-radius:8px;padding:12px;margin-bottom:10px">
-          <div style="font-weight:700;color:#444;font-size:12px;margin-bottom:8px">
-            STEP B｜既存商品CSVをアップロード（任意・既存商品をマージする場合）
-            <span style="font-weight:400;color:#888;margin-left:8px">バックオフィス →「商品をCSVで編集する」→「商品一括編集用ファイルをダウンロード」</span>
-          </div>
-          <div class="uarea" style="padding:12px;margin:0" onclick="document.getElementById('airFile').click()">
-            <div class="ui" style="font-size:20px">📁</div>
-            <p style="margin:4px 0 0">既存Airレジ商品CSV（任意）</p>
-            <input type="file" id="airFile" accept=".csv" style="display:none">
-          </div>
-          <div class="minfo" id="airMergeInfo"></div>
-        </div>
-
-        <!-- カテゴリー割り当てUI -->
-        <div id="catAssignBox" style="display:none;margin-bottom:12px;background:#fff8f0;border:1.5px solid #FF6600;border-radius:8px;padding:14px">
+        <!-- カテゴリー割り当てUI（アップロード後に表示） -->
+        <div id="catAssignBox" style="display:none;margin-top:12px;margin-bottom:8px;background:#fff8f0;border:1.5px solid #FF6600;border-radius:8px;padding:14px">
           <div style="font-weight:700;color:#FF6600;margin-bottom:10px;font-size:13px">🏷 ページとカテゴリーを対応づける</div>
           <div id="catAssignRows"></div>
-          <div style="margin-top:10px;font-size:11px;color:#888">選択したカテゴリーが商品CSVに反映されます</div>
+          <div style="margin-top:10px;font-size:11px;color:#888">選択したカテゴリーIDが商品CSVに反映されます</div>
         </div>
 
-        <div class="ibox">設定完了後、「💾 ダウンロード」→ バックオフィス「商品をCSVで編集する」からアップロード</div>
-        <div style="overflow-x:auto"><table class="atbl"><thead><tr>
+        <div style="overflow-x:auto;margin-top:6px"><table class="atbl"><thead><tr>
           <th class="chkcol">出力</th><th>商品名</th><th>カテゴリー</th><th>税率</th>
           <th>税込価格</th><th>原価</th><th>在庫数</th><th>バーコード</th><th>備考</th>
         </tr></thead><tbody id="airBody"></tbody></table></div>
@@ -489,12 +466,22 @@ tbody tr:hover td.sticky-name{background:#e8f0f8}
 // 定数
 // ============================================================
 const CATS = [
-  {id:'',l:'カテゴリー未設定'},{id:'0002',l:'0002:はちみつ'},{id:'0001',l:'0001:雑貨'},
-  {id:'0006',l:'0006:エムズオリジナル'},{id:'0004',l:'0004:ミツロウ'},{id:'0003',l:'0003:靴'},
-  {id:'0009',l:'0009:個人作家'},{id:'0005',l:'0005:服・靴下'},{id:'0008',l:'0008:食品'},
-  {id:'0010',l:'0010:送料・袋・包装'},{id:'0012',l:'0012:ドライフラワー・植物'},
-  {id:'0013',l:'0013:委託'},{id:'0014',l:'0014:企画展'}
+  {id:'',l:'── カテゴリー未設定 ──'},
+  {id:'0002',l:'はちみつ'},
+  {id:'0001',l:'雑貨'},
+  {id:'0006',l:'エムズオリジナル'},
+  {id:'0004',l:'ミツロウ'},
+  {id:'0003',l:'靴'},
+  {id:'0009',l:'個人作家'},
+  {id:'0005',l:'服・靴下'},
+  {id:'0008',l:'食品'},
+  {id:'0010',l:'送料・袋・包装'},
+  {id:'0012',l:'ドライフラワー・植物'},
+  {id:'0013',l:'委託'},
+  {id:'0014',l:'企画展'}
 ];
+// カテゴリー一覧（初期値はCATS、カテゴリーID確認用ファイルで上書き可能）
+let airCats = CATS.filter(c=>c.id).map(c=>({id:c.id, name:c.l}));
 const R = 25;
 const FK = 'tb_fb_v3';
 const RK = 'tb_recent_v3';
@@ -834,23 +821,25 @@ function fy(n){return '¥'+(n?fm(n):'0');}
 function renderAll(){renderPTabs();renderTable();renderQbar();}
 
 function renderPTabs(){
+function renderPTabs(){
   const el=document.getElementById('ptabs');if(!el)return;
   let h='';
   order.forEach((k,i)=>{
     const pg=pages[k]||{}, on=k===curKey;
     const t=pg.tanto||'', catId=pg.catId||'';
+    const catLabel=((CATS.find(c=>c.id===catId)||{}).l||catId||'未設定');
+    const opts=CATS.map(c=>`<option value="${e(c.id)}"${catId===c.id?' selected':''}>${e(c.l)}</option>`).join('');
     h+=`<div class="ptab">
       <div class="ptab-top${on?' on':''}" onclick="switchPage('${k}')">
         <span>${i+1}P</span>
         <span style="font-size:11px;max-width:110px;overflow:hidden;text-overflow:ellipsis">${e(t)||'未設定'}</span>
-        ${catId?`<span style="font-size:9px;background:#FF6600;color:#fff;border-radius:3px;padding:1px 5px">ID:${catId}</span>`:'<span style="font-size:9px;background:#aaa;color:#fff;border-radius:3px;padding:1px 5px">ID未設定</span>'}
+        ${catId?`<span style="font-size:9px;background:#FF6600;color:#fff;border-radius:3px;padding:1px 5px">${e(catLabel)}</span>`:''}
       </div>
       <div class="ptab-bot" style="flex-wrap:wrap;gap:4px;padding:5px 6px">
-        <input class="ptinp" style="width:100px" value="${e(t)}" placeholder="ブランド名（=カテゴリー名）" onchange="updTanto('${k}',this.value)" title="このページのブランド名がエアレジのカテゴリー名になります">
-        <div style="display:flex;align-items:center;gap:3px">
-          <span style="font-size:10px;color:#888;white-space:nowrap">カテゴリーID:</span>
-          <input class="ptinp" style="width:55px;font-family:monospace;color:#FF6600;font-weight:700" value="${e(catId)}" placeholder="例:0015" onchange="updPageCatId('${k}',this.value)" title="エアレジで新規作成するカテゴリーのID（4桁推奨）">
-        </div>
+        <input class="ptinp" style="width:90px" value="${e(t)}" placeholder="ブランド名" onchange="updTanto('${k}',this.value)">
+        <select class="ptinp" style="width:170px;color:${catId?'#FF6600':'#888'};font-weight:${catId?'700':'400'}" onchange="updPageCatId('${k}',this.value)">
+          ${opts}
+        </select>
         ${order.length>1?`<button class="ptdel" onclick="delPage('${k}')">✕</button>`:''}
       </div>
     </div>`;
@@ -1219,11 +1208,14 @@ function renderAirTable(){
   const prods=getProds();
   document.getElementById('airBody').innerHTML=prods.length?prods.map((p,i)=>{
     const c=calc(p), tl=p.z==='8'?'<span class="tax8b">軽減8%</span>':'<span class="tax10b">標準10%</span>';
-    const cat = p.catName ? `<span style="font-weight:600;color:#FF6600">${e(p.catName)}</span>${p.cat?`<span style="font-size:10px;color:#aaa;margin-left:4px">ID:${p.cat}</span>`:'<span style="font-size:10px;color:#e74c3c;margin-left:4px">⚠️ID未設定</span>'}` : '<span style="color:#aaa">未設定</span>';
+    const cat = airCats.find(x=>x.id===p.cat);
+    const catDisp = p.cat
+      ? `<span style="font-weight:600;color:#FF6600">${e(cat?.name||p.cat)}</span>`
+      : '<span style="color:#aaa">未設定</span>';
     return `<tr>
       <td class="chkcol"><input type="checkbox" id="ac${i}" checked style="width:15px;height:15px;cursor:pointer;accent-color:#FF6600"></td>
       <td style="font-weight:600;color:#0f2744">${e(p.n)}</td>
-      <td style="font-size:11px">${cat}</td><td>${tl}</td>
+      <td style="font-size:11px">${catDisp}</td><td>${tl}</td>
       <td><span class="aprice">¥${fm(c.p)||0}</span><br><span style="font-size:10px;color:#6b7a8d">内税</span></td>
       <td style="color:#1a7a4a">¥${fm(parseFloat(p.st))||0}</td>
       <td style="text-align:center;background:#e8f5e9;font-weight:700;color:#1a5c2e">${Math.floor(parseFloat(p.k)||0)}</td>
@@ -1266,41 +1258,7 @@ function setupFiles(){
   if(af) af.addEventListener('change',ev=>{if(ev.target.files[0])readAirFile(ev.target.files[0]);});
   const zf=document.getElementById('zFile');
   if(zf) zf.addEventListener('change',ev=>{if(ev.target.files[0])readZFile(ev.target.files[0]);});
-  const cf=document.getElementById('catIdFile');
-  if(cf) cf.addEventListener('change',ev=>{if(ev.target.files[0])readCatIdFile(ev.target.files[0]);});
 }
-
-// カテゴリーID確認用ファイルの読み込み
-function readCatIdFile(f){
-  const rd=new FileReader();
-  rd.onload=ev=>{
-    const arr=new Uint8Array(ev.target.result); let csv='';
-    try{const u=Encoding.convert(arr,{to:'UNICODE',from:'SJIS'});for(let i=0;i<u.length;i++)csv+=String.fromCharCode(u[i]);}
-    catch(_){csv=new TextDecoder('utf-8').decode(arr);}
-    const lines=csv.split('\n').map(l=>l.trim()).filter(Boolean);
-    airCats=[];
-    // ヘッダー行をスキップ（1行目またはIDっぽくない行）
-    for(let i=0;i<lines.length;i++){
-      const cols=parseCsv(lines[i]);
-      if(!cols[0]||cols[0]==='カテゴリーID'||cols[0]==='ID') continue;
-      const id=(cols[0]||'').trim();
-      const name=(cols[1]||cols[0]||'').trim();
-      if(id) airCats.push({id, name});
-    }
-    const el=document.getElementById('catFileInfo');
-    if(el){
-      el.style.display='block';
-      el.style.background='#e8f4fd'; el.style.borderColor='#1a6ea6'; el.style.color='#0f2744';
-      el.textContent='✅ カテゴリー '+airCats.length+'件を読み込みました：'+airCats.map(c=>c.name||c.id).join('、');
-    }
-    toast('カテゴリー '+airCats.length+'件を読み込みました');
-    renderCatAssign();
-    renderAirTable();
-  };
-  rd.readAsArrayBuffer(f);
-}
-
-let airCats = []; // CSVから抽出したカテゴリー一覧 [{id, name}]
 
 function readAirFile(f){
   const rd=new FileReader();
@@ -1308,29 +1266,56 @@ function readAirFile(f){
     const arr=new Uint8Array(ev.target.result); let csv='';
     try{const u=Encoding.convert(arr,{to:'UNICODE',from:'SJIS'});for(let i=0;i<u.length;i++)csv+=String.fromCharCode(u[i]);}
     catch(_){csv=new TextDecoder('utf-8').decode(arr);}
-    const lines=csv.split('\n'); airExist=[];
-    if(lines[0]&&!lines[0].includes(',')) airVer=lines[0].trim();
-    for(let i=2;i<lines.length;i++){const l=lines[i].trim();if(l){const r=parseCsv(l);if(r.length>=5&&r[0])airExist.push(r);}}
 
-    // カテゴリーを抽出（列index=3がカテゴリーID、ヘッダー行=index1から名前対応表を作る）
-    // ヘッダー行(index=1)を取得してカラム位置を確認
-    const headLine = lines[1]||'';
+    const rawLines=csv.split('\n');
+    // バージョン行があれば取得（1行目がカンマなし＝バージョン文字列）
+    const hasVer = rawLines[0]&&!rawLines[0].includes(',');
+    const headLine = rawLines[hasVer?1:0]||'';
     const heads = parseCsv(headLine);
-    const catIdIdx = heads.findIndex(h=>h.includes('カテゴリーID'));
-    const catIdCol = catIdIdx >= 0 ? catIdIdx : 3;
 
-    // カテゴリーID一覧を収集（重複排除）
-    const catMap = {};
-    airExist.forEach(r=>{
-      const cid = (r[catIdCol]||'').trim();
-      if(cid) catMap[cid] = true;
-    });
-    airCats = Object.keys(catMap).sort().map(id=>({id, name:id}));
+    // ---- ファイル種別の自動判定 ----
+    // カテゴリーID確認用ファイル: 列数が少ない（≤4）かつヘッダーが「カテゴリーID」「カテゴリー名」
+    const isCatFile = heads.length <= 4 ||
+      (heads[0]&&(heads[0].includes('カテゴリー')||heads[0]==='ID'));
 
     const el=document.getElementById('airMergeInfo');
     el.style.display='block';
-    el.textContent='✅ 既存CSV '+airExist.length+'件を読み込みました';
-    toast('既存CSV '+airExist.length+'件読み込み完了（カテゴリー'+airCats.length+'件）');
+
+    if(isCatFile){
+      // カテゴリーID確認用ファイル
+      airCats=[];
+      const startLine = hasVer ? 2 : 1;
+      for(let i=startLine;i<rawLines.length;i++){
+        const l=rawLines[i].trim(); if(!l) continue;
+        const cols=parseCsv(l);
+        const id=(cols[0]||'').trim();
+        const name=(cols[1]||cols[0]||'').trim();
+        if(id && id!=='カテゴリーID' && id!=='ID') airCats.push({id,name});
+      }
+      el.style.background='#e8f4fd'; el.style.borderColor='#1a6ea6'; el.style.color='#0f2744';
+      el.textContent='✅ カテゴリー '+airCats.length+'件を読み込みました：'+airCats.map(c=>c.name+(c.name!==c.id?' ('+c.id+')':'')).join('、');
+      toast('カテゴリー '+airCats.length+'件読み込み完了');
+    } else {
+      // 商品一括編集CSV
+      airExist=[];
+      if(hasVer) airVer=rawLines[0].trim();
+      const catIdCol = Math.max(0, heads.findIndex(h=>h.includes('カテゴリーID')));
+      const startLine = hasVer ? 2 : 1;
+      for(let i=startLine;i<rawLines.length;i++){
+        const l=rawLines[i].trim();if(!l) continue;
+        const r=parseCsv(l);
+        if(r.length>=5&&r[0]) airExist.push(r);
+      }
+      // 商品CSVからもカテゴリーを抽出（名前なし・IDのみ）
+      if(!airCats.length){
+        const catMap={};
+        airExist.forEach(r=>{const cid=(r[catIdCol]||'').trim();if(cid)catMap[cid]=true;});
+        airCats=Object.keys(catMap).sort().map(id=>({id,name:id}));
+      }
+      el.style.background=''; el.style.borderColor=''; el.style.color='';
+      el.textContent='✅ 既存CSV '+airExist.length+'件を読み込みました';
+      toast('既存CSV '+airExist.length+'件読み込み完了');
+    }
 
     renderCatAssign();
     renderAirTable();
@@ -1360,7 +1345,7 @@ function renderCatAssign(){
       <select style="flex:1;min-width:200px;padding:7px 10px;border:1.5px solid #FF6600;border-radius:6px;font-size:13px;color:#FF6600;font-weight:700;font-family:inherit;background:#fff"
         onchange="setPageCatId('${k}',this.value)">${opts}</select>
       <div style="font-size:11px;white-space:nowrap;color:${cur?'#1a7a4a':'#e74c3c'}">
-        ${cur?'✅ '+e(curCat?.name||cur):'⚠️ 未設定'}
+        ${cur?'✅ '+(curCat?curCat.name:cur):'⚠️ 未設定'}
       </div>
     </div>`;
   });
