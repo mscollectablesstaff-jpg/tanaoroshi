@@ -8,7 +8,6 @@
 <script src="https://cdn.jsdelivr.net/npm/encoding-japanese@2.0.0/encoding.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jsbarcode/3.11.5/JsBarcode.all.min.js"></script>
-<script src="https://cdn.jsdelivr.net/npm/tesseract.js@5/dist/tesseract.min.js"></script>
 <style>
 *{margin:0;padding:0;box-sizing:border-box}
 html,body{width:100%;min-height:100vh;font-family:'Noto Sans JP',sans-serif;font-size:13px;background:#f0f2f5;color:#1a2332}
@@ -3666,183 +3665,80 @@ function nkSaveProducts(list){ try{localStorage.setItem(PK,JSON.stringify(list))
 function nkGetArrivals(){ try{return JSON.parse(localStorage.getItem(NAK)||'[]');}catch(e){return[];} }
 function nkSaveArrivals(list){ try{localStorage.setItem(NAK,JSON.stringify(list.slice(0,500)));}catch(e){} }
 
-// ── 納品書OCR ─────────────────────────────────
-let nkOcrFileData=null;
+// ── Claude貼り付けインポート ─────────────────────
 
-function nkOcrDrop(ev){
-  ev.preventDefault();
-  document.getElementById('nkOcrDrop').classList.remove('drag-on');
-  const file=ev.dataTransfer.files[0]; if(!file)return;
-  nkOcrLoadFile(file);
-}
-function nkOcrFileSelected(input){
-  const file=input.files[0]; if(!file)return;
-  nkOcrLoadFile(file);
-  // 同じファイルを再選択できるようにリセット
-  input.value='';
-}
-
-function nkOcrLoadFile(file){
-  const allowed=['image/jpeg','image/png','image/webp','image/gif','application/pdf'];
-  if(!allowed.includes(file.type)){alert('JPG/PNG/PDF ファイルを選択してください');return;}
-  const reader=new FileReader();
-  reader.onload=ev=>{
-    const dataUrl=ev.target.result;
-    nkOcrFileData={dataUrl, mediaType:file.type, name:file.name};
-    const pa=document.getElementById('nkOcrPreviewArea');
-    const img=document.getElementById('nkOcrPreviewImg');
-    const pdfDiv=document.getElementById('nkOcrPreviewPdf');
-    pa.style.display='block';
-    if(file.type==='application/pdf'){
-      img.style.display='none';
-      pdfDiv.style.display='block';
-      document.getElementById('nkOcrPdfName').textContent=file.name;
-    } else {
-      img.src=dataUrl; img.style.display='block';
-      pdfDiv.style.display='none';
-    }
-    document.getElementById('nkOcrStatus').style.display='none';
-  };
-  reader.readAsDataURL(file);
+function nkCopyPrompt(){
+  const txt=document.getElementById('nkPromptBox').textContent;
+  navigator.clipboard.writeText(txt).then(()=>{
+    toast('プロンプトをコピーしました。Claudeに貼り付けてください');
+  }).catch(()=>{
+    // fallback
+    const ta=document.createElement('textarea');
+    ta.value=txt; document.body.appendChild(ta);
+    ta.select(); document.execCommand('copy'); document.body.removeChild(ta);
+    toast('プロンプトをコピーしました');
+  });
 }
 
-// ── Tesseract.js OCR（完全無料・ブラウザ内処理）─────────
-async function nkRunOcr(){
-  if(!nkOcrFileData){alert('写真またはファイルを選択してください');return;}
+function nkImportPaste(){
+  const raw=(document.getElementById('nkPasteArea').value||'').trim();
+  const status=document.getElementById('nkPasteStatus');
+  status.style.display='none';
 
-  // Tesseract.js がロードされているか確認
-  if(typeof Tesseract==='undefined'){
-    alert('OCRライブラリの読み込みに失敗しました。\nページを再読み込み（Ctrl+Shift+R）してから再試行してください。');
+  if(!raw){ alert('Claudeの出力テキストを貼り付けてください'); return; }
+
+  const lines=raw.split('\n').map(l=>l.trim()).filter(l=>l&&!l.startsWith('//'));
+  const items=[];
+  const errors=[];
+
+  lines.forEach((line,i)=>{
+    // コードブロック記法や空行を無視
+    if(line.startsWith('```')||line.startsWith('#')||line==='-') return;
+
+    // カンマ区切りでパース（全角カンマも対応）
+    const cols=line.split(/[,，]/).map(c=>c.trim());
+    if(cols.length<2){ errors.push(`行${i+1}: 「${line}」（スキップ）`); return; }
+
+    const name=cols[0].replace(/^["「『]|["」』]$/g,'').trim();
+    if(!name){ errors.push(`行${i+1}: 商品名なし（スキップ）`); return; }
+
+    const qty=parseInt(cols[1])||1;
+    const cost=cols[2]?cols[2].replace(/[¥￥,，\s]/g,''):'';
+    const taxRate=(cols[3]||'').replace(/[^0-9]/g,'');
+    const z=(taxRate==='8')?'8':'10';
+
+    items.push({n:name, z, qty, cost, p:'', u:'点', cat:'', catId:'', bc:'', isNew:true});
+  });
+
+  if(!items.length){
+    status.style.display='block';
+    status.style.color='#e74c3c';
+    status.textContent='❌ 読み込める行がありませんでした。Claudeに指定フォーマットで出力させてください。';
     return;
   }
 
-  const btn=document.getElementById('nkOcrRunBtn');
-  const status=document.getElementById('nkOcrStatus');
-  btn.disabled=true;
+  // 既存の空行をクリアして追加
+  nkArrivalRows=nkArrivalRows.filter(r=>r.n.trim());
+  items.forEach(it=>nkArrivalRows.push(it));
+  if(!nkArrivalRows.length) nkAddRow();
+  nkRenderArrival();
+
+  document.getElementById('nkPasteArea').value='';
+  document.getElementById('nkPasteArea').style.borderColor='#c8d4f0';
+
   status.style.display='block';
+  status.style.color='#1a7a4a';
+  let msg=`✅ ${items.length}件を読み込みました。内容を確認・修正して保存してください。`;
+  if(errors.length) msg+=`　（${errors.length}行スキップ）`;
+  status.textContent=msg;
 
-  const setMsg=(msg,color)=>{
-    status.style.color=color||'#1a6ea6';
-    status.textContent=msg;
-  };
+  toast(`${items.length}件インポートしました`);
 
-  try{
-    setMsg('📥 日本語OCRデータを準備中（初回は20秒ほどかかります）...');
-    btn.textContent='⏳ 処理中...';
-
-    // v5の推奨API: Tesseract.recognize() を直接呼ぶ
-    const result = await Tesseract.recognize(
-      nkOcrFileData.dataUrl,
-      'jpn+eng',
-      {
-        logger: m=>{
-          if(m.status==='recognizing text'){
-            const pct=Math.round((m.progress||0)*100);
-            btn.textContent=`⏳ 読み取り中 ${pct}%`;
-            setMsg(`🔍 OCR処理中… ${pct}%`);
-          } else if(m.status==='loading language traineddata'){
-            setMsg('📥 日本語データを読み込み中（初回のみ）...');
-            btn.textContent='⏳ ダウンロード中...';
-          } else if(m.status==='initializing tesseract'){
-            setMsg('⚙️ OCRエンジンを起動中...');
-          }
-        }
-      }
-    );
-
-    const text = result.data.text || '';
-
-    if(!text.trim()) throw new Error('文字が読み取れませんでした。写真をもっと明るく・鮮明に撮り直してください。');
-
-    // OCRテキスト全文を確認用に表示
-    nkShowOcrRaw(text);
-
-    // 商品行を抽出
-    const lines = text.split('\n').map(l=>l.trim()).filter(l=>l.length>1);
-    const items = nkParseOcrLines(lines);
-
-    if(items.length===0){
-      setMsg('⚠️ 商品の自動解析が難しい形式でした。下のOCR生テキストを参考に手動で入力してください。', '#e67e00');
-      btn.textContent='🔍 もう一度読み取る';
-      btn.disabled=false;
-      return;
-    }
-
-    // 商品リストに追加
-    nkArrivalRows=nkArrivalRows.filter(r=>r.n.trim());
-    items.forEach(it=>{
-      nkArrivalRows.push({
-        n:it.name, z:'10', qty:it.qty||1,
-        cost:it.cost||'', p:'', u:it.unit||'点',
-        cat:'', catId:'', bc:'', isNew:true
-      });
-    });
-    if(!nkArrivalRows.length) nkAddRow();
-    nkRenderArrival();
-
-    setMsg(`✅ ${items.length}件を読み取りました。内容を確認・修正してから保存してください。`, '#1a7a4a');
-    btn.textContent='🔍 もう一度読み取る';
-
-  }catch(err){
-    status.style.color='#e74c3c';
-    status.textContent='❌ エラー：'+err.message;
-    btn.textContent='🔍 OCRで読み取る';
-    console.error('OCR error:',err);
-  }
-  btn.disabled=false;
-}
-
-// OCR生テキスト表示エリアを作成・更新
-function nkShowOcrRaw(text){
-  let box=document.getElementById('nkOcrRawBox');
-  if(!box){
-    box=document.createElement('div');
-    box.id='nkOcrRawBox';
-    box.style.cssText='margin-top:12px;border:1px solid #dde3ea;border-radius:6px;overflow:hidden';
-    const header=document.createElement('div');
-    header.style.cssText='background:#f0f2f5;padding:6px 12px;font-size:11px;font-weight:700;color:#6b7a8d;cursor:pointer;display:flex;justify-content:space-between;align-items:center';
-    header.innerHTML='📋 OCR生テキスト（参考）<span style="font-size:10px;color:#1a6ea6">▼ タップで開閉</span>';
-    const pre=document.createElement('pre');
-    pre.id='nkOcrRawPre';
-    pre.style.cssText='margin:0;padding:10px 12px;font-size:10px;line-height:1.6;max-height:160px;overflow-y:auto;background:#fafbfc;white-space:pre-wrap;word-break:break-all;display:none;font-family:monospace';
-    header.onclick=()=>{ pre.style.display=pre.style.display==='none'?'block':'none'; };
-    box.appendChild(header);
-    box.appendChild(pre);
-    document.getElementById('nkOcrStatus').after(box);
-  }
-  document.getElementById('nkOcrRawPre').textContent=text;
-}
-
-// OCRテキストから商品行を抽出するパーサー
-function nkParseOcrLines(lines){
-  const items=[];
-  // 数字（価格・数量っぽい）を含む行を候補にする
-  const numRe=/[\d,，]+/;
-  // 明らかにヘッダーや区切りっぽいキーワード
-  const skipRe=/^(no|№|品番|商品名|商品|品名|数量|単価|金額|合計|小計|税|備考|納品|請求|発行|様|御中|〒|tel|fax|株式会|有限会|合同会)/i;
-
-  lines.forEach(line=>{
-    if(skipRe.test(line)) return;
-    if(!numRe.test(line)) return;
-    if(line.length<3) return;
-
-    // 数字部分を抽出
-    const nums=(line.match(/[\d,，]+/g)||[])
-      .map(n=>parseInt(n.replace(/[,，]/g,''),10))
-      .filter(n=>n>0&&n<10000000);
-
-    // 商品名部分（数字・記号以外）
-    const namePart=line.replace(/[\d,，¥￥\s\|｜\/\\×x\*]+/g,' ').replace(/\s+/g,' ').trim();
-    if(namePart.length<2) return;
-
-    // qty: 小さい数（1〜999）、cost: 大きめの数（100〜）
-    const qty=nums.find(n=>n>=1&&n<=999)||1;
-    const cost=nums.filter(n=>n>=100).sort((a,b)=>a-b)[0]||'';
-
-    items.push({name:namePart, qty, cost:cost||''});
-  });
-
-  return items;
+  // 入荷情報カードまでスクロール
+  setTimeout(()=>{
+    const el=document.getElementById('nkTbody');
+    if(el) el.closest('.nk-card').scrollIntoView({behavior:'smooth',block:'start'});
+  },200);
 }
 
 
@@ -4228,50 +4124,52 @@ function nkRenderHistory(){
     <div id="nkpnl-arrival">
 
       <!-- OCR取り込みカード -->
+      <!-- Claude貼り付けインポートカード -->
       <div class="nk-card" id="nkOcrCard">
-        <h2>📄 納品書を読み取る <span style="font-size:11px;font-weight:400;color:#6b7a8d">PDF・スクリーンショット → 無料OCRで商品リストを自動入力</span></h2>
+        <h2>🤖 Claudeから読み取る</h2>
 
-        <div style="background:#e8f5e9;border:1.5px solid #66bb6a;border-radius:8px;padding:9px 14px;margin-bottom:14px;font-size:12px;color:#1a5c2e">
-          ✅ <b>完全無料・アカウント不要</b>　ブラウザ内でOCR処理するため外部にデータは送信されません。<br>
-          <span style="color:#555">※初回のみ日本語データのダウンロード（約20MB）が発生します。読み取り後に内容を確認・修正してください。</span>
-        </div>
-
-        <!-- ドラッグ&ドロップ + ファイル選択エリア -->
-        <div id="nkOcrDrop"
-          ondragover="event.preventDefault();this.classList.add('drag-on')"
-          ondragleave="this.classList.remove('drag-on')"
-          ondrop="nkOcrDrop(event)"
-          onclick="document.getElementById('nkOcrFile').click()"
-          style="border:2px dashed #c8d4f0;border-radius:10px;padding:32px 20px;text-align:center;cursor:pointer;background:#f8faff;transition:.15s">
-          <div style="font-size:36px;margin-bottom:10px">📂</div>
-          <div style="font-size:14px;font-weight:700;color:#1a6ea6;margin-bottom:6px">ここをクリック、またはファイルをドロップ</div>
-          <div style="font-size:12px;color:#6b7a8d">PDF・PNG・JPG（スクリーンショット）対応</div>
-        </div>
-        <input type="file" id="nkOcrFile" accept="image/*,application/pdf" style="display:none" onchange="nkOcrFileSelected(this)">
-
-        <!-- プレビュー＋実行 -->
-        <div id="nkOcrPreviewArea" style="display:none;margin-top:14px">
-          <div style="display:flex;align-items:flex-start;gap:12px;flex-wrap:wrap">
-            <div style="flex:1;min-width:180px">
-              <img id="nkOcrPreviewImg" style="max-width:100%;max-height:220px;border-radius:8px;border:1px solid #dde3ea;display:none">
-              <div id="nkOcrPreviewPdf" style="display:none;background:#f0f2f5;border-radius:8px;padding:20px;text-align:center;font-size:13px;color:#6b7a8d">
-                📄 <span id="nkOcrPdfName" style="font-weight:700"></span>
-              </div>
-              <button onclick="document.getElementById('nkOcrFile').click()"
-                style="margin-top:8px;width:100%;padding:8px;background:#f0f2f5;color:#0f2744;border:1px solid #dde3ea;border-radius:6px;font-size:12px;font-weight:700;cursor:pointer;font-family:inherit">
-                📂 別のファイルを選ぶ
-              </button>
-            </div>
-            <div style="flex:1;min-width:200px;display:flex;flex-direction:column;gap:8px">
-              <div style="font-size:12px;font-weight:700;color:#0f2744">補足ヒント（任意）</div>
-              <textarea id="nkOcrHint" rows="3" placeholder="例：「税率はすべて10%」「単位は個で統一」など" style="width:100%;padding:8px;border:1px solid #dde3ea;border-radius:6px;font-size:12px;font-family:inherit;resize:vertical;box-sizing:border-box"></textarea>
-              <button onclick="nkRunOcr()" id="nkOcrRunBtn"
-                style="padding:14px;background:#1a6ea6;color:#fff;border:none;border-radius:8px;font-size:14px;font-weight:700;cursor:pointer;font-family:inherit">
-                🔍 OCRで読み取る
-              </button>
-            </div>
+        <!-- ステップ1: プロンプトコピー -->
+        <div style="margin-bottom:14px">
+          <div style="font-size:12px;font-weight:700;color:#0f2744;margin-bottom:8px">
+            <span style="background:#0f2744;color:#fff;border-radius:50%;width:18px;height:18px;display:inline-flex;align-items:center;justify-content:center;font-size:10px;margin-right:6px">1</span>
+            別のClaudeを開き、納品書（画像・PDF）を添付してこのプロンプトを送る
           </div>
-          <div id="nkOcrStatus" style="margin-top:10px;font-size:12px;color:#1a6ea6;display:none"></div>
+          <div id="nkPromptBox" style="background:#f8faff;border:1.5px solid #c8d4f0;border-radius:8px;padding:12px 14px;font-size:12px;color:#333;line-height:1.7;position:relative;white-space:pre-wrap;font-family:monospace">この納品書から商品情報を読み取り、以下のCSV形式で出力してください。
+ヘッダー行は不要です。1商品1行で出力してください。
+
+形式: 商品名,数量,仕入単価(税抜),税率(10か8)
+
+例:
+UGG Matt Black 37,10,25000,10
+インソール Scandinavian 41,5,3500,10
+
+数量・単価が読み取れない場合は0を入れてください。</div>
+          <button onclick="nkCopyPrompt()" style="margin-top:8px;padding:8px 18px;background:#0f2744;color:#fff;border:none;border-radius:6px;font-size:12px;font-weight:700;cursor:pointer;font-family:inherit">
+            📋 プロンプトをコピー
+          </button>
+        </div>
+
+        <!-- ステップ2: 貼り付け -->
+        <div>
+          <div style="font-size:12px;font-weight:700;color:#0f2744;margin-bottom:8px">
+            <span style="background:#0f2744;color:#fff;border-radius:50%;width:18px;height:18px;display:inline-flex;align-items:center;justify-content:center;font-size:10px;margin-right:6px">2</span>
+            Claudeが出力したCSVテキストをここに貼り付けて「読み込む」を押す
+          </div>
+          <textarea id="nkPasteArea" rows="7"
+            placeholder="例：&#10;UGG Matt Black 37,10,25000,10&#10;UGG Walnut 37,3,20000,10&#10;インソール Scandinavian 41,5,3500,10"
+            style="width:100%;padding:10px;border:2px solid #c8d4f0;border-radius:8px;font-size:12px;font-family:monospace;resize:vertical;box-sizing:border-box;line-height:1.7;background:#fafbfc"
+            oninput="this.style.borderColor=this.value.trim()?'#1a6ea6':'#c8d4f0'"></textarea>
+          <div style="display:flex;gap:8px;margin-top:8px;align-items:center;flex-wrap:wrap">
+            <button onclick="nkImportPaste()"
+              style="flex:1;padding:13px;background:#1a6ea6;color:#fff;border:none;border-radius:8px;font-size:14px;font-weight:700;cursor:pointer;font-family:inherit">
+              📥 商品リストに読み込む
+            </button>
+            <button onclick="document.getElementById('nkPasteArea').value='';document.getElementById('nkPasteArea').style.borderColor='#c8d4f0'"
+              style="padding:13px 16px;background:#f0f2f5;color:#6b7a8d;border:none;border-radius:8px;font-size:13px;cursor:pointer;font-family:inherit;font-weight:700">
+              クリア
+            </button>
+          </div>
+          <div id="nkPasteStatus" style="display:none;margin-top:8px;font-size:12px;font-weight:700"></div>
         </div>
       </div>
 
