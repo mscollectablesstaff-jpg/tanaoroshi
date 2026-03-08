@@ -3673,25 +3673,36 @@ async function nkOpenCamera(){
   const video=document.getElementById('nkCameraVideo');
   modal.style.display='flex';
 
-  // 既存ストリームを停止
   if(nkCameraStream){ nkCameraStream.getTracks().forEach(t=>t.stop()); nkCameraStream=null; }
 
-  try{
-    nkCameraStream=await navigator.mediaDevices.getUserMedia({
-      video:{ facingMode: nkCameraFacing, width:{ideal:1920}, height:{ideal:1080} },
-      audio:false
-    });
-    video.srcObject=nkCameraStream;
-  }catch(err){
-    modal.style.display='none';
-    // カメラ権限なし or 非対応 → ファイル選択にフォールバック
-    if(err.name==='NotAllowedError'){
-      alert('カメラへのアクセスが拒否されました。\nブラウザのアドレスバー左端の🔒アイコン→カメラを「許可」に変更してください。');
-    } else if(err.name==='NotFoundError'){
-      alert('カメラが見つかりませんでした。\nファイル選択ボタンから写真を選んでください。');
-    } else {
-      alert('カメラを起動できませんでした（'+err.message+'）\nファイル選択ボタンを使ってください。');
-    }
+  await nkStartCamera(video);
+}
+
+// カメラ起動共通処理（exact → fallback の順で試行）
+async function nkStartCamera(video){
+  const facing=nkCameraFacing;
+  // まず exact で試行、ダメなら ideal にフォールバック
+  const constraints=[
+    { video:{ facingMode:{exact: facing}, width:{ideal:1920}, height:{ideal:1080} }, audio:false },
+    { video:{ facingMode: facing, width:{ideal:1920}, height:{ideal:1080} }, audio:false },
+    { video:true, audio:false }
+  ];
+  let lastErr=null;
+  for(const c of constraints){
+    try{
+      nkCameraStream=await navigator.mediaDevices.getUserMedia(c);
+      video.srcObject=nkCameraStream;
+      return; // 成功
+    }catch(err){ lastErr=err; }
+  }
+  // 全部失敗
+  document.getElementById('nkCameraModal').style.display='none';
+  if(lastErr.name==='NotAllowedError'){
+    alert('カメラへのアクセスが拒否されました。\nアドレスバー左の🔒→カメラを「許可」に変更してください。');
+  } else if(lastErr.name==='NotFoundError'){
+    alert('カメラが見つかりませんでした。\nファイル選択ボタンから写真を選んでください。');
+  } else {
+    alert('カメラを起動できませんでした（'+lastErr.message+'）');
   }
 }
 
@@ -3702,16 +3713,9 @@ function nkCloseCamera(){
 
 async function nkCameraFlip(){
   nkCameraFacing = nkCameraFacing==='environment' ? 'user' : 'environment';
-  // ストリームを再起動
   if(nkCameraStream){ nkCameraStream.getTracks().forEach(t=>t.stop()); nkCameraStream=null; }
   const video=document.getElementById('nkCameraVideo');
-  try{
-    nkCameraStream=await navigator.mediaDevices.getUserMedia({
-      video:{ facingMode: nkCameraFacing, width:{ideal:1920}, height:{ideal:1080} },
-      audio:false
-    });
-    video.srcObject=nkCameraStream;
-  }catch(err){ alert('カメラの切り替えに失敗しました'); }
+  await nkStartCamera(video);
 }
 
 function nkCameraCapture(){
@@ -3813,9 +3817,12 @@ async function nkRunOcr(){
 
     const resp=await fetch('https://api.anthropic.com/v1/messages',{
       method:'POST',
-      headers:{'Content-Type':'application/json'},
+      headers:{
+        'Content-Type':'application/json',
+        'anthropic-dangerous-direct-browser-access':'true'
+      },
       body:JSON.stringify({
-        model:'claude-sonnet-4-20250514',
+        model:'claude-sonnet-4-5-20251001',
         max_tokens:1000,
         messages:[{role:'user', content:[contentBlock,{type:'text',text:prompt}]}]
       })
