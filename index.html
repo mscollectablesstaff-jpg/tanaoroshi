@@ -1008,6 +1008,7 @@ const RK = 'tb_recent_v3';
 const AK = 'tb_archive_v3'; // アーカイブ履歴
 const MK = 'tb_mstock_v1'; // 月次在庫データ
 const MDK = 'tb_mdept_v1'; // 月次在庫部門・マスタ
+const DK = 'tb_draft_v1';  // 入力中セッションの下書き（完了保存前でも月次インポートで使える）
 
 // ============================================================
 // 状態
@@ -1548,19 +1549,26 @@ function msRefreshImportSelect(){
 
   function populateSel(){
     const arcList=getArcList();
+    // セッション中（メモリにデータあり）
     const hasSession=!!(order&&order.length&&Object.values(pages||{}).some(pg=>(pg.rows||[]).some(r=>r.n)));
+    // 下書き（退出後 or セッション外でも使えるバックアップ）
+    const draft=getDraft();
+    const hasDraft=!!(draft&&draft.order&&draft.order.length&&Object.values(draft.pages||{}).some(pg=>(pg.rows||[]).some(r=>r.n)));
+    const draftLabel=draft&&draft.meta
+      ?`📝 入力中の棚卸（${draft.meta.date||'日付未設定'}　${draft.meta.basho||draft.meta.company||''}）保存前`
+      :'📝 入力中の棚卸（保存前）';
+
     sel.innerHTML='<option value="">― アーカイブを選択 ―</option>'
       +(hasSession?'<option value="__session__">✅ 現在の棚卸セッション（入力中）</option>':'')
+      +(!hasSession&&hasDraft?`<option value="__draft__">${draftLabel}</option>`:'')
       +(arcList.length
         ? arcList.map(a=>`<option value="${a.id}">${a.date}　${a.label}</option>`).join('')
         : '<option disabled>（保存済みアーカイブなし）</option>');
     if(pgBox) pgBox.style.display='none';
   }
 
-  // まずローカルで即表示
   populateSel();
 
-  // Firebaseからアーカイブを取得して追記（セッション外でも動くよう直接参照）
   if(!offline&&db){
     db.ref('archive').once('value',sn=>{
       const data=sn.val();
@@ -1575,7 +1583,7 @@ function msRefreshImportSelect(){
       });
       if(added){
         try{localStorage.setItem(AK,JSON.stringify(local.slice(0,50)));}catch(e){}
-        populateSel(); // 再描画
+        populateSel();
       }
     });
   }
@@ -1594,6 +1602,10 @@ function msImportSrcChanged(){
   let srcPages={}, srcOrder=[];
   if(val==='__session__'){
     srcPages=pages||{}; srcOrder=order||Object.keys(srcPages);
+  } else if(val==='__draft__'){
+    const draft=getDraft();
+    if(!draft){ pgBox.style.display='none'; return; }
+    srcPages=draft.pages||{}; srcOrder=draft.order||Object.keys(srcPages);
   } else {
     const arc=getArcList().find(a=>a.id===val);
     if(!arc){ pgBox.style.display='none'; return; }
@@ -1639,6 +1651,10 @@ function msImportFromArc(){
   let srcPages={};
   if(val==='__session__'){
     srcPages=pages||{};
+  } else if(val==='__draft__'){
+    const draft=getDraft();
+    if(!draft){alert('下書きデータが見つかりません');return;}
+    srcPages=draft.pages||{};
   } else {
     const arc=getArcList().find(a=>a.id===val);
     if(!arc){alert('アーカイブが見つかりません');return;}
@@ -2050,8 +2066,26 @@ function closePrint(){
 function doExit(){
   if(!confirm('退出しますか？'))return;
   if(db&&sid) db.ref('s/'+sid+'/users/'+myId).remove();
+  // 退出前に下書きを保存（月次インポートで使えるように）
+  saveDraft();
   pages={}; order=[]; curKey=null; sid=null;
   showPage('pgSession');
+}
+
+// 入力中セッションをlocalStorageに随時バックアップ
+function saveDraft(){
+  if(!sid||!order.length) return;
+  try{
+    const g=id=>{ const el=document.getElementById(id); return el?el.value:''; };
+    const meta={company:g('hCompany'),date:g('hDate'),basho:g('hBasho'),tanto:g('hTanto')};
+    localStorage.setItem(DK, JSON.stringify({sid, order, pages, meta, at:Date.now()}));
+  }catch(e){}
+}
+function getDraft(){
+  try{ return JSON.parse(localStorage.getItem(DK)||'null'); }catch(e){ return null; }
+}
+function clearDraft(){
+  localStorage.removeItem(DK);
 }
 
 // ============================================================
@@ -2424,6 +2458,7 @@ function upd(k,ri,f,v){
       db.ref('s/'+sid+'/pages/'+k+'/rows').set(pages[k].rows);
       db.ref('s/'+sid+'/pages/'+k+'/at').set(Date.now());
     }
+    saveDraft();
   },400);
 }
 
