@@ -8,6 +8,7 @@
 <script src="https://cdn.jsdelivr.net/npm/encoding-japanese@2.0.0/encoding.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jsbarcode/3.11.5/JsBarcode.all.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/tesseract.js@5/dist/tesseract.min.js"></script>
 <style>
 *{margin:0;padding:0;box-sizing:border-box}
 html,body{width:100%;min-height:100vh;font-family:'Noto Sans JP',sans-serif;font-size:13px;background:#f0f2f5;color:#1a2332}
@@ -3749,28 +3750,6 @@ function nkCameraCapture(){
 // ── 納品書OCR ─────────────────────────────────
 let nkOcrFileData=null; // {base64, mediaType}
 
-function nkGetApiKey(){ return localStorage.getItem(AIKK)||''; }
-function nkSaveApiKey(){
-  const val=(document.getElementById('nkApiKeyInput').value||'').trim();
-  if(!val){ alert('APIキーを入力してください'); return; }
-  if(!val.startsWith('sk-ant-')){ alert('APIキーは sk-ant- で始まる文字列です。\nAnthropicコンソールで確認してください。'); return; }
-  localStorage.setItem(AIKK, val);
-  document.getElementById('nkApiKeyInput').value='';
-  document.getElementById('nkApiKeySaved').style.display='inline';
-  document.getElementById('nkApiKeyBox').style.borderColor='#4caf50';
-  document.getElementById('nkApiKeyBox').style.background='#f0fff4';
-  toast('APIキーを保存しました');
-}
-
-// 起動時にAPIキー保存済みなら表示を更新
-function nkInitApiKey(){
-  if(nkGetApiKey()){
-    document.getElementById('nkApiKeySaved').style.display='inline';
-    document.getElementById('nkApiKeyBox').style.borderColor='#4caf50';
-    document.getElementById('nkApiKeyBox').style.background='#f0fff4';
-  }
-}
-
 function nkOcrDrop(ev){
   ev.preventDefault();
   document.getElementById('nkOcrDrop').classList.remove('drag-on');
@@ -3780,6 +3759,8 @@ function nkOcrDrop(ev){
 function nkOcrFileSelected(input){
   const file=input.files[0]; if(!file)return;
   nkOcrLoadFile(file);
+  // 同じファイルを再選択できるようにリセット
+  input.value='';
 }
 
 function nkOcrLoadFile(file){
@@ -3788,9 +3769,7 @@ function nkOcrLoadFile(file){
   const reader=new FileReader();
   reader.onload=ev=>{
     const dataUrl=ev.target.result;
-    const base64=dataUrl.split(',')[1];
-    nkOcrFileData={base64, mediaType:file.type, name:file.name};
-    // プレビュー表示
+    nkOcrFileData={dataUrl, mediaType:file.type, name:file.name};
     const pa=document.getElementById('nkOcrPreviewArea');
     const img=document.getElementById('nkOcrPreviewImg');
     const pdfDiv=document.getElementById('nkOcrPreviewPdf');
@@ -3808,105 +3787,138 @@ function nkOcrLoadFile(file){
   reader.readAsDataURL(file);
 }
 
+// ── Tesseract.js OCR（完全無料・ブラウザ内処理）─────────
 async function nkRunOcr(){
-  if(!nkOcrFileData){alert('ファイルを選択してください');return;}
-  const apiKey=nkGetApiKey();
-  if(!apiKey){
-    alert('APIキーが設定されていません。\n上の「🔑 Anthropic APIキー」欄に入力して保存してください。');
-    return;
-  }
+  if(!nkOcrFileData){alert('写真またはファイルを選択してください');return;}
   const btn=document.getElementById('nkOcrRunBtn');
   const status=document.getElementById('nkOcrStatus');
-  btn.disabled=true; btn.textContent='🤖 読み取り中...';
-  status.style.display='block'; status.style.color='#1a6ea6';
-  status.textContent='AIが納品書を解析しています...';
-
-  const hint=(document.getElementById('nkOcrHint').value||'').trim();
-  const hintText=hint?`\n\n補足指示：${hint}`:'';
-
-  const prompt=`この納品書・請求書・入荷リストから商品情報を読み取り、以下のJSON形式で返してください。
-商品名・数量・仕入単価（税抜き）・税率を読み取れる範囲で抽出してください。
-読み取れない項目はnullにしてください。
-仕入先・会社名がわかれば supplierに入れてください。
-
-出力形式（JSONのみ、説明文なし）：
-{
-  "supplier": "仕入先名またはnull",
-  "date": "YYYY-MM-DD形式またはnull",
-  "items": [
-    {"name": "商品名", "qty": 数量, "cost": 税抜単価または税込単価, "taxRate": "10"または"8", "unit": "単位"}
-  ]
-}${hintText}`;
+  btn.disabled=true;
+  status.style.display='block';
 
   try{
-    const contentBlock = nkOcrFileData.mediaType==='application/pdf'
-      ? {type:'document', source:{type:'base64', media_type:'application/pdf', data:nkOcrFileData.base64}}
-      : {type:'image',    source:{type:'base64', media_type:nkOcrFileData.mediaType, data:nkOcrFileData.base64}};
+    // --- 進捗メッセージ ---
+    const setMsg=(msg,color)=>{
+      status.style.color=color||'#1a6ea6';
+      status.textContent=msg;
+    };
 
-    const resp=await fetch('https://api.anthropic.com/v1/messages',{
-      method:'POST',
-      headers:{
-        'Content-Type':'application/json',
-        'x-api-key': apiKey,
-        'anthropic-version': '2023-06-01',
-        'anthropic-dangerous-direct-browser-access': 'true'
-      },
-      body:JSON.stringify({
-        model:'claude-haiku-4-5-20251001',
-        max_tokens:1500,
-        messages:[{role:'user', content:[contentBlock,{type:'text',text:prompt}]}]
-      })
+    setMsg('📦 OCRエンジンを初期化中...');
+    btn.textContent='⏳ 初期化中...';
+
+    const worker=await Tesseract.createWorker('jpn+eng',1,{
+      logger: m=>{
+        if(m.status==='recognizing text'){
+          const pct=Math.round((m.progress||0)*100);
+          btn.textContent=`⏳ 読み取り中 ${pct}%`;
+          setMsg(`🔍 OCR処理中… ${pct}%`);
+        } else if(m.status==='loading language traineddata'){
+          setMsg('📥 日本語データを読み込み中（初回のみ）...');
+        }
+      }
     });
-    const data=await resp.json();
 
-    // エラーレスポンスのチェック
-    if(!resp.ok || data.type==='error'){
-      const errMsg=data.error?.message || JSON.stringify(data);
-      throw new Error(`APIエラー(${resp.status}): ${errMsg}`);
+    setMsg('🔍 文字を読み取っています...');
+
+    const { data:{ text } } = await worker.recognize(nkOcrFileData.dataUrl);
+    await worker.terminate();
+
+    if(!text.trim()) throw new Error('文字が読み取れませんでした。写真をもっと明るく・鮮明に撮り直してください。');
+
+    // --- OCRテキストをパース ---
+    const lines = text.split('\n').map(l=>l.trim()).filter(l=>l.length>1);
+
+    // OCRテキスト全文を確認用に表示するエリア
+    nkShowOcrRaw(text);
+
+    // 商品行を抽出（数字と文字が混在する行を商品として扱う）
+    const items = nkParseOcrLines(lines);
+
+    if(items.length===0){
+      // パースできなくても生テキストを表示して手動入力を促す
+      setMsg('⚠️ 商品の自動解析が難しい形式でした。下のテキストを参考に手動で入力してください。', '#e67e00');
+      btn.textContent='🔍 もう一度読み取る';
+      btn.disabled=false;
+      return;
     }
 
-    const text=(data.content||[]).map(b=>b.text||'').join('');
-    const jsonMatch=text.match(/\{[\s\S]*\}/);
-    if(!jsonMatch) throw new Error('JSONが見つかりませんでした。モデルの応答: '+text.slice(0,200));
-    const parsed=JSON.parse(jsonMatch[0]);
-
-    if(parsed.supplier){
-      const sup=document.getElementById('nkSupplier');
-      if(sup&&!sup.value) sup.value=parsed.supplier;
-    }
-    if(parsed.date){
-      const dt=document.getElementById('nkDate');
-      if(dt&&!dt.value) dt.value=parsed.date;
-    }
-
-    const items=parsed.items||[];
-    if(!items.length) throw new Error('商品が読み取れませんでした');
-
+    // 商品リストに追加
     nkArrivalRows=nkArrivalRows.filter(r=>r.n.trim());
     items.forEach(it=>{
       nkArrivalRows.push({
-        n:it.name||'',
-        z:it.taxRate==='8'?'8':'10',
-        qty:it.qty||1,
-        cost:it.cost||'',
-        p:'', u:it.unit||'点',
+        n:it.name, z:'10', qty:it.qty||1,
+        cost:it.cost||'', p:'', u:it.unit||'点',
         cat:'', catId:'', bc:'', isNew:true
       });
     });
     if(!nkArrivalRows.length) nkAddRow();
     nkRenderArrival();
 
-    status.textContent=`✅ ${items.length}件の商品を読み取りました。内容を確認・修正してから保存してください。`;
-    status.style.color='#1a7a4a';
-    btn.textContent='🤖 もう一度読み取る';
+    setMsg(`✅ ${items.length}件を読み取りました。内容を確認・修正してから保存してください。`, '#1a7a4a');
+    btn.textContent='🔍 もう一度読み取る';
+
   }catch(err){
-    status.textContent='❌ 読み取りエラー：'+err.message;
     status.style.color='#e74c3c';
-    btn.textContent='🤖 AIで読み取る';
-    console.error('OCR error:', err);
+    status.textContent='❌ エラー：'+err.message;
+    btn.textContent='🔍 OCRで読み取る';
+    console.error('OCR error:',err);
   }
   btn.disabled=false;
 }
+
+// OCR生テキスト表示エリアを作成・更新
+function nkShowOcrRaw(text){
+  let box=document.getElementById('nkOcrRawBox');
+  if(!box){
+    box=document.createElement('div');
+    box.id='nkOcrRawBox';
+    box.style.cssText='margin-top:12px;border:1px solid #dde3ea;border-radius:6px;overflow:hidden';
+    const header=document.createElement('div');
+    header.style.cssText='background:#f0f2f5;padding:6px 12px;font-size:11px;font-weight:700;color:#6b7a8d;cursor:pointer;display:flex;justify-content:space-between;align-items:center';
+    header.innerHTML='📋 OCR生テキスト（参考）<span style="font-size:10px;color:#1a6ea6">▼ タップで開閉</span>';
+    const pre=document.createElement('pre');
+    pre.id='nkOcrRawPre';
+    pre.style.cssText='margin:0;padding:10px 12px;font-size:10px;line-height:1.6;max-height:160px;overflow-y:auto;background:#fafbfc;white-space:pre-wrap;word-break:break-all;display:none;font-family:monospace';
+    header.onclick=()=>{ pre.style.display=pre.style.display==='none'?'block':'none'; };
+    box.appendChild(header);
+    box.appendChild(pre);
+    document.getElementById('nkOcrStatus').after(box);
+  }
+  document.getElementById('nkOcrRawPre').textContent=text;
+}
+
+// OCRテキストから商品行を抽出するパーサー
+function nkParseOcrLines(lines){
+  const items=[];
+  // 数字（価格・数量っぽい）を含む行を候補にする
+  const numRe=/[\d,，]+/;
+  // 明らかにヘッダーや区切りっぽいキーワード
+  const skipRe=/^(no|№|品番|商品名|商品|品名|数量|単価|金額|合計|小計|税|備考|納品|請求|発行|様|御中|〒|tel|fax|株式会|有限会|合同会)/i;
+
+  lines.forEach(line=>{
+    if(skipRe.test(line)) return;
+    if(!numRe.test(line)) return;
+    if(line.length<3) return;
+
+    // 数字部分を抽出
+    const nums=(line.match(/[\d,，]+/g)||[])
+      .map(n=>parseInt(n.replace(/[,，]/g,''),10))
+      .filter(n=>n>0&&n<10000000);
+
+    // 商品名部分（数字・記号以外）
+    const namePart=line.replace(/[\d,，¥￥\s\|｜\/\\×x\*]+/g,' ').replace(/\s+/g,' ').trim();
+    if(namePart.length<2) return;
+
+    // qty: 小さい数（1〜999）、cost: 大きめの数（100〜）
+    const qty=nums.find(n=>n>=1&&n<=999)||1;
+    const cost=nums.filter(n=>n>=100).sort((a,b)=>a-b)[0]||'';
+
+    items.push({name:namePart, qty, cost:cost||''});
+  });
+
+  return items;
+}
+
+
 
 
 function nkNextBarcode(){
@@ -3921,7 +3933,6 @@ function doNyuuka(){
   nkArrivalRows=[];
   nkAddRow();
   nkShowTab('arrival');
-  nkInitApiKey();
 }
 
 function nkShowTab(name){
@@ -4291,21 +4302,11 @@ function nkRenderHistory(){
 
       <!-- OCR取り込みカード -->
       <div class="nk-card" id="nkOcrCard">
-        <h2>📄 納品書を読み取る <span style="font-size:11px;font-weight:400;color:#6b7a8d">カメラ撮影またはファイル選択 → AIが商品リストを自動入力</span></h2>
+        <h2>📄 納品書を読み取る <span style="font-size:11px;font-weight:400;color:#6b7a8d">カメラ撮影またはファイル選択 → 無料OCRで商品リストを自動入力</span></h2>
 
-        <!-- Anthropic APIキー入力 -->
-        <div id="nkApiKeyBox" style="background:#fffbe6;border:1.5px solid #f5c518;border-radius:8px;padding:10px 14px;margin-bottom:14px">
-          <div style="font-size:12px;font-weight:700;color:#7a5800;margin-bottom:6px">🔑 Anthropic APIキー（AI読み取りに必要）</div>
-          <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">
-            <input type="password" id="nkApiKeyInput" placeholder="sk-ant-..." autocomplete="off"
-              style="flex:1;min-width:200px;padding:8px 10px;border:1px solid #e0c060;border-radius:6px;font-size:13px;font-family:monospace;background:#fff;box-sizing:border-box">
-            <button onclick="nkSaveApiKey()"
-              style="padding:8px 16px;background:#e8a000;color:#fff;border:none;border-radius:6px;font-size:12px;font-weight:700;cursor:pointer;font-family:inherit;white-space:nowrap">
-              保存
-            </button>
-            <span id="nkApiKeySaved" style="font-size:11px;color:#1a7a4a;display:none;font-weight:700">✅ 保存済み</span>
-          </div>
-          <div style="font-size:10px;color:#999;margin-top:5px">キーはこのブラウザのみに保存されます。<a href="https://console.anthropic.com/settings/keys" target="_blank" style="color:#1a6ea6">APIキーの取得はこちら</a></div>
+        <div style="background:#e8f5e9;border:1.5px solid #66bb6a;border-radius:8px;padding:9px 14px;margin-bottom:14px;font-size:12px;color:#1a5c2e">
+          ✅ <b>完全無料・アカウント不要</b>　ブラウザ内でOCR処理するため外部にデータは送信されません。<br>
+          <span style="color:#555">※初回のみ日本語データのダウンロード（約20MB）が発生します。読み取り後に内容を確認・修正してください。</span>
         </div>
 
         <!-- 撮影 / ファイル選択 ボタン -->
@@ -4351,7 +4352,7 @@ function nkRenderHistory(){
               <textarea id="nkOcrHint" rows="3" placeholder="例：「税率はすべて10%」「単位は個で統一」など" style="width:100%;padding:8px;border:1px solid #dde3ea;border-radius:6px;font-size:12px;font-family:inherit;resize:vertical;box-sizing:border-box"></textarea>
               <button onclick="nkRunOcr()" id="nkOcrRunBtn"
                 style="padding:14px;background:#1a6ea6;color:#fff;border:none;border-radius:8px;font-size:14px;font-weight:700;cursor:pointer;font-family:inherit">
-                🤖 AIで読み取る
+                🔍 OCRで読み取る
               </button>
             </div>
           </div>
