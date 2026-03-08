@@ -236,7 +236,7 @@ tbody tr:hover td.sticky-name{background:#e8f0f8}
     </div>
 
     <div class="lbl">firebaseConfig のコードをそのまま貼り付け</div>
-    <textarea class="inp" id="fcPaste" rows="5" style="height:100px;font-family:monospace;font-size:11px;resize:none" placeholder='apiKey: "AIza...",&#10;databaseURL: "https://...",&#10;projectId: "..."' oninput="parsePaste()"></textarea>
+    <textarea class="inp" id="fcPaste" rows="5" style="height:100px;font-family:monospace;font-size:11px;resize:none" placeholder='apiKey: "AIza...",&#10;databaseURL: "https://...",&#10;projectId: "..."' oninput="parsePaste()" onpaste="setTimeout(parsePaste,50)"></textarea>
     <div id="parseMsg" style="font-size:12px;min-height:18px;margin:-8px 0 10px;color:#27ae60"></div>
 
     <div class="lbl">データベースURL</div>
@@ -518,14 +518,23 @@ function showPage(id){
 // ============================================================
 function parsePaste(){
   const t=document.getElementById('fcPaste').value;
-  const g=(k)=>{const m=t.match(new RegExp(k+'["\']?\\s*:\\s*["\']([^"\'\\s,}]+)'));return m?m[1]:''};
+  // キー: "値" または キー: '値' の両パターンに対応
+  function g(key){
+    const patterns=[
+      new RegExp(key+'\\s*:\\s*"([^"]+)"'),
+      new RegExp(key+"\\s*:\\s*'([^']+)'"),
+      new RegExp(key+'\\s*:\\s*([^,\'"\\s}]+)')
+    ];
+    for(const p of patterns){const m=t.match(p);if(m&&m[1])return m[1].trim();}
+    return '';
+  }
   const url=g('databaseURL'), api=g('apiKey'), proj=g('projectId');
   if(url) document.getElementById('sDbUrl').value=url;
   if(api) document.getElementById('sApiKey').value=api;
   if(proj) document.getElementById('sProjId').value=proj;
   const n=[url,api,proj].filter(Boolean).length;
-  document.getElementById('parseMsg').textContent = n===3?'✅ 3項目読み取り完了':n?`${n}/3項目読み取り`:'' ;
-  document.getElementById('parseMsg').style.color = n===3?'#27ae60':'#e67e22';
+  document.getElementById('parseMsg').textContent=n===3?'✅ 3項目読み取り完了':n?n+'/3項目読み取り':'';
+  document.getElementById('parseMsg').style.color=n===3?'#27ae60':'#e67e22';
 }
 
 function doSave(){
