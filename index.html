@@ -1035,6 +1035,7 @@ svg.trend-chart text{font-family:inherit}
           <div id="camResult" style="margin-top:10px;padding:10px 12px;background:rgba(0,0,0,.3);border-radius:8px;font-size:13px;color:#fff;min-height:40px;display:none"></div>
         </div>
       </div>
+
       <div class="hcard">
         <div><div class="hl">会社名・店舗名</div><input class="hi" id="hCompany" placeholder="例：MS collectables" oninput="syncMeta()"></div>
         <div><div class="hl">棚卸日</div><input class="hi" type="date" id="hDate" oninput="syncMeta()"></div>
@@ -4135,7 +4136,11 @@ let _bcpFiltered=[];
 function bcpAutoAssign(){
   const prods=nkGetProducts();
   const prodMap={};
-  prods.forEach(p=>{if(p.name)prodMap[p.name]=p;});
+  // キー = 商品名|価格（同名・価格違いは別商品として扱う）
+  prods.forEach(p=>{if(p.name){
+    const k=p.name+'|'+(p.price||'');
+    prodMap[k]=p;
+  }});
 
   // 現在の最大番号を取得（商品マスタ＋セッション全行＋使用済みリスト）
   // 形式: 8桁純数字 10000001〜
@@ -4163,9 +4168,10 @@ function bcpAutoAssign(){
       const name=(r.n||'').trim();
       if(!name) return;
       if((r.bc||'').trim()) return;
-      // 商品マスタに登録済みでバーコードがあればそちらを使用
-      if(prodMap[name]&&(prodMap[name].barcode||'').trim()){
-        pages[k].rows[ri].bc=prodMap[name].barcode;
+      // 商品マスタに登録済みでバーコードがあればそちらを使用（名前+価格で照合）
+      const pk=name+'|'+(r.p||'');
+      if(prodMap[pk]&&(prodMap[pk].barcode||'').trim()){
+        pages[k].rows[ri].bc=prodMap[pk].barcode;
         assigned++; return;
       }
       // 新規発番（8桁純数字・使用済みをスキップ）
@@ -4173,8 +4179,8 @@ function bcpAutoAssign(){
       const newBc=String(maxNum);
       newBcList.push(newBc);
       pages[k].rows[ri].bc=newBc;
-      if(prodMap[name]){
-        prodMap[name].barcode=newBc;
+      if(prodMap[pk]){
+        prodMap[pk].barcode=newBc;
       } else {
         const pc=nkGenProductCode(pages[k]?.catId||'', pages[k]?.tanto||r.cat||'');
         const np={
@@ -4186,7 +4192,7 @@ function bcpAutoAssign(){
           supplier:'', createdAt:Date.now()
         };
         prods.push(np);
-        prodMap[name]=np;
+        prodMap[pk]=np; // ✅ name|price キー（同名・別価格は別商品）
       }
       assigned++;
     });
@@ -5047,18 +5053,21 @@ function nkSaveArrival(){
 
   const prods=nkGetProducts();
   const prodMap={};
-  prods.forEach(p=>{prodMap[p.name]=p;});
+  // キー = 商品名|価格（同名・価格違いは別商品として扱う）
+  prods.forEach(p=>{
+    const k=p.name+'|'+(p.price||'');
+    prodMap[k]=p;
+  });
 
-  // ── 重複チェック ──────────────────────────────
+  // ── 重複チェック（同名・同価格のみ重複とみなす）──────────────────────────────
   const dups=[];
   rows.forEach(r=>{
     const name=r.n.trim(); if(!name)return;
-    const ex=prodMap[name];
+    const pk=name+'|'+(r.p||'');
+    const ex=prodMap[pk];
     if(!ex) return; // 新規は問題なし
     const diffs=[];
     const fmt=v=>v?'¥'+Number(v).toLocaleString():'未設定';
-    if(r.p && String(r.p)!==String(ex.price||''))
-      diffs.push(`売価：登録済み${fmt(ex.price)} → 今回${fmt(r.p)}`);
     if(r.cost && String(r.cost)!==String(ex.costPrice||''))
       diffs.push(`原価：登録済み${fmt(ex.costPrice)} → 今回${fmt(r.cost)}`);
     if(r.z && r.z!==(ex.taxRate||'10'))
@@ -5094,9 +5103,9 @@ function nkSaveArrival(){
   const savedItems=[];
   rows.forEach(r=>{
     const name=r.n.trim(); if(!name)return;
-    if(prodMap[name]){
-      const p=prodMap[name];
-      if(r.p)    p.price=r.p;
+    const pk=name+'|'+(r.p||'');
+    if(prodMap[pk]){
+      const p=prodMap[pk];
       if(r.cost) p.costPrice=r.cost;
       if(r.catId){p.catId=r.catId;}
       if(r.cat)  p.category=r.cat;
@@ -5118,7 +5127,7 @@ function nkSaveArrival(){
         supplier:supplier||'', createdAt:Date.now()
       };
       prods.push(np);
-      prodMap[name]=np;
+      prodMap[name+'|'+(r.p||'')]=np;
       r.bc=bc;
       newCount++;
     }
@@ -5172,6 +5181,62 @@ function nkDeleteProduct(id){
   nkRenderProducts();
 }
 
+// ── 既存マスタの重複バーコードを検出・整理 ──
+function nkFixDuplicateBarcodes(){
+  const prods=nkGetProducts();
+  // バーコード別に商品をグループ化
+  const bcGroups={};
+  prods.forEach(p=>{
+    if(!p.barcode) return;
+    if(!bcGroups[p.barcode]) bcGroups[p.barcode]=[];
+    bcGroups[p.barcode].push(p);
+  });
+  const dupBcs=Object.keys(bcGroups).filter(bc=>bcGroups[bc].length>1);
+  if(!dupBcs.length){
+    toast('✅ 重複バーコードはありません');
+    return;
+  }
+
+  // 重複の内容を確認
+  let msg=`重複バーコードが${dupBcs.length}件見つかりました。
+
+`;
+  dupBcs.slice(0,5).forEach(bc=>{
+    const names=bcGroups[bc].map(p=>p.name+(p.price?'(¥'+p.price+')':'')).join('、');
+    msg+=`BC:${bc} → ${names}\n`;
+  });
+  if(dupBcs.length>5) msg+=`…他${dupBcs.length-5}件\n`;
+  msg+='\n重複している商品にそれぞれ新しいバーコードを割り当てます（最初の1件はそのまま）。よろしいですか？';
+  if(!confirm(msg)) return;
+
+  const used=getBcUsed();
+  const numPat=/^(\d{8,})$/;
+  let maxNum=10000000;
+  prods.forEach(p=>{ const m=p.barcode&&p.barcode.match(numPat); if(m) maxNum=Math.max(maxNum,parseInt(m[1],10)); });
+  used.forEach(v=>{ const m=v.match(numPat); if(m) maxNum=Math.max(maxNum,parseInt(m[1],10)); });
+
+  const newBcList=[];
+  let fixed=0;
+  dupBcs.forEach(bc=>{
+    const group=bcGroups[bc];
+    // 最初の1件はそのまま、2件目以降に新バーコードを割り当て
+    group.slice(1).forEach(p=>{
+      do{ maxNum++; }while(used.has(String(maxNum)));
+      const newBc=String(maxNum);
+      p.barcode=newBc;
+      newBcList.push(newBc);
+      fixed++;
+    });
+  });
+
+  addBcUsed(newBcList);
+  nkSaveProducts(prods);
+  nkRenderProducts();
+  toast(`✅ ${fixed}件の重複バーコードを修正しました`);
+  alert(`✅ ${fixed}件を修正しました。
+修正後は「🛒 Airレジ出力」でCSVを再出力してアップロードしてください。`);
+}
+
 // 既存商品に商品コードが未設定のものへ一括付与
 function nkAssignAllProductCodes(){
   const prods=nkGetProducts();
@@ -5191,42 +5256,33 @@ function nkExportAir(){
   const prods=nkGetProducts();
   if(!prods.length){alert('登録済み商品がありません');return;}
 
-  // バーコード未設定チェック
   const noBc=prods.filter(p=>!p.barcode);
   if(noBc.length){
     if(!confirm(`${noBc.length}件にバーコードが未設定です。\n「入荷・商品登録」→「🏷バーコード印刷」タブで発番してから出力することをお勧めします。\nそのまま出力しますか？`)) return;
   }
 
   // エアレジ正式形式（AHEADS 27列）で出力
-  // index 17: 商品コード, index 19: バーコード がエアレジで認識される列
   let csv = AHEADS.map(ec).join(',') + '\r\n';
   prods.forEach(p=>{
     const tax = p.taxRate==='8' ? '軽減税率' : '標準税率';
     const row = new Array(27).fill('');
-    // 0:商品ID  1:バリエーションID  2:削除設定 → 空
-    row[3]  = p.catId||'';              // カテゴリーID
-    row[4]  = p.name||'';              // 【必須】商品名
-    row[5]  = p.name||'';              // 商品名（レシート用）
-    row[6]  = p.name||'';              // 商品名（商品入力用）
-    // 7:バリエーション種別1  8:種別2 → 空
-    row[9]  = '内税';                  // 税設定
-    row[10] = tax;                     // 適用税率
-    // 11:税率別価格 → 空
-    row[12] = '通常';                  // 価格設定
-    row[13] = p.unit||'';              // 販売単位ID
-    row[14] = p.price||'';             // 【必須】価格
-    // 15:価格2 → 空
-    row[16] = p.costPrice||'';         // 原価
-    row[17] = p.productCode||'';       // 商品コード（HCH00001 など）
-    row[18] = '';                      // 自動発番 → 空（手動発番）
-    row[19] = p.barcode||'';           // ★ バーコード（エアレジがスキャンで照合する列）
-    row[20] = '対象';                  // ポイント付与
-    row[21] = '表示';                  // 表示/非表示
-    row[22] = '印字する';              // レシート印字
-    row[23] = '印字する';              // 登録番号印字
-    row[24] = '';                      // 備考
-    row[25] = '';                      // 旧商品コード
-    row[26] = '';                      // 分析タグID
+    row[3]  = p.catId||'';
+    row[4]  = p.name||'';
+    row[5]  = p.name||'';
+    row[6]  = p.name||'';
+    row[9]  = '内税';
+    row[10] = tax;
+    row[12] = '通常';
+    row[13] = p.unit||'';
+    row[14] = p.price||'';
+    row[16] = p.costPrice||'';
+    row[17] = p.productCode||'';
+    row[18] = '';
+    row[19] = p.barcode||'';
+    row[20] = '対象';
+    row[21] = '表示';
+    row[22] = '印字する';
+    row[23] = '印字する';
     csv += row.map(ec).join(',') + '\r\n';
   });
 
@@ -5476,6 +5532,7 @@ UGG Matt Black 37,10,25000,10
         <div style="display:flex;align-items:center;gap:8px;margin-bottom:12px;flex-wrap:wrap">
           <h2 style="margin:0;border:none;flex:1">📋 登録済み商品一覧 <span id="nkProdCount" style="font-size:11px;color:#6b7a8d;font-weight:400"></span></h2>
           <input id="nkProdSearch" class="nk-inp" placeholder="🔍 商品名・コードで絞り込み" style="width:180px;margin:0" oninput="nkRenderProducts()">
+          <button onclick="nkFixDuplicateBarcodes()" style="background:#e74c3c;color:#fff;border:none;border-radius:6px;padding:8px 12px;font-size:11px;font-weight:700;cursor:pointer;white-space:nowrap">🔧 重複BC修正</button>
           <button onclick="nkExportAir()" style="background:#FF6600;color:#fff;border:none;border-radius:6px;padding:8px 14px;font-size:12px;font-weight:700;cursor:pointer;white-space:nowrap">🛒 Airレジ出力</button>
         </div>
         <!-- 商品コード体系の説明 -->
