@@ -2000,7 +2000,8 @@ function msRefreshImportSelect(){
 
     sel.innerHTML='<option value="">― アーカイブを選択 ―</option>'
       +(hasSession?'<option value="__session__">✅ 現在の棚卸セッション（入力中）</option>':'')
-      +(!hasSession&&hasDraft?`<option value="__draft__">${draftLabel}</option>`:'')
+      +(hasDraft?`<option value="__draft__">${draftLabel}</option>`:'')
+      +(!hasSession&&!hasDraft?'<option disabled style="color:#aaa">※ 棚卸入力画面で入力後に選択できます</option>':'')
       +(arcList.length
         ? arcList.map(a=>`<option value="${a.id}">${a.date}　${a.label}</option>`).join('')
         : '<option disabled>（保存済みアーカイブなし）</option>');
@@ -2157,6 +2158,77 @@ function msDeleteMasterRow(id){
   const data=msGetDepts(); if(!msCurDept)return;
   data.masters[msCurDept]=(data.masters[msCurDept]||[]).filter(m=>m.id!==id);
   msSaveDepts(data); msRenderMasterTable();
+}
+
+// ── 入荷登録済み商品からインポート ──────────────────────────
+function _msProdGetUnregistered(){
+  const prods=nkGetProducts();
+  const data=msGetDepts();
+  const existing=new Set((data.masters[msCurDept]||[]).map(m=>m.name.trim()));
+  return prods.filter(p=>p.name&&!existing.has(p.name.trim()));
+}
+
+function msProdImportOpen(){
+  if(!msCurDept){alert('先に部門を選択してください');return;}
+  const prods=nkGetProducts();
+  if(!prods.length){alert('入荷・商品登録に商品が登録されていません');return;}
+  const data=msGetDepts();
+  const existing=new Set((data.masters[msCurDept]||[]).map(m=>m.name.trim()));
+  const box=document.getElementById('msProdImportList');
+  if(!box)return;
+  box.style.display='block';
+  box.innerHTML=prods.map(p=>{
+    const registered=existing.has((p.name||'').trim());
+    return `<label style="display:flex;align-items:center;gap:8px;padding:7px 10px;border-bottom:1px solid #e8f0ec;cursor:${registered?'default':'pointer'};opacity:${registered?0.45:1}">
+      <input type="checkbox" value="${e(p.name)}" data-unit="${e(p.unit||'個')}" ${registered?'disabled':''} style="width:15px;height:15px;flex-shrink:0">
+      <span style="font-size:13px;flex:1">${e(p.name)}</span>
+      <span style="font-size:11px;color:#888">${e(p.unit||'個')}</span>
+      ${registered?'<span style="font-size:10px;color:#2d7a4f;background:#e8f5e9;padding:2px 6px;border-radius:4px">登録済</span>':''}
+    </label>`;
+  }).join('')
+  +`<div style="padding:10px;display:flex;gap:8px">
+    <button onclick="msProdImportSelected()" style="flex:1;padding:8px;background:#2d7a4f;color:#fff;border:none;border-radius:6px;font-size:12px;font-weight:700;cursor:pointer;font-family:inherit">✅ 選択した商品を追加</button>
+    <button onclick="document.getElementById('msProdImportList').style.display='none'" style="padding:8px 14px;background:#eee;border:none;border-radius:6px;font-size:12px;cursor:pointer;font-family:inherit">キャンセル</button>
+  </div>`;
+}
+
+function msProdImportSelected(){
+  if(!msCurDept)return;
+  const checks=[...document.querySelectorAll('#msProdImportList input[type=checkbox]:checked')];
+  if(!checks.length){alert('商品を選択してください');return;}
+  const data=msGetDepts();
+  if(!data.masters[msCurDept]) data.masters[msCurDept]=[];
+  const existing=new Set(data.masters[msCurDept].map(m=>m.name.trim()));
+  let added=0;
+  checks.forEach(cb=>{
+    const name=cb.value.trim(); if(!name||existing.has(name))return;
+    data.masters[msCurDept].push({id:'m'+Date.now()+'_'+Math.random().toString(36).slice(2,5),name,unit:cb.dataset.unit||'個',memo:'',init:''});
+    existing.add(name); added++;
+  });
+  msSaveDepts(data); msRenderMasterTable();
+  document.getElementById('msProdImportList').style.display='none';
+  const msg=document.getElementById('msProdImportMsg');
+  if(msg){msg.textContent=`✅ ${added}件追加しました`; setTimeout(()=>msg.textContent='',3000);}
+  if(added)toast(added+'件の商品を追加しました');
+}
+
+function msProdImportAll(){
+  if(!msCurDept){alert('先に部門を選択してください');return;}
+  const unreg=_msProdGetUnregistered();
+  if(!unreg.length){
+    const msg=document.getElementById('msProdImportMsg');
+    if(msg){msg.textContent='ℹ️ 未登録の商品はありません（すべて登録済み）'; setTimeout(()=>msg.textContent='',3000);}
+    return;
+  }
+  const data=msGetDepts();
+  if(!data.masters[msCurDept]) data.masters[msCurDept]=[];
+  unreg.forEach(p=>{
+    data.masters[msCurDept].push({id:'m'+Date.now()+'_'+Math.random().toString(36).slice(2,5),name:p.name,unit:p.unit||'個',memo:'',init:''});
+  });
+  msSaveDepts(data); msRenderMasterTable();
+  const msg=document.getElementById('msProdImportMsg');
+  if(msg){msg.textContent=`✅ ${unreg.length}件すべて追加しました`; setTimeout(()=>msg.textContent='',3000);}
+  toast(unreg.length+'件の商品を追加しました');
 }
 
 // --- 履歴・グラフ ---
