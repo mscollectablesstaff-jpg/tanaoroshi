@@ -1718,6 +1718,8 @@ function msSaveRecords(list){
 
 // --- 画面遷移 ---
 function doMstock(){
+  // 棚卸入力中なら遷移前に下書き保存（商品マスタインポートで確実に参照できるように）
+  saveDraft();
   showPage('pgMstock');
   const now=new Date();
   document.getElementById('msMonthInp').value=now.getFullYear()+'-'+String(now.getMonth()+1).padStart(2,'0');
@@ -1982,51 +1984,94 @@ function msBindMasterDrag(tbody){
   });
 }
 
-// インポート用セレクトをFirebase同期してから更新
+// インポート用セレクトを更新（Firebase対応・現行セッション・下書き・アーカイブ全対応）
 function msRefreshImportSelect(){
   const sel=document.getElementById('msImportSrcSel'); if(!sel)return;
   const pgBox=document.getElementById('msImportPageBox');
+  if(pgBox) pgBox.style.display='none';
+  sel.innerHTML='<option value="">読み込み中...</option>';
 
-  function populateSel(){
+  // ── データ源を全部集める ──────────────────────────────
+  // ① メモリ上の現行セッション
+  const memHasData=!!(sid&&order&&order.length&&Object.values(pages||{}).some(pg=>(pg.rows||[]).some(r=>r.n)));
+  // ② localStorage下書き
+  const draft=getDraft();
+  const draftHasData=!!(draft&&draft.order&&draft.order.length&&Object.values(draft.pages||{}).some(pg=>(pg.rows||[]).some(r=>r.n)));
+  const draftLabel=draft&&draft.meta
+    ?`📝 棚卸入力中（${draft.meta.date||''}${draft.meta.basho?' '+draft.meta.basho:''}）`
+    :'📝 棚卸入力中（保存前）';
+
+  function buildSel(fbSessionPages, fbSessionOrder, fbSessionLabel){
     const arcList=getArcList();
-    // セッション中（メモリにデータあり）
-    const hasSession=!!(order&&order.length&&Object.values(pages||{}).some(pg=>(pg.rows||[]).some(r=>r.n)));
-    // 下書き（退出後 or セッション外でも使えるバックアップ）
-    const draft=getDraft();
-    const hasDraft=!!(draft&&draft.order&&draft.order.length&&Object.values(draft.pages||{}).some(pg=>(pg.rows||[]).some(r=>r.n)));
-    const draftLabel=draft&&draft.meta
-      ?`📝 入力中の棚卸（${draft.meta.date||'日付未設定'}　${draft.meta.basho||draft.meta.company||''}）保存前`
-      :'📝 入力中の棚卸（保存前）';
+    let opts='<option value="">― 読み込み元を選択 ―</option>';
 
-    sel.innerHTML='<option value="">― アーカイブを選択 ―</option>'
-      +(hasSession?'<option value="__session__">✅ 現在の棚卸セッション（入力中）</option>':'')
-      +(hasDraft?`<option value="__draft__">${draftLabel}</option>`:'')
-      +(!hasSession&&!hasDraft?'<option disabled style="color:#aaa">※ 棚卸入力画面で入力後に選択できます</option>':'')
-      +(arcList.length
-        ? arcList.map(a=>`<option value="${a.id}">${a.date}　${a.label}</option>`).join('')
-        : '<option disabled>（保存済みアーカイブなし）</option>');
+    // 現行セッション（メモリ優先、なければFirebaseから取得済みのデータ）
+    if(memHasData){
+      opts+='<option value="__session__">✅ 現在の棚卸セッション（入力中）</option>';
+    } else if(fbSessionPages){
+      opts+=`<option value="__fbsession__">✅ ${fbSessionLabel||'入力中の棚卸（Firebase）'}</option>`;
+    }
+    // 下書き（メモリと異なる場合のみ表示）
+    if(draftHasData && !(memHasData && draft&&draft.sid===sid)){
+      opts+=`<option value="__draft__">${draftLabel}</option>`;
+    }
+    // 何もなければ案内
+    if(!memHasData&&!fbSessionPages&&!draftHasData){
+      opts+='<option disabled style="color:#aaa">（棚卸入力後に選択できます）</option>';
+    }
+    // 保存済みアーカイブ
+    if(arcList.length){
+      opts+=arcList.map(a=>`<option value="${a.id}">${a.date}　${a.label}</option>`).join('');
+    } else {
+      opts+='<option disabled style="color:#aaa">（保存済みアーカイブなし）</option>';
+    }
+    sel.innerHTML=opts;
     if(pgBox) pgBox.style.display='none';
+
+    // __fbsession__ 用にグローバル退避
+    if(fbSessionPages) window._msFbSessionPages=fbSessionPages, window._msFbSessionOrder=fbSessionOrder;
   }
 
-  populateSel();
+  // まずローカルで即描画
+  buildSel(null,null,null);
 
+  // Firebaseからアーカイブ同期 & 現行セッションページ取得
   if(!offline&&db){
-    db.ref('archive').once('value',sn=>{
-      const data=sn.val();
-      if(!data) return;
+    const tasks=[];
+
+    // アーカイブ最新化
+    tasks.push(db.ref('archive').once('value').then(sn=>{
+      if(!sn.exists())return;
       const local=getArcList();
       const localIds=new Set(local.map(a=>a.id));
       let added=false;
-      Object.values(data).forEach(a=>{
-        if(!a||!a.id||localIds.has(a.id)) return;
-        local.unshift(a);
-        added=true;
-      });
-      if(added){
-        try{localStorage.setItem(AK,JSON.stringify(local.slice(0,50)));}catch(e){}
-        populateSel();
-      }
-    });
+      Object.values(sn.val()).forEach(a=>{if(a&&a.id&&!localIds.has(a.id)){local.unshift(a);added=true;}});
+      if(added) try{localStorage.setItem(AK,JSON.stringify(local.sort((a,b)=>b.at-a.at).slice(0,50)));}catch(e){}
+    }).catch(()=>{}));
+
+    // 現行セッションがメモリにないときFirebaseから取得
+    if(!memHasData&&sid){
+      tasks.push(db.ref('s/'+sid).once('value').then(sn=>{
+        if(!sn.exists())return;
+        const val=sn.val();
+        const fbPages=val.pages||{};
+        const fbOrder=val.order||Object.keys(fbPages);
+        const hasRows=Object.values(fbPages).some(pg=>(pg.rows||[]).some(r=>r.n));
+        if(hasRows){
+          const meta=val.meta||{};
+          const label=`棚卸 ${meta.date||''} ${meta.basho||meta.company||''}（Firebase）`;
+          window._msFbSessionPages=fbPages;
+          window._msFbSessionOrder=fbOrder;
+          window._msFbSessionLabel=label;
+        }
+      }).catch(()=>{}));
+    }
+
+    Promise.all(tasks).then(()=>buildSel(
+      window._msFbSessionPages||null,
+      window._msFbSessionOrder||null,
+      window._msFbSessionLabel||null
+    ));
   }
 }
 
@@ -2036,44 +2081,47 @@ function msImportSrcChanged(){
   const pgBox=document.getElementById('msImportPageBox');
   const pgList=document.getElementById('msImportPageList');
   if(!pgBox||!pgList)return;
-
   if(!val){ pgBox.style.display='none'; return; }
 
+  function showPageList(srcPages, srcOrder){
+    const pageItems=srcOrder.map((k,i)=>{
+      const pg=srcPages[k]||{};
+      const cnt=(pg.rows||[]).filter(r=>r.n).length;
+      // ページ名はtanto（担当名）に保存されている
+      const label=pg.tanto||pg.ownerName||`ページ${i+1}`;
+      return {k, label, cnt};
+    }).filter(p=>p.cnt>0);
+
+    if(!pageItems.length){ pgBox.style.display='none'; return; }
+
+    pgList.innerHTML=pageItems.map(p=>`
+      <label style="display:inline-flex;align-items:center;gap:5px;
+        padding:5px 12px;border:1.5px solid #b0d0b8;border-radius:20px;
+        background:#fff;cursor:pointer;font-size:12px;font-weight:600;color:#1a3a2a">
+        <input type="checkbox" value="${p.k}" checked
+          style="accent-color:#2d7a4f;width:14px;height:14px">
+        ${e(p.label)}<span style="font-size:10px;color:#888;font-weight:400">（${p.cnt}件）</span>
+      </label>
+    `).join('');
+    pgBox.style.display='block';
+  }
+
   // ソース決定
-  let srcPages={}, srcOrder=[];
   if(val==='__session__'){
-    srcPages=pages||{}; srcOrder=order||Object.keys(srcPages);
+    showPageList(pages||{}, order||Object.keys(pages||{}));
+  } else if(val==='__fbsession__'){
+    const fp=window._msFbSessionPages||{};
+    const fo=window._msFbSessionOrder||Object.keys(fp);
+    showPageList(fp, fo);
   } else if(val==='__draft__'){
     const draft=getDraft();
     if(!draft){ pgBox.style.display='none'; return; }
-    srcPages=draft.pages||{}; srcOrder=draft.order||Object.keys(srcPages);
+    showPageList(draft.pages||{}, draft.order||Object.keys(draft.pages||{}));
   } else {
     const arc=getArcList().find(a=>a.id===val);
     if(!arc){ pgBox.style.display='none'; return; }
-    srcPages=arc.pages||{}; srcOrder=arc.order||Object.keys(srcPages);
+    showPageList(arc.pages||{}, arc.order||Object.keys(arc.pages||{}));
   }
-
-  // ページが1つしかなければ全部選択状態で表示
-  const pageItems=srcOrder.map((k,i)=>{
-    const pg=srcPages[k]||{};
-    const cnt=(pg.rows||[]).filter(r=>r.n).length;
-    const label=pg.tanto||pg.ownerName||`${i+1}P`;
-    return {k, label, cnt};
-  }).filter(p=>p.cnt>0);
-
-  if(!pageItems.length){ pgBox.style.display='none'; return; }
-
-  pgList.innerHTML=pageItems.map(p=>`
-    <label style="display:inline-flex;align-items:center;gap:5px;
-      padding:5px 12px;border:1.5px solid #b0d0b8;border-radius:20px;
-      background:#fff;cursor:pointer;font-size:12px;font-weight:600;
-      transition:.15s" class="ms-page-chk-label">
-      <input type="checkbox" value="${p.k}" checked
-        style="accent-color:#2d7a4f;width:14px;height:14px">
-      ${e(p.label)}<span style="font-size:10px;color:#888;font-weight:400">（${p.cnt}点）</span>
-    </label>
-  `).join('');
-  pgBox.style.display='block';
 }
 
 // 棚卸データから商品マスタへインポート（ページ指定）
@@ -2092,6 +2140,8 @@ function msImportFromArc(){
   let srcPages={};
   if(val==='__session__'){
     srcPages=pages||{};
+  } else if(val==='__fbsession__'){
+    srcPages=window._msFbSessionPages||{};
   } else if(val==='__draft__'){
     const draft=getDraft();
     if(!draft){alert('下書きデータが見つかりません');return;}
@@ -2336,6 +2386,7 @@ function msRenderHistAll(){
 }
 
 function doMstock(){
+  saveDraft();
   showPage('pgMstock');
   const now=new Date();
   document.getElementById('msMonthInp').value=now.getFullYear()+'-'+String(now.getMonth()+1).padStart(2,'0');
