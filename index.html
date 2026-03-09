@@ -1284,7 +1284,56 @@ const AK = 'tb_archive_v3'; // アーカイブ履歴
 const MK = 'tb_mstock_v1'; // 月次在庫データ
 const MDK = 'tb_mdept_v1'; // 月次在庫部門・マスタ
 const DK = 'tb_draft_v1';  // 入力中セッションの下書き（完了保存前でも月次インポートで使える）
-const BK = 'tb_bc_used_v1'; // 使用済みバーコード番号の永続追跡
+const BK   = 'tb_bc_used_v1'; // 使用済みバーコード番号の永続追跡
+const PCSK = 'tb_pc_seq_v1';  // 商品コード連番（カテゴリー別）
+
+// カテゴリー略称マップ（catId → 3文字プレフィックス）
+const CAT_PREFIX_MAP = {
+  '0002':'HCH', // はちみつ
+  '0001':'ZAK', // 雑貨
+  '0006':'EMS', // エムズオリジナル
+  '0004':'MIT', // ミツロウ
+  '0003':'KUT', // 靴
+  '0009':'KOJ', // 個人作家
+  '0005':'FUK', // 服・靴下
+  '0008':'SHO', // 食品
+  '0010':'SOR', // 送料・袋・包装
+  '0012':'DRY', // ドライフラワー・植物
+  '0013':'ITK', // 委託
+  '0014':'KIK', // 企画展
+};
+function getCatPrefix(catId, category){
+  if(catId && CAT_PREFIX_MAP[catId]) return CAT_PREFIX_MAP[catId];
+  if(category){
+    if(/はちみつ/.test(category)) return 'HCH';
+    if(/雑貨/.test(category))     return 'ZAK';
+    if(/オリジナル/.test(category))return 'EMS';
+    if(/ミツロウ/.test(category)) return 'MIT';
+    if(/靴/.test(category))       return 'KUT';
+    if(/個人|作家/.test(category)) return 'KOJ';
+    if(/服|靴下/.test(category))  return 'FUK';
+    if(/食品/.test(category))     return 'SHO';
+    if(/送料|袋|包装/.test(category)) return 'SOR';
+    if(/ドライ|植物/.test(category))  return 'DRY';
+    if(/委託/.test(category))     return 'ITK';
+    if(/企画/.test(category))     return 'KIK';
+  }
+  return 'GEN';
+}
+// 商品コード発番: {3文字プレフィックス}{5桁連番} 例: HCH00001
+function nkGenProductCode(catId, category){
+  const prefix = getCatPrefix(catId, category);
+  try{
+    const seqs = JSON.parse(localStorage.getItem(PCSK)||'{}');
+    const cur = seqs[prefix]||0;
+    const next = cur+1;
+    seqs[prefix] = next;
+    localStorage.setItem(PCSK, JSON.stringify(seqs));
+    return prefix + String(next).padStart(5,'0');
+  }catch(e){
+    return prefix + String(Date.now()).slice(-5);
+  }
+}
 
 // ============================================================
 // 状態
@@ -4127,12 +4176,13 @@ function bcpAutoAssign(){
       if(prodMap[name]){
         prodMap[name].barcode=newBc;
       } else {
+        const pc=nkGenProductCode(pages[k]?.catId||'', pages[k]?.tanto||r.cat||'');
         const np={
           id:'p'+Date.now()+'_'+Math.random().toString(36).slice(2,5),
-          name, barcode:newBc,
+          name, barcode:newBc, productCode:pc,
           price:r.p||'', costPrice:r.st||'',
           taxRate:r.z||'10', unit:r.u||'点',
-          category:r.cat||'', catId:'',
+          category:pages[k]?.tanto||r.cat||'', catId:pages[k]?.catId||'',
           supplier:'', createdAt:Date.now()
         };
         prods.push(np);
@@ -4574,9 +4624,25 @@ function dlAir(){
     const chk=document.getElementById('ac'+i);
     if(chk&&!chk.checked) return;
     const c=calc(p), tax=p.z==='8'?'軽減税率':'標準税率', pr=Math.round(c.p);
-    rows.push(['','','',p.cat,p.n,p.n,p.n,p.u||'','','内税',tax,'',p.pt,'',
-      p.pt==='部門打ち'?'0':String(pr),'',p.st||'','','',p.bc||'',
-      '対象','表示','印字する','印字する',p.b||'','','']);
+    // 商品マスタからproductCodeを取得
+    const _mProd=nkGetProducts().find(mp=>mp.barcode&&mp.barcode===p.bc)||
+                 nkGetProducts().find(mp=>mp.name&&mp.name===p.n)||{};
+    const _pc=_mProd.productCode||'';
+    const _row=new Array(27).fill('');
+    _row[3] =p.cat;                                    // カテゴリーID
+    _row[4] =p.n; _row[5]=p.n; _row[6]=p.n;           // 商品名×3
+    _row[9] ='内税';                                   // 税設定
+    _row[10]=tax;                                      // 適用税率
+    _row[12]=p.pt||'通常';                             // 価格設定
+    _row[13]=p.u||'';                                  // 販売単位ID
+    _row[14]=p.pt==='部門打ち'?'0':String(pr);         // 価格
+    _row[16]=p.st||'';                                 // 原価
+    _row[17]=_pc;                                      // ★ 商品コード
+    _row[19]=p.bc||'';                                 // ★ バーコード
+    _row[20]='対象'; _row[21]='表示';
+    _row[22]='印字する'; _row[23]='印字する';
+    _row[24]=p.b||'';
+    rows.push(_row);
   });
   let csv=airVer+'\n'+AHEADS.map(ec).join(',')+'\n';
   airExist.forEach(r=>{csv+=r.map(ec).join(',')+'\n';});
@@ -5041,9 +5107,11 @@ function nkSaveArrival(){
       updCount++;
     } else {
       const bc=nkNextBarcode();
+      addBcUsed([bc]); // 発番した番号を即座に使用済み登録（重複防止）
+      const pc=nkGenProductCode(r.catId||'', r.cat||'');
       const np={
         id:'p'+Date.now()+'_'+Math.random().toString(36).slice(2,5),
-        name, barcode:bc,
+        name, barcode:bc, productCode:pc,
         price:r.p||'', costPrice:r.cost||'',
         taxRate:r.z||'10', unit:r.u||'点',
         category:r.cat||'', catId:r.catId||'',
@@ -5073,6 +5141,11 @@ function nkRenderProducts(){
   const q=(document.getElementById('nkProdSearch')||{}).value||'';
   let prods=nkGetProducts();
   if(q) prods=prods.filter(p=>p.name.includes(q)||(p.barcode||'').includes(q));
+  // 商品コード未設定数をバナーに反映
+  const noPc=prods.filter(p=>!p.productCode).length;
+  const pcBanner=document.getElementById('nkPcBanner');
+  if(pcBanner) pcBanner.style.display=noPc>0?'block':'none';
+  if(pcBanner&&noPc>0) pcBanner.querySelector('span').textContent=`商品コード未設定：${noPc}件`;
   const cnt=document.getElementById('nkProdCount');
   if(cnt) cnt.textContent=`（${prods.length}件）`;
   if(!prods.length){
@@ -5081,7 +5154,8 @@ function nkRenderProducts(){
   }
   list.innerHTML=prods.map(p=>`
     <div class="nk-prod-item">
-      <span class="nk-prod-bc">${e(p.barcode)}</span>
+      <span class="nk-prod-bc" title="バーコード">${e(p.barcode)||'<span style="color:#e74c3c;font-size:10px">BC未設定</span>'}</span>
+      <span style="font-size:10px;color:#2d7a4f;font-weight:700;font-family:monospace;min-width:74px" title="商品コード">${e(p.productCode)||'<span style="color:#aab">―</span>'}</span>
       <span class="nk-prod-name">${e(p.name)}</span>
       ${p.category?`<span class="nk-prod-cat">${e(p.category)}</span>`:''}
       <span class="nk-prod-price">${p.price?'¥'+Number(p.price).toLocaleString():'価格未設定'}</span>
@@ -5098,26 +5172,67 @@ function nkDeleteProduct(id){
   nkRenderProducts();
 }
 
+// 既存商品に商品コードが未設定のものへ一括付与
+function nkAssignAllProductCodes(){
+  const prods=nkGetProducts();
+  let cnt=0;
+  prods.forEach(p=>{
+    if(p.productCode) return;
+    p.productCode=nkGenProductCode(p.catId||'', p.category||'');
+    cnt++;
+  });
+  if(!cnt){ toast('すべての商品にすでに商品コードが設定されています'); return; }
+  nkSaveProducts(prods);
+  nkRenderProducts();
+  toast(`✅ ${cnt}件に商品コードを付与しました`);
+}
+
 function nkExportAir(){
   const prods=nkGetProducts();
   if(!prods.length){alert('登録済み商品がありません');return;}
-  const header='商品コード,商品名,価格,税種別,カテゴリーID,バーコード,単位';
-  const rows=prods.map(p=>[
-    p.barcode||'',
-    `"${(p.name||'').replace(/"/g,'""')}"`,
-    p.price||'',
-    p.taxRate==='8'?'軽減税率対象':'通常税率',
-    p.catId||'',
-    p.barcode||'',
-    p.unit||''
-  ].join(','));
-  const csv='\uFEFF'+[header,...rows].join('\r\n');
-  const blob=new Blob([csv],{type:'text/csv;charset=utf-8'});
-  const a=document.createElement('a');
-  a.href=URL.createObjectURL(blob);
-  a.download=`airレジ商品登録_${new Date().toISOString().slice(0,10)}.csv`;
-  a.click();
-  toast(`${prods.length}件のCSVをダウンロードしました`);
+
+  // バーコード未設定チェック
+  const noBc=prods.filter(p=>!p.barcode);
+  if(noBc.length){
+    if(!confirm(`${noBc.length}件にバーコードが未設定です。\n「入荷・商品登録」→「🏷バーコード印刷」タブで発番してから出力することをお勧めします。\nそのまま出力しますか？`)) return;
+  }
+
+  // エアレジ正式形式（AHEADS 27列）で出力
+  // index 17: 商品コード, index 19: バーコード がエアレジで認識される列
+  let csv = AHEADS.map(ec).join(',') + '\r\n';
+  prods.forEach(p=>{
+    const tax = p.taxRate==='8' ? '軽減税率' : '標準税率';
+    const row = new Array(27).fill('');
+    // 0:商品ID  1:バリエーションID  2:削除設定 → 空
+    row[3]  = p.catId||'';              // カテゴリーID
+    row[4]  = p.name||'';              // 【必須】商品名
+    row[5]  = p.name||'';              // 商品名（レシート用）
+    row[6]  = p.name||'';              // 商品名（商品入力用）
+    // 7:バリエーション種別1  8:種別2 → 空
+    row[9]  = '内税';                  // 税設定
+    row[10] = tax;                     // 適用税率
+    // 11:税率別価格 → 空
+    row[12] = '通常';                  // 価格設定
+    row[13] = p.unit||'';              // 販売単位ID
+    row[14] = p.price||'';             // 【必須】価格
+    // 15:価格2 → 空
+    row[16] = p.costPrice||'';         // 原価
+    row[17] = p.productCode||'';       // 商品コード（HCH00001 など）
+    row[18] = '';                      // 自動発番 → 空（手動発番）
+    row[19] = p.barcode||'';           // ★ バーコード（エアレジがスキャンで照合する列）
+    row[20] = '対象';                  // ポイント付与
+    row[21] = '表示';                  // 表示/非表示
+    row[22] = '印字する';              // レシート印字
+    row[23] = '印字する';              // 登録番号印字
+    row[24] = '';                      // 備考
+    row[25] = '';                      // 旧商品コード
+    row[26] = '';                      // 分析タグID
+    csv += row.map(ec).join(',') + '\r\n';
+  });
+
+  const fname = `エアレジ商品登録_${new Date().toISOString().slice(0,10).replace(/-/g,'')}.csv`;
+  dlSJIS(csv, fname);
+  toast(`${prods.length}件を出力（バーコード設定済：${prods.filter(p=>p.barcode).length}件）`);
 }
 
 function nkRenderLabelList(){
@@ -5360,8 +5475,24 @@ UGG Matt Black 37,10,25000,10
       <div class="nk-card">
         <div style="display:flex;align-items:center;gap:8px;margin-bottom:12px;flex-wrap:wrap">
           <h2 style="margin:0;border:none;flex:1">📋 登録済み商品一覧 <span id="nkProdCount" style="font-size:11px;color:#6b7a8d;font-weight:400"></span></h2>
-          <input id="nkProdSearch" class="nk-inp" placeholder="🔍 商品名で絞り込み" style="width:180px;margin:0" oninput="nkRenderProducts()">
+          <input id="nkProdSearch" class="nk-inp" placeholder="🔍 商品名・コードで絞り込み" style="width:180px;margin:0" oninput="nkRenderProducts()">
           <button onclick="nkExportAir()" style="background:#FF6600;color:#fff;border:none;border-radius:6px;padding:8px 14px;font-size:12px;font-weight:700;cursor:pointer;white-space:nowrap">🛒 Airレジ出力</button>
+        </div>
+        <!-- 商品コード体系の説明 -->
+        <div style="background:#f0f8f4;border:1.5px solid #b0d8b0;border-radius:8px;padding:10px 14px;margin-bottom:10px;font-size:12px;color:#1a4a2e">
+          <b>📌 商品コードの見方</b>｜カテゴリー略称（3文字）＋連番5桁で自動発番されます<br>
+          <span style="font-family:monospace;font-size:11px;color:#2d7a4f">
+            HCH=はちみつ　ZAK=雑貨　EMS=エムズオリジナル　MIT=ミツロウ　KUT=靴　KOJ=個人作家<br>
+            FUK=服・靴下　SHO=食品　DRY=ドライフラワー・植物　ITK=委託　SOR=送料　KIK=企画展
+          </span>
+        </div>
+        <!-- 商品コード未設定バナー -->
+        <div id="nkPcBanner" style="display:none;background:#fff8e7;border:1.5px solid #f39c12;border-radius:8px;padding:10px 14px;margin-bottom:10px;display:flex;align-items:center;justify-content:space-between;gap:10px">
+          <span style="font-size:12px;color:#7b4500;font-weight:700"></span>
+          <button onclick="nkAssignAllProductCodes()"
+            style="background:#f39c12;color:#fff;border:none;border-radius:6px;padding:6px 14px;font-size:12px;font-weight:700;cursor:pointer;white-space:nowrap;font-family:inherit">
+            🔢 一括で商品コードを付与する
+          </button>
         </div>
         <div id="nkProdList"></div>
       </div>
