@@ -731,24 +731,56 @@ svg.trend-chart text{font-family:inherit}
 
 <!-- ===== SESSION PAGE ===== -->
 <div class="page" id="pgSession">
-  <div class="card">
-    <div class="card-logo">📋 棚卸 × Airレジ</div>
+  <div class="card" style="padding:20px 20px 24px">
+
+    <div class="card-logo">📋 棚卸システム</div>
     <div class="card-sub" id="modeLabel">リアルタイム同期モード 🔴</div>
 
-    <div class="lbl">あなたの名前</div>
+    <!-- ① 名前入力（常に上に） -->
+    <div class="lbl" style="margin-top:12px">あなたの名前</div>
     <input class="inp" id="myNameInp" placeholder="例：山田">
 
-    <button class="btn btn-navy" onclick="doCreate()">✨ 新しい棚卸を開始する</button>
-    <button class="btn" style="background:#2d7a4f;color:#fff;margin-top:8px" onclick="doMstock()">☕ 月次在庫管理を開く</button>
-    <button class="btn" style="background:#6a1a9a;color:#fff;margin-top:8px" onclick="doNyuuka()">📦 入荷・商品登録</button>
-    <div class="divider">または参加</div>
-    <div class="lbl">セッションコード（6桁）</div>
-    <input class="inp inp-code" id="joinCodeInp" placeholder="XXXXXX" maxlength="6">
-    <button class="btn btn-green" onclick="doJoin()">🔗 参加する</button>
-    <button class="btn btn-gray" style="margin-top:6px" onclick="showPage('pgSetup')">⚙ Firebase設定を変更</button>
-    <button class="btn btn-gray" style="margin-top:6px" onclick="showPage('pgHome')">🏠 ホームへ戻る</button>
+    <!-- ② 再参加リスト（メイン） -->
+    <div id="recentList" style="margin-top:14px"></div>
 
-    <div id="recentList" style="margin-top:18px"></div>
+    <!-- ③ コード入力（折りたたみ） -->
+    <div style="margin-top:10px">
+      <button onclick="toggleJoinPanel()" id="btnToggleJoin"
+        style="width:100%;padding:11px;background:#f0f4f8;border:1.5px solid #c0ccd8;border-radius:10px;
+               font-size:13px;font-weight:700;color:#3a5a7a;cursor:pointer;font-family:inherit;
+               display:flex;align-items:center;justify-content:center;gap:6px">
+        🔗 コードで参加する（別のセッション）
+      </button>
+      <div id="joinPanel" style="display:none;margin-top:8px;padding:14px;background:#f0f4f8;border-radius:10px;border:1px solid #c0ccd8">
+        <div class="lbl">セッションコード（6桁）</div>
+        <input class="inp inp-code" id="joinCodeInp" placeholder="XXXXXX" maxlength="6" style="margin-bottom:8px">
+        <button class="btn btn-green" onclick="doJoin()" style="margin-top:0">🔗 参加する</button>
+      </div>
+    </div>
+
+    <!-- ④ 新規作成（サブ） -->
+    <button class="btn btn-navy" onclick="doCreate()" style="margin-top:10px;font-size:13px;padding:10px">
+      ✨ 新しい棚卸を開始する
+    </button>
+
+    <!-- ⑤ その他 -->
+    <div style="display:flex;gap:8px;margin-top:10px">
+      <button class="btn" onclick="doMstock()"
+        style="flex:1;background:#2d7a4f;color:#fff;margin-top:0;font-size:12px;padding:9px 6px">
+        ☕ 月次在庫
+      </button>
+      <button class="btn" onclick="doNyuuka()"
+        style="flex:1;background:#6a1a9a;color:#fff;margin-top:0;font-size:12px;padding:9px 6px">
+        📦 入荷登録
+      </button>
+    </div>
+
+    <div style="display:flex;gap:8px;margin-top:8px">
+      <button class="btn btn-gray" onclick="showPage('pgSetup')"
+        style="flex:1;margin-top:0;font-size:11px;padding:7px">⚙ Firebase設定</button>
+      <button class="btn btn-gray" onclick="showPage('pgHome')"
+        style="flex:1;margin-top:0;font-size:11px;padding:7px">🏠 ホーム</button>
+    </div>
 
     <!-- アーカイブ履歴 -->
     <div class="arc-section" id="arcSection" style="display:none">
@@ -2938,16 +2970,41 @@ function renderRecent(){
   const el=document.getElementById('recentList'); if(!el)return;
   try{
     const list=JSON.parse(localStorage.getItem(RK)||'[]');
-    if(!list.length){el.innerHTML='';} else {
-    el.innerHTML='<div style="font-size:11px;font-weight:700;color:#6b7a8d;margin-bottom:8px">最近のセッション</div>'+
-      list.map(x=>{
-        const d=new Date(x.t);
-        return `<div class="recent-item" onclick="quickJoin('${x.c}','${x.n}')">
-          <span class="recent-code">${x.c}</span>
-          <span class="recent-info">${d.getMonth()+1}/${d.getDate()} ${d.getHours()}:${String(d.getMinutes()).padStart(2,'0')}</span>
-          <button class="recent-btn">再参加</button>
-        </div>`;
-      }).join('');
+    if(!list.length){
+      el.innerHTML=`<div style="text-align:center;padding:16px 10px;background:#f8faf8;border-radius:10px;border:1.5px dashed #b0c8b0">
+        <div style="font-size:22px;margin-bottom:6px">👆</div>
+        <div style="font-size:13px;color:#6b7a8d;font-weight:700">初めての方は名前を入力して<br>「新しい棚卸を開始する」へ</div>
+      </div>`;
+    } else {
+      const d0=new Date(list[0].t);
+      const fmt=d=>`${d.getMonth()+1}/${d.getDate()} ${d.getHours()}:${String(d.getMinutes()).padStart(2,'0')}`;
+      // 最後のセッション → 大きいボタン
+      el.innerHTML=`
+        <div style="font-size:11px;font-weight:700;color:#6b7a8d;margin-bottom:8px;letter-spacing:.05em">🔄 前回の続きから再参加</div>
+        <button onclick="quickJoin('${list[0].c}','${list[0].n}')"
+          style="width:100%;padding:16px 18px;background:linear-gradient(135deg,#1a4a2e,#2d7a4f);color:#fff;
+                 border:none;border-radius:12px;cursor:pointer;font-family:inherit;text-align:left;
+                 display:flex;align-items:center;justify-content:space-between;gap:10px;margin-bottom:8px;
+                 box-shadow:0 3px 12px rgba(45,122,79,.3)">
+          <div>
+            <div style="font-size:18px;font-weight:900;letter-spacing:.08em;margin-bottom:2px">${list[0].c}</div>
+            <div style="font-size:12px;opacity:.8">${fmt(d0)} 最終参加　担当：${list[0].n||'（名前なし）'}</div>
+          </div>
+          <div style="font-size:28px">▶</div>
+        </button>
+        ${list.slice(1).map(x=>{
+          const d=new Date(x.t);
+          return `<button onclick="quickJoin('${x.c}','${x.n}')"
+            style="width:100%;padding:10px 14px;background:#f0f8f4;border:1.5px solid #b0d8b0;
+                   border-radius:10px;cursor:pointer;font-family:inherit;text-align:left;
+                   display:flex;align-items:center;justify-content:space-between;margin-bottom:6px">
+            <div>
+              <span style="font-size:14px;font-weight:800;color:#1a4a2e;letter-spacing:.06em">${x.c}</span>
+              <span style="font-size:11px;color:#888;margin-left:10px">${fmt(d)}　担当：${x.n||'―'}</span>
+            </div>
+            <span style="font-size:12px;font-weight:700;color:#2d7a4f;background:#d4eed8;padding:4px 10px;border-radius:6px">再参加</span>
+          </button>`;
+        }).join('')}`;
     }
   }catch(e){el.innerHTML=''}
   renderSessionArcList();
@@ -2956,6 +3013,10 @@ function quickJoin(code,name){
   document.getElementById('joinCodeInp').value=code;
   if(!document.getElementById('myNameInp').value) document.getElementById('myNameInp').value=name;
   doJoin();
+}
+function toggleJoinPanel(){
+  const p=document.getElementById('joinPanel');
+  if(p) p.style.display=p.style.display==='none'?'block':'none';
 }
 
 // ============================================================
