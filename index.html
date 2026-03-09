@@ -632,6 +632,7 @@ svg.trend-chart text{font-family:inherit}
 .hm-foot button{background:rgba(255,255,255,.1);color:rgba(255,255,255,.7);border:1px solid rgba(255,255,255,.2);padding:9px 18px;border-radius:20px;font-size:12px;font-weight:700;cursor:pointer;font-family:inherit}
 .hm-foot button:hover{background:rgba(255,255,255,.2)}
 </style>
+<script src="https://unpkg.com/@zxing/library@0.19.1/umd/index.min.js"></script>
 </head>
 <body>
 
@@ -825,6 +826,22 @@ svg.trend-chart text{font-family:inherit}
           </div>
           <button class="ms-save-btn" onclick="msImportFromArc()" style="padding:9px 16px;font-size:12px;white-space:nowrap;width:100%">📥 選択したページからインポート</button>
           <div id="msImportMsg" style="font-size:11px;color:#1a7a4a;margin-top:6px;display:none"></div>
+
+          <!-- ── 商品登録マスタから直接インポート ── -->
+          <div style="border-top:1px solid #c0dcc8;margin-top:14px;padding-top:12px">
+            <div style="font-size:12px;font-weight:700;color:#1a3a2a;margin-bottom:6px">📦 入荷登録済み商品からインポート</div>
+            <div style="font-size:11px;color:#4a7a5a;margin-bottom:10px">入荷・商品登録で登録した商品をこの部門に追加します。すでに登録済みの商品はスキップされます。</div>
+            <div id="msProdImportList" style="max-height:200px;overflow-y:auto;border:1px solid #b0d0b8;border-radius:6px;background:#fff;margin-bottom:10px;display:none"></div>
+            <div style="display:flex;gap:8px;flex-wrap:wrap">
+              <button onclick="msProdImportOpen()" style="flex:1;padding:9px 14px;background:#fff;border:1.5px solid #2d7a4f;border-radius:6px;font-size:12px;font-weight:700;color:#1a5c2e;cursor:pointer;font-family:inherit">
+                🔍 商品を選んでインポート
+              </button>
+              <button onclick="msProdImportAll()" style="flex:1;padding:9px 14px;background:#2d7a4f;color:#fff;border:none;border-radius:6px;font-size:12px;font-weight:700;cursor:pointer;font-family:inherit">
+                ⚡ 未登録をすべて追加
+              </button>
+            </div>
+            <div id="msProdImportMsg" style="font-size:11px;color:#1a7a4a;margin-top:6px;min-height:16px"></div>
+          </div>
         </div>
         <table class="master-tbl">
           <thead><tr>
@@ -900,6 +917,92 @@ svg.trend-chart text{font-family:inherit}
 
     <!-- 入力パネル -->
     <div class="panel on" id="pnl-entry">
+
+      <!-- バーコードスキャナーバー (Socket Mobile D750 HIDモード対応) -->
+      <div id="scanBar" style="display:none;background:#0f2744;border-radius:10px;margin-bottom:10px;overflow:hidden">
+        <!-- メインバー -->
+        <div style="padding:10px 14px;display:flex;align-items:center;gap:10px;flex-wrap:wrap">
+          <div style="display:flex;align-items:center;gap:8px;flex-shrink:0">
+            <span id="scanDot" style="width:10px;height:10px;border-radius:50%;background:#ff6b6b;display:inline-block;transition:.3s"></span>
+            <span style="color:#fff;font-size:13px;font-weight:700;white-space:nowrap">📡 スキャンモード</span>
+          </div>
+          <!-- フォーカス維持用の隠し入力（実際のキャプチャ） -->
+          <input id="scanInput" type="text" inputmode="none"
+            style="position:absolute;opacity:0;width:1px;height:1px;pointer-events:none"
+            autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false"
+            onkeydown="scanKeydown(event)"
+            oninput="scanOnInput(this.value)">
+          <!-- 表示用バー（タップでフォーカス再取得） -->
+          <div id="scanDisplay" onclick="scanFocus()"
+            style="flex:1;min-width:160px;padding:9px 14px;background:rgba(255,255,255,.12);border:2px solid rgba(255,255,255,.3);border-radius:7px;font-size:14px;font-family:monospace;font-weight:700;letter-spacing:2px;color:#fff;cursor:pointer;min-height:38px;transition:.2s"
+            title="タップしてスキャン待機">
+            <span id="scanDisplayTxt" style="opacity:.5">スキャン待機中... ここをタップ</span>
+          </div>
+          <span id="scanMsg" style="color:#a0e0b0;font-size:12px;white-space:nowrap"></span>
+          <button onclick="toggleScanMode(false)"
+            style="background:rgba(255,255,255,.15);color:#fff;border:none;border-radius:6px;padding:7px 14px;font-size:12px;font-weight:700;cursor:pointer;font-family:inherit;white-space:nowrap">
+            ✕ 終了
+          </button>
+        </div>
+        <!-- D750接続ガイド（折りたたみ） -->
+        <div id="scanGuide" style="background:rgba(0,0,0,.25);padding:10px 16px;font-size:11px;color:rgba(255,255,255,.75);line-height:1.9;display:none">
+          <b style="color:#a0e0b0">📋 Socket Mobile D750 接続手順（初回のみ）</b><br>
+          1. スキャナーの電源を入れBluetoothボタンを長押し（青ランプ点滅）<br>
+          2. iPad/PC の設定 → Bluetooth → 「Socket D750[xxxxxx]」を選択してペアリング<br>
+          3. iPadの場合：iOSモード切替バーコードをスキャン（ソフトキーボードが無効化されます）<br>
+          4. 青ランプが点灯（点滅停止）になれば接続完了 → スキャン開始
+        </div>
+        <div style="padding:4px 16px 8px;display:flex;gap:12px">
+          <button onclick="document.getElementById('scanGuide').style.display=document.getElementById('scanGuide').style.display==='none'?'block':'none'"
+            style="background:none;border:none;color:rgba(255,255,255,.5);font-size:11px;cursor:pointer;font-family:inherit;padding:0">
+            ❓ D750接続方法
+          </button>
+          <span style="color:rgba(255,255,255,.3);font-size:11px">スキャンすると自動で行に追加されます</span>
+        </div>
+      </div>
+      <!-- スキャン入力ボタン（2択） -->
+      <div id="btnScanArea" style="display:flex;gap:8px;margin-bottom:10px;flex-wrap:wrap">
+        <button id="btnScanMode" onclick="toggleScanMode(true)"
+          style="display:flex;align-items:center;gap:6px;padding:9px 18px;background:#1a3a5c;color:#fff;border:none;border-radius:8px;font-size:13px;font-weight:700;cursor:pointer;font-family:inherit">
+          📡 スキャナーで入力
+        </button>
+        <button onclick="openCameraScanner()"
+          style="display:flex;align-items:center;gap:6px;padding:9px 18px;background:#1a6ea6;color:#fff;border:none;border-radius:8px;font-size:13px;font-weight:700;cursor:pointer;font-family:inherit">
+          📷 カメラでスキャン
+        </button>
+      </div>
+
+      <!-- カメラスキャナーモーダル -->
+      <div id="camModal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.85);z-index:9000;flex-direction:column;align-items:center;justify-content:center">
+        <div style="background:#0f2744;border-radius:16px;padding:16px;width:min(95vw,480px);box-shadow:0 8px 40px rgba(0,0,0,.5)">
+          <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px">
+            <span style="color:#fff;font-size:15px;font-weight:700">📷 カメラでバーコードスキャン</span>
+            <button onclick="closeCameraScanner()"
+              style="background:rgba(255,255,255,.15);color:#fff;border:none;border-radius:6px;padding:6px 14px;font-size:13px;font-weight:700;cursor:pointer;font-family:inherit">✕ 閉じる</button>
+          </div>
+          <!-- カメラ映像 -->
+          <div style="position:relative;border-radius:10px;overflow:hidden;background:#000;aspect-ratio:4/3">
+            <video id="camVideo" style="width:100%;height:100%;object-fit:cover" playsinline muted></video>
+            <!-- 照準線 -->
+            <div style="position:absolute;inset:0;pointer-events:none;display:flex;align-items:center;justify-content:center">
+              <div style="width:70%;height:30%;border:2px solid rgba(46,204,113,.8);border-radius:6px;box-shadow:0 0 0 2000px rgba(0,0,0,.25)"></div>
+            </div>
+            <div id="camScanFlash" style="position:absolute;inset:0;background:rgba(46,204,113,.3);opacity:0;transition:opacity .15s;pointer-events:none;border-radius:10px"></div>
+          </div>
+          <!-- カメラ切替・状態 -->
+          <div style="display:flex;align-items:center;justify-content:space-between;margin-top:10px;flex-wrap:wrap;gap:8px">
+            <span id="camStatus" style="color:#a0e0b0;font-size:12px">カメラ起動中...</span>
+            <div style="display:flex;gap:8px;align-items:center">
+              <select id="camSelect" onchange="switchCamera(this.value)"
+                style="padding:6px 10px;border-radius:6px;border:none;font-size:12px;font-family:inherit;background:rgba(255,255,255,.1);color:#fff;max-width:160px">
+              </select>
+              <button onclick="toggleTorch()"  id="btnTorch"
+                style="display:none;background:rgba(255,255,255,.15);color:#fff;border:none;border-radius:6px;padding:6px 12px;font-size:12px;cursor:pointer;font-family:inherit">🔦</button>
+            </div>
+          </div>
+          <div id="camResult" style="margin-top:10px;padding:10px 12px;background:rgba(0,0,0,.3);border-radius:8px;font-size:13px;color:#fff;min-height:40px;display:none"></div>
+        </div>
+      </div>
       <div class="hcard">
         <div><div class="hl">会社名・店舗名</div><input class="hi" id="hCompany" placeholder="例：MS collectables" oninput="syncMeta()"></div>
         <div><div class="hl">棚卸日</div><input class="hi" type="date" id="hDate" oninput="syncMeta()"></div>
@@ -1396,7 +1499,7 @@ function initFB(cfg,btn){
 function syncFromFirebase(cb){
   if(!db){if(cb)cb();return;}
   let done=0;
-  const finish=()=>{done++;if(done>=2&&cb)cb();};
+  const finish=()=>{done++;if(done>=3&&cb)cb();};
 
   // ① アーカイブ同期
   db.ref('archive').once('value').then(snap=>{
@@ -1404,7 +1507,6 @@ function syncFromFirebase(cb){
       const fbData=snap.val();
       const local=getArcList();
       const localIds=new Set(local.map(a=>a.id));
-      // Firebaseにあってローカルにないものをマージ
       const fbList=Object.values(fbData).filter(a=>a&&a.id&&!localIds.has(a.id));
       if(fbList.length){
         const merged=[...local,...fbList].sort((a,b)=>b.at-a.at).slice(0,50);
@@ -1414,7 +1516,7 @@ function syncFromFirebase(cb){
     finish();
   }).catch(()=>finish());
 
-  // ② 月次在庫同期
+  // ② 月次在庫記録同期
   db.ref('mstock').once('value').then(snap=>{
     if(snap.exists()){
       const fbDepts=snap.val();
@@ -1428,7 +1530,25 @@ function syncFromFirebase(cb){
       });
       if(fbList.length){
         const merged=[...local,...fbList].sort((a,b)=>b.month.localeCompare(a.month)||b.at-a.at);
-        msSaveRecords(merged);
+        msSaveRecordsLocal(merged);
+      }
+    }
+    finish();
+  }).catch(()=>finish());
+
+  // ③ 月次在庫 部門・商品マスタ同期（Firebaseが優先）
+  db.ref('mdept').once('value').then(snap=>{
+    if(snap.exists()){
+      const fbData=snap.val();
+      if(fbData&&fbData.depts&&fbData.depts.length){
+        // Firebaseのデータで上書き（最新が正）
+        try{localStorage.setItem(MDK,JSON.stringify(fbData));}catch(e){}
+      }
+    } else {
+      // Firebaseに未登録ならローカルをアップロード
+      const local=msGetDepts();
+      if(local.depts&&local.depts.length&&!offline&&db){
+        try{ db.ref('mdept').set(local); }catch(e){}
       }
     }
     finish();
@@ -1448,7 +1568,7 @@ function startGlobalListeners(){
       renderSessionArcList();
     }
   });
-  // 月次の追加を監視
+  // 月次記録の追加を監視
   db.ref('mstock').on('child_changed', snap=>{
     const dept=snap.val(); if(!dept)return;
     const local=msGetRecords();
@@ -1459,7 +1579,22 @@ function startGlobalListeners(){
       if(idx>=0){local[idx]=rec;}else{local.push(rec);updated=true;}
     });
     if(updated){
-      msSaveRecords(local.sort((a,b)=>b.month.localeCompare(a.month)||b.at-a.at));
+      msSaveRecordsLocal(local.sort((a,b)=>b.month.localeCompare(a.month)||b.at-a.at));
+    }
+  });
+  // 部門・商品マスタの変更を監視（他端末で変更したら即反映）
+  db.ref('mdept').on('value', snap=>{
+    if(!snap.exists())return;
+    const fbData=snap.val();
+    if(fbData&&fbData.depts&&fbData.depts.length){
+      try{localStorage.setItem(MDK,JSON.stringify(fbData));}catch(e){}
+      // 月次在庫画面が開いていれば再描画
+      if(document.getElementById('pgMstock')?.classList.contains('show')){
+        msRenderMasterDeptTabs();
+        msRenderMasterTable();
+        msRenderDeptTabs();
+        msRenderCountArea();
+      }
     }
   });
 }
@@ -1565,12 +1700,21 @@ function msGetDepts(){
   };
   }catch(e){return {depts:[],masters:{}};}
 }
-function msSaveDepts(data){ try{localStorage.setItem(MDK,JSON.stringify(data));}catch(e){} }
+function msSaveDepts(data){
+  try{localStorage.setItem(MDK,JSON.stringify(data));}catch(e){}
+  // Firebaseにも同期
+  if(!offline&&db){
+    try{ db.ref('mdept').set(data); }catch(e){}
+  }
+}
 
 function msGetRecords(){
   try{ return JSON.parse(localStorage.getItem(MK)||'[]'); }catch(e){return[];}
 }
-function msSaveRecords(list){ try{localStorage.setItem(MK,JSON.stringify(list));}catch(e){} }
+function msSaveRecordsLocal(list){ try{localStorage.setItem(MK,JSON.stringify(list));}catch(e){} }
+function msSaveRecords(list){
+  msSaveRecordsLocal(list);
+}
 
 // --- 画面遷移 ---
 function doMstock(){
@@ -2756,6 +2900,320 @@ function upd(k,ri,f,v){
     }
     saveDraft();
   },400);
+}
+
+// ============================================================
+// 📡 バーコードスキャン入力 (Socket Mobile D750 HIDモード対応)
+// ============================================================
+let _scanBuf='';           // スキャン文字バッファ
+let _scanBufTimer=null;    // バッファタイムアウト
+let _scanFocusTimer=null;  // フォーカス維持タイマー
+
+function toggleScanMode(on){
+  const bar=document.getElementById('scanBar');
+  const area=document.getElementById('btnScanArea');
+  if(on){
+    bar.style.display='block';
+    if(area) area.style.display='none';
+    scanFocus();
+    // フォーカス維持（iPadでD750スキャン時にフォーカスが外れることがある）
+    _scanFocusTimer=setInterval(()=>{
+      const inp=document.getElementById('scanInput');
+      if(inp&&document.activeElement!==inp) inp.focus();
+    },1500);
+    setScanDot(true);
+    setScanMsg('待機中');
+    setScanDisplay('');
+  } else {
+    bar.style.display='none';
+    if(area) area.style.display='flex';
+    clearInterval(_scanFocusTimer);
+    _scanBuf='';
+    clearTimeout(_scanBufTimer);
+  }
+}
+
+function scanFocus(){
+  const inp=document.getElementById('scanInput');
+  if(inp){ inp.focus(); }
+  setScanDisplay('');
+  setScanMsg('待機中');
+}
+
+function setScanMsg(msg,ok){
+  const el=document.getElementById('scanMsg');
+  if(!el) return;
+  el.textContent=msg;
+  el.style.color=(ok===false)?'#ffcc66':'#a0e0b0';
+}
+
+function setScanDisplay(txt){
+  const el=document.getElementById('scanDisplayTxt');
+  if(!el) return;
+  if(txt){
+    el.textContent=txt; el.style.opacity='1';
+  } else {
+    el.textContent='スキャン待機中... ここをタップ'; el.style.opacity='.5';
+  }
+}
+
+function setScanDot(active){
+  const d=document.getElementById('scanDot');
+  if(d) d.style.background=active?'#2ecc71':'#ff6b6b';
+}
+
+// D750 HIDモード：文字をキー入力として1文字ずつ送信 → Enterで確定
+function scanKeydown(e){
+  if(e.key==='Enter'){
+    e.preventDefault();
+    const bc=_scanBuf.trim();
+    _scanBuf='';
+    clearTimeout(_scanBufTimer);
+    setScanDisplay('');
+    const inp=document.getElementById('scanInput');
+    if(inp) inp.value='';
+    if(bc) scanBarcode(bc);
+  } else if(e.key.length===1){
+    _scanBuf+=e.key;
+    setScanDisplay(_scanBuf);
+    // 300ms以内にEnterが来なければバッファをリセット（ノイズ対策）
+    clearTimeout(_scanBufTimer);
+    _scanBufTimer=setTimeout(()=>{ _scanBuf=''; setScanDisplay(''); },1500);
+  }
+}
+
+// inputイベントでも拾う（一部環境でkeydownが発火しない場合の保険）
+function scanOnInput(val){
+  if(!val) return;
+  // Enterサフィックスが含まれる場合（改行コード）
+  const bc=val.replace(/[\r\n]/g,'').trim();
+  if(bc){ _scanBuf=bc; }
+  const inp=document.getElementById('scanInput');
+  if(inp) inp.value='';
+}
+
+function scanBarcode(bc){
+  if(!bc) return;
+  setScanDot(false);
+  setTimeout(()=>setScanDot(true),120);
+
+  if(!curKey||!pages[curKey]){
+    setScanMsg('⚠️ ページ未選択',false); return;
+  }
+
+  const prods=nkGetProducts();
+  const found=prods.find(p=>(p.barcode||'').trim()===bc);
+  const rows=pages[curKey].rows;
+
+  if(found){
+    const existIdx=rows.findIndex(r=>(r.n||'').trim()===found.name);
+    if(existIdx>=0){
+      // 既存行：個数+1
+      const cur=parseFloat(rows[existIdx].k)||0;
+      rows[existIdx].k=String(cur+1);
+      renderTable(); renderQbar(); saveDraftDebounced();
+      if(!offline&&db) db.ref('s/'+sid+'/pages/'+curKey+'/rows').set(rows);
+      setScanMsg('✅ '+found.name+'（'+rows[existIdx].k+'個）');
+      setTimeout(()=>{
+        const tbody=document.getElementById('tbody');
+        if(tbody){
+          const tr=tbody.querySelectorAll('tr')[existIdx];
+          if(tr){
+            tr.style.transition='background .1s';
+            tr.style.background='#c8f0da';
+            setTimeout(()=>{ tr.style.background=''; },700);
+            tr.scrollIntoView({behavior:'smooth',block:'center'});
+          }
+        }
+      },50);
+      toast('📡 '+found.name+' → '+rows[existIdx].k+'個');
+    } else {
+      // 新規行追加（商品情報を自動入力）
+      const newRow={
+        n:found.name, z:found.taxRate||'10', k:'1',
+        u:found.unit||'点', p:found.price||'',
+        ss:found.supplier||'', sr:'', st:'',
+        b:'', cat:found.category||found.catId||'',
+        bc:found.barcode||'', pt:'通常'
+      };
+      const emptyIdx=rows.findIndex(r=>!(r.n||'').trim());
+      if(emptyIdx>=0){ rows[emptyIdx]={...newRow}; }
+      else { rows.push({...newRow}); }
+      renderTable(); renderQbar(); saveDraftDebounced();
+      if(!offline&&db) db.ref('s/'+sid+'/pages/'+curKey+'/rows').set(rows);
+      setScanMsg('✅ '+found.name+' 追加');
+      toast('📡 '+found.name+' を追加');
+    }
+  } else {
+    // 未登録バーコード
+    setScanMsg('⚠️ 未登録: '+bc, false);
+    toast('⚠️ 未登録バーコード: '+bc);
+    const blank={n:'',z:'10',k:'1',u:'点',p:'',ss:'',sr:'',st:'',b:'【要確認】'+bc,cat:'',bc:bc,pt:'通常'};
+    const emptyIdx=rows.findIndex(r=>!(r.n||'').trim());
+    if(emptyIdx>=0){ rows[emptyIdx]={...blank}; }
+    else { rows.push({...blank}); }
+    renderTable(); renderQbar(); saveDraftDebounced();
+    if(!offline&&db) db.ref('s/'+sid+'/pages/'+curKey+'/rows').set(rows);
+  }
+}
+
+
+// ============================================================
+// 📷 カメラスキャン (ZXing / BarcodeDetector)
+// ============================================================
+let _camStream=null, _camReader=null, _camDevices=[], _camActive=false, _camLastBc='', _camLastTime=0;
+
+async function openCameraScanner(){
+  const modal=document.getElementById('camModal');
+  modal.style.display='flex';
+  document.getElementById('camResult').style.display='none';
+  await startCamera();
+}
+
+async function startCamera(deviceId){
+  stopCamera();
+  _camActive=true;
+  const status=document.getElementById('camStatus');
+  status.textContent='カメラ起動中...'; status.style.color='#a0e0b0';
+  try{
+    const constraints={video: deviceId ? {deviceId:{exact:deviceId}} : {facingMode:'environment'}, audio:false};
+    _camStream=await navigator.mediaDevices.getUserMedia(constraints);
+    const video=document.getElementById('camVideo');
+    video.srcObject=_camStream;
+    await video.play();
+    status.textContent='スキャン中...バーコードをカメラに向けてください';
+    // カメラ一覧を取得してセレクトに反映
+    await populateCamSelect(deviceId);
+    // スキャン開始
+    startDecode(video);
+  }catch(err){
+    status.textContent='⚠️ カメラが使えません: '+err.message;
+    status.style.color='#ffcc66';
+  }
+}
+
+async function populateCamSelect(activeId){
+  try{
+    const devices=await navigator.mediaDevices.enumerateDevices();
+    _camDevices=devices.filter(d=>d.kind==='videoinput');
+    const sel=document.getElementById('camSelect');
+    sel.innerHTML='';
+    _camDevices.forEach(d=>{
+      const o=document.createElement('option');
+      o.value=d.deviceId;
+      o.textContent=d.label||('カメラ '+(sel.options.length+1));
+      if(d.deviceId===activeId) o.selected=true;
+      sel.appendChild(o);
+    });
+    // 背面カメラをデフォルト選択
+    if(!activeId){
+      const back=_camDevices.find(d=>/back|rear|環境/i.test(d.label));
+      if(back) sel.value=back.deviceId;
+    }
+  }catch(e){}
+}
+
+function switchCamera(deviceId){ if(deviceId) startCamera(deviceId); }
+
+function startDecode(video){
+  // BarcodeDetector API（Chrome/Safari対応）優先
+  if('BarcodeDetector' in window){
+    const det=new BarcodeDetector({formats:['code_128','ean_13','ean_8','upc_a','upc_e','qr_code','code_39','code_93','itf','data_matrix']});
+    const loop=async()=>{
+      if(!_camActive) return;
+      try{
+        const results=await det.detect(video);
+        if(results.length){ camGotBarcode(results[0].rawValue); }
+      }catch(e){}
+      if(_camActive) requestAnimationFrame(loop);
+    };
+    requestAnimationFrame(loop);
+  } else {
+    // ZXing フォールバック
+    try{
+      const hints=new Map();
+      if(window.ZXing){
+        _camReader=new ZXing.BrowserMultiFormatReader();
+        _camReader.decodeFromVideoElement(video,(result,err)=>{
+          if(result) camGotBarcode(result.getText());
+        });
+      } else {
+        document.getElementById('camStatus').textContent='⚠️ ZXingライブラリ読み込み中...再度お試しください';
+      }
+    }catch(e){
+      document.getElementById('camStatus').textContent='⚠️ スキャンエラー: '+e.message;
+    }
+  }
+}
+
+function camGotBarcode(bc){
+  if(!bc) return;
+  const now=Date.now();
+  // 同じバーコードを1秒以内に連続検出しないようにする
+  if(bc===_camLastBc && now-_camLastTime<1500) return;
+  _camLastBc=bc; _camLastTime=now;
+  // フラッシュ演出
+  const flash=document.getElementById('camScanFlash');
+  if(flash){ flash.style.opacity='1'; setTimeout(()=>flash.style.opacity='0',150); }
+  // 結果表示
+  const res=document.getElementById('camResult');
+  res.style.display='block';
+  // 商品マスタ検索
+  const prods=nkGetProducts();
+  const found=prods.find(p=>(p.barcode||'').trim()===bc.trim());
+  if(found){
+    res.innerHTML=`<span style="color:#2ecc71;font-weight:700">✅ ${e(found.name)}</span><br><span style="font-size:11px;color:#aaa">${bc}</span>`;
+    res.style.borderLeft='3px solid #2ecc71';
+  } else {
+    res.innerHTML=`<span style="color:#ffcc66;font-weight:700">⚠️ 未登録バーコード</span><br><span style="font-size:12px;color:#aaa">${bc}</span>`;
+    res.style.borderLeft='3px solid #ffcc66';
+  }
+  // 棚卸テーブルに登録してモーダルを閉じる
+  scanBarcode(bc.trim());
+  // 1.2秒後に自動でスキャン継続（同じバーコードは1.5秒抑制済み）
+  setTimeout(()=>{ if(res) res.style.display='none'; },1200);
+}
+
+async function toggleTorch(){
+  if(!_camStream) return;
+  const track=_camStream.getVideoTracks()[0];
+  if(!track) return;
+  try{
+    const cap=track.getCapabilities();
+    if(!cap.torch) return;
+    const cur=track.getSettings().torch;
+    await track.applyConstraints({advanced:[{torch:!cur}]});
+    document.getElementById('btnTorch').textContent=cur?'🔦':'💡';
+  }catch(e){}
+}
+
+function stopCamera(){
+  _camActive=false;
+  if(_camReader){ try{_camReader.reset();}catch(e){} _camReader=null; }
+  if(_camStream){ _camStream.getTracks().forEach(t=>t.stop()); _camStream=null; }
+  const video=document.getElementById('camVideo');
+  if(video){ video.srcObject=null; }
+}
+
+function closeCameraScanner(){
+  stopCamera();
+  document.getElementById('camModal').style.display='none';
+}
+
+// トーチボタン対応チェック
+function checkTorchSupport(){
+  if(!_camStream) return;
+  const track=_camStream.getVideoTracks()[0];
+  if(!track) return;
+  try{
+    const cap=track.getCapabilities();
+    if(cap.torch){ document.getElementById('btnTorch').style.display='inline-block'; }
+  }catch(e){}
+}
+let _scanDraftTimer=null;
+function saveDraftDebounced(){
+  clearTimeout(_scanDraftTimer);
+  _scanDraftTimer=setTimeout(()=>saveDraft(),400);
 }
 
 function addRows(n){
@@ -4254,6 +4712,47 @@ function nkSaveArrival(){
   const prodMap={};
   prods.forEach(p=>{prodMap[p.name]=p;});
 
+  // ── 重複チェック ──────────────────────────────
+  const dups=[];
+  rows.forEach(r=>{
+    const name=r.n.trim(); if(!name)return;
+    const ex=prodMap[name];
+    if(!ex) return; // 新規は問題なし
+    const diffs=[];
+    const fmt=v=>v?'¥'+Number(v).toLocaleString():'未設定';
+    if(r.p && String(r.p)!==String(ex.price||''))
+      diffs.push(`売価：登録済み${fmt(ex.price)} → 今回${fmt(r.p)}`);
+    if(r.cost && String(r.cost)!==String(ex.costPrice||''))
+      diffs.push(`原価：登録済み${fmt(ex.costPrice)} → 今回${fmt(r.cost)}`);
+    if(r.z && r.z!==(ex.taxRate||'10'))
+      diffs.push(`税率：登録済み${ex.taxRate||'10'}% → 今回${r.z}%`);
+    if(r.u && r.u!=='点' && r.u!==(ex.unit||''))
+      diffs.push(`単位：登録済み「${ex.unit||'点'}」→ 今回「${r.u}」`);
+    dups.push({name, diffs, hasDiff: diffs.length>0});
+  });
+
+  if(dups.length){
+    const changed=dups.filter(d=>d.hasDiff);
+    const same=dups.filter(d=>!d.hasDiff);
+    let msg='【重複商品が見つかりました】\n\n';
+    if(changed.length){
+      msg+='▼ 内容が異なる商品（上書き確認）\n';
+      changed.forEach(d=>{
+        msg+=`・${d.name}\n`;
+        d.diffs.forEach(diff=>{ msg+=`　${diff}\n`; });
+      });
+      msg+='\n';
+    }
+    if(same.length){
+      msg+='▼ 同名・同内容の商品（再登録不要）\n';
+      same.forEach(d=>{ msg+=`・${d.name}\n`; });
+      msg+='\n';
+    }
+    msg+='このまま保存（上書き更新）しますか？\n「キャンセル」で入力画面に戻って修正できます。';
+    if(!confirm(msg)) return;
+  }
+
+  // ── 保存処理 ──────────────────────────────────
   let newCount=0,updCount=0;
   const savedItems=[];
   rows.forEach(r=>{
