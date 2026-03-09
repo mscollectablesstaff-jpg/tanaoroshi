@@ -1284,6 +1284,7 @@ const AK = 'tb_archive_v3'; // アーカイブ履歴
 const MK = 'tb_mstock_v1'; // 月次在庫データ
 const MDK = 'tb_mdept_v1'; // 月次在庫部門・マスタ
 const DK = 'tb_draft_v1';  // 入力中セッションの下書き（完了保存前でも月次インポートで使える）
+const BK = 'tb_bc_used_v1'; // 使用済みバーコード番号の永続追跡
 
 // ============================================================
 // 状態
@@ -1311,6 +1312,7 @@ function showPage(id){
   });
   const target=document.getElementById(id);
   if(target) target.classList.add('show');
+  if(id==='pgSession') renderRecent();
 }
 
 // ホーム画面ナビゲーション
@@ -3315,33 +3317,78 @@ async function populateCamSelect(activeId){
 function switchCamera(deviceId){ if(deviceId) startCamera(deviceId); }
 
 function startDecode(video){
-  // BarcodeDetector API（Chrome/Safari対応）優先
+  // キャンバスを確保
+  let canvas=document.getElementById('_scanCanvas');
+  if(!canvas){
+    canvas=document.createElement('canvas');
+    canvas.id='_scanCanvas';
+    canvas.style.display='none';
+    document.body.appendChild(canvas);
+  }
+  const ctx=canvas.getContext('2d',{willReadFrequently:true});
+
+  // BarcodeDetector API（Android Chrome / macOS Safari 対応）
   if('BarcodeDetector' in window){
-    const det=new BarcodeDetector({formats:['code_128','ean_13','ean_8','upc_a','upc_e','qr_code','code_39','code_93','itf','data_matrix']});
-    const loop=async()=>{
+    let supported=['code_128','ean_13','ean_8','upc_a','upc_e','qr_code','code_39','code_93','itf','data_matrix'];
+    // getSupportedFormats があれば絞り込む
+    const tryDet=async()=>{
+      try{
+        if(BarcodeDetector.getSupportedFormats){
+          const sf=await BarcodeDetector.getSupportedFormats();
+          supported=supported.filter(f=>sf.includes(f));
+        }
+      }catch(e){}
+      const det=new BarcodeDetector({formats:supported});
+      const loop=async()=>{
+        if(!_camActive) return;
+        try{
+          if(video.readyState>=2){
+            canvas.width=video.videoWidth||640;
+            canvas.height=video.videoHeight||480;
+            ctx.drawImage(video,0,0,canvas.width,canvas.height);
+            const results=await det.detect(canvas);
+            if(results.length) camGotBarcode(results[0].rawValue);
+          }
+        }catch(e){}
+        if(_camActive) setTimeout(loop,120);
+      };
+      loop();
+    };
+    tryDet();
+
+  } else if(window.ZXing){
+    // ZXing: canvasポーリング方式（decodeFromVideoElementより安定）
+    const zxHints=new Map();
+    const reader=new ZXing.BrowserMultiFormatReader();
+    _camReader=reader;
+    const loop=()=>{
       if(!_camActive) return;
       try{
-        const results=await det.detect(video);
-        if(results.length){ camGotBarcode(results[0].rawValue); }
+        if(video.readyState>=2){
+          canvas.width=video.videoWidth||640;
+          canvas.height=video.videoHeight||480;
+          ctx.drawImage(video,0,0,canvas.width,canvas.height);
+          const imgData=ctx.getImageData(0,0,canvas.width,canvas.height);
+          const luminanceSource=new ZXing.HTMLCanvasElementLuminanceSource(canvas);
+          const binaryBitmap=new ZXing.BinaryBitmap(new ZXing.HybridBinarizer(luminanceSource));
+          try{
+            const result=reader.decodeBitmap(binaryBitmap);
+            if(result) camGotBarcode(result.getText());
+          }catch(notFound){}
+        }
       }catch(e){}
-      if(_camActive) requestAnimationFrame(loop);
+      if(_camActive) setTimeout(loop,150);
     };
-    requestAnimationFrame(loop);
+    loop();
   } else {
-    // ZXing フォールバック
-    try{
-      const hints=new Map();
-      if(window.ZXing){
-        _camReader=new ZXing.BrowserMultiFormatReader();
-        _camReader.decodeFromVideoElement(video,(result,err)=>{
-          if(result) camGotBarcode(result.getText());
-        });
-      } else {
-        document.getElementById('camStatus').textContent='⚠️ ZXingライブラリ読み込み中...再度お試しください';
-      }
-    }catch(e){
-      document.getElementById('camStatus').textContent='⚠️ スキャンエラー: '+e.message;
-    }
+    document.getElementById('camStatus').textContent='⚠️ スキャン機能を読み込み中…しばらくお待ちください';
+    // ZXing CDN ロード待ちで再試行
+    let retry=0;
+    const wait=setInterval(()=>{
+      retry++;
+      if(window.ZXing){ clearInterval(wait); startDecode(video); }
+      if(retry>20){ clearInterval(wait); document.getElementById('camStatus').textContent='⚠️ スキャン機能の読み込みに失敗しました。リロードしてください'; }
+    },500);
   }
 }
 
@@ -4041,8 +4088,9 @@ function bcpAutoAssign(){
   const prodMap={};
   prods.forEach(p=>{if(p.name)prodMap[p.name]=p;});
 
-  // 現在の最大番号を取得（商品マスタ＋セッション全行）
+  // 現在の最大番号を取得（商品マスタ＋セッション全行＋使用済みリスト）
   // 形式: 8桁純数字 10000001〜
+  const used=getBcUsed();
   let maxNum=10000000;
   const numPat=/^(\d{8,})$/;
   prods.forEach(p=>{
@@ -4055,7 +4103,10 @@ function bcpAutoAssign(){
       if(m) maxNum=Math.max(maxNum,parseInt(m[1],10));
     });
   });
+  used.forEach(v=>{ const m=v.match(numPat); if(m) maxNum=Math.max(maxNum,parseInt(m[1],10)); });
 
+  // 再利用チェック：これから発番しようとする番号が使用済みでないか検証
+  const newBcList=[];
   let assigned=0;
   order.forEach(k=>{
     const pg=pages[k]||{};
@@ -4068,9 +4119,10 @@ function bcpAutoAssign(){
         pages[k].rows[ri].bc=prodMap[name].barcode;
         assigned++; return;
       }
-      // 新規発番（8桁純数字）
-      maxNum++;
+      // 新規発番（8桁純数字・使用済みをスキップ）
+      do{ maxNum++; }while(used.has(String(maxNum)));
       const newBc=String(maxNum);
+      newBcList.push(newBc);
       pages[k].rows[ri].bc=newBc;
       if(prodMap[name]){
         prodMap[name].barcode=newBc;
@@ -4091,6 +4143,7 @@ function bcpAutoAssign(){
     if(!offline&&db) db.ref('s/'+sid+'/pages/'+k+'/rows').set(pg.rows);
   });
 
+  if(newBcList.length) addBcUsed(newBcList);
   nkSaveProducts(prods);
   renderAllPages();
 
@@ -4108,27 +4161,32 @@ function bcpAutoAssign(){
 
 // ── 既存バーコードを全クリア（商品マスタ＋セッション全行） ──
 function bcpClearAllBarcodes(){
-  if(!confirm('商品マスタおよび現在のセッション入力行のバーコードをすべて削除します。\nよろしいですか？')) return;
+  if(!confirm('商品マスタおよび現在のセッション入力行のバーコードをすべて削除します。\n⚠️ 削除した番号は再利用されません。\nよろしいですか？')) return;
 
-  // 商品マスタのバーコードをクリア
+  const numPat=/^(\d{8,})$/;
+  const toRetire=[];
+
+  // 削除前に使用済みリストへ退避（再利用防止）
   const prods=nkGetProducts();
-  prods.forEach(p=>{ p.barcode=''; });
+  prods.forEach(p=>{ if(p.barcode&&p.barcode.match(numPat)) toRetire.push(p.barcode); p.barcode=''; });
   nkSaveProducts(prods);
 
   // セッション入力行のバーコードをクリア
   order.forEach(k=>{
     const pg=pages[k]||{};
     let changed=false;
-    (pg.rows||[]).forEach(r=>{ if(r.bc){r.bc=''; changed=true;} });
+    (pg.rows||[]).forEach(r=>{ if(r.bc){ if(r.bc.match(numPat)) toRetire.push(r.bc); r.bc=''; changed=true; } });
     if(changed&&!offline&&db) db.ref('s/'+sid+'/pages/'+k+'/rows').set(pg.rows);
   });
+
+  if(toRetire.length) addBcUsed(toRetire);
 
   renderAllPages();
   bcpRender();
 
   const st=document.getElementById('bcpAssignStatus');
   st.style.display='block'; st.style.color='#c0392b';
-  st.textContent='🗑️ すべてのバーコードを削除しました';
+  st.textContent=`🗑️ ${toRetire.length}件のバーコードを削除しました（番号は再利用されません）`;
   toast('バーコードをすべて削除しました');
 }
 
@@ -4727,6 +4785,14 @@ const AIKK = 'tb_aikey_v1'; // Anthropic APIキー
 
 function nkGetProducts(){ try{return JSON.parse(localStorage.getItem(PK)||'[]');}catch(e){return[];} }
 function nkSaveProducts(list){ try{localStorage.setItem(PK,JSON.stringify(list));}catch(e){} }
+
+// ── 使用済みバーコード管理（一度発番した番号は永久に再利用しない） ──
+function getBcUsed(){ try{return new Set(JSON.parse(localStorage.getItem(BK)||'[]'));}catch(e){return new Set();} }
+function addBcUsed(nums){
+  const s=getBcUsed();
+  nums.forEach(n=>s.add(String(n)));
+  try{localStorage.setItem(BK,JSON.stringify([...s]));}catch(e){}
+}
 function nkGetArrivals(){ try{return JSON.parse(localStorage.getItem(NAK)||'[]');}catch(e){return[];} }
 function nkSaveArrivals(list){ try{localStorage.setItem(NAK,JSON.stringify(list.slice(0,500)));}catch(e){} }
 
@@ -4810,10 +4876,16 @@ function nkImportPaste(){
 
 
 function nkNextBarcode(){
-  const prods=nkGetProducts(); let maxNum=10000000;
+  const prods=nkGetProducts();
+  const used=getBcUsed();
+  let maxNum=10000000;
   const numPat=/^(\d{8,})$/;
   prods.forEach(p=>{ const m=p.barcode&&p.barcode.match(numPat); if(m) maxNum=Math.max(maxNum,parseInt(m[1],10)); });
-  return String(maxNum+1);
+  used.forEach(v=>{ const m=v.match(numPat); if(m) maxNum=Math.max(maxNum,parseInt(m[1],10)); });
+  let next=maxNum+1;
+  // 万が一の衝突回避（念のため）
+  while(used.has(String(next))) next++;
+  return String(next);
 }
 
 function doNyuuka(){
