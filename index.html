@@ -1984,96 +1984,105 @@ function msBindMasterDrag(tbody){
   });
 }
 
-// インポート用セレクトを更新（Firebase対応・現行セッション・下書き・アーカイブ全対応）
+// インポート用セレクトを更新（最近のセッションをFirebaseから直接取得）
 function msRefreshImportSelect(){
   const sel=document.getElementById('msImportSrcSel'); if(!sel)return;
   const pgBox=document.getElementById('msImportPageBox');
   if(pgBox) pgBox.style.display='none';
-  sel.innerHTML='<option value="">読み込み中...</option>';
 
-  // ── データ源を全部集める ──────────────────────────────
-  // ① メモリ上の現行セッション
-  const memHasData=!!(sid&&order&&order.length&&Object.values(pages||{}).some(pg=>(pg.rows||[]).some(r=>r.n)));
-  // ② localStorage下書き
-  const draft=getDraft();
-  const draftHasData=!!(draft&&draft.order&&draft.order.length&&Object.values(draft.pages||{}).some(pg=>(pg.rows||[]).some(r=>r.n)));
-  const draftLabel=draft&&draft.meta
-    ?`📝 棚卸入力中（${draft.meta.date||''}${draft.meta.basho?' '+draft.meta.basho:''}）`
-    :'📝 棚卸入力中（保存前）';
+  // Firebaseから取得したセッションデータを保持
+  window._msImportSessions = window._msImportSessions || {};
 
-  function buildSel(fbSessionPages, fbSessionOrder, fbSessionLabel){
-    const arcList=getArcList();
-    let opts='<option value="">― 読み込み元を選択 ―</option>';
+  function buildSel(sessions){
+    // sessions = [{code, label, pages, order}, ...]
+    const arcList = getArcList();
+    let opts = '<option value="">― 読み込み元を選択 ―</option>';
 
-    // 現行セッション（メモリ優先、なければFirebaseから取得済みのデータ）
-    if(memHasData){
-      opts+='<option value="__session__">✅ 現在の棚卸セッション（入力中）</option>';
-    } else if(fbSessionPages){
-      opts+=`<option value="__fbsession__">✅ ${fbSessionLabel||'入力中の棚卸（Firebase）'}</option>`;
+    if(sessions.length){
+      opts += '<optgroup label="📝 入力中の棚卸（未保存）">';
+      sessions.forEach(s=>{
+        opts += `<option value="__sess_${s.code}">${s.label}</option>`;
+      });
+      opts += '</optgroup>';
     }
-    // 下書き（メモリと異なる場合のみ表示）
-    if(draftHasData && !(memHasData && draft&&draft.sid===sid)){
-      opts+=`<option value="__draft__">${draftLabel}</option>`;
-    }
-    // 何もなければ案内
-    if(!memHasData&&!fbSessionPages&&!draftHasData){
-      opts+='<option disabled style="color:#aaa">（棚卸入力後に選択できます）</option>';
-    }
-    // 保存済みアーカイブ
+
     if(arcList.length){
-      opts+=arcList.map(a=>`<option value="${a.id}">${a.date}　${a.label}</option>`).join('');
-    } else {
-      opts+='<option disabled style="color:#aaa">（保存済みアーカイブなし）</option>';
+      opts += '<optgroup label="📦 保存済みアーカイブ">';
+      opts += arcList.map(a=>`<option value="${a.id}">${a.date}　${a.label}</option>`).join('');
+      opts += '</optgroup>';
     }
-    sel.innerHTML=opts;
-    if(pgBox) pgBox.style.display='none';
 
-    // __fbsession__ 用にグローバル退避
-    if(fbSessionPages) window._msFbSessionPages=fbSessionPages, window._msFbSessionOrder=fbSessionOrder;
+    if(!sessions.length && !arcList.length){
+      opts += '<option disabled style="color:#aaa">（まず棚卸入力画面でセッションを開始してください）</option>';
+    }
+
+    sel.innerHTML = opts;
   }
 
-  // まずローカルで即描画
-  buildSel(null,null,null);
+  // まず空で描画
+  buildSel([]);
 
-  // Firebaseからアーカイブ同期 & 現行セッションページ取得
-  if(!offline&&db){
-    const tasks=[];
+  // ── Firebase から最近のセッションコードを使ってデータを取得 ──
+  const recents = [];
+  try{ const r=JSON.parse(localStorage.getItem(RK)||'[]'); recents.push(...r); }catch(e){}
+  // メモリ上の現行セッションも候補に
+  if(sid && !recents.find(r=>r.c===sid)) recents.unshift({c:sid, n:myName, t:Date.now()});
 
-    // アーカイブ最新化
-    tasks.push(db.ref('archive').once('value').then(sn=>{
-      if(!sn.exists())return;
-      const local=getArcList();
-      const localIds=new Set(local.map(a=>a.id));
-      let added=false;
-      Object.values(sn.val()).forEach(a=>{if(a&&a.id&&!localIds.has(a.id)){local.unshift(a);added=true;}});
-      if(added) try{localStorage.setItem(AK,JSON.stringify(local.sort((a,b)=>b.at-a.at).slice(0,50)));}catch(e){}
-    }).catch(()=>{}));
+  if(!recents.length){
+    buildSel([]); return;
+  }
 
-    // 現行セッションがメモリにないときFirebaseから取得
-    if(!memHasData&&sid){
-      tasks.push(db.ref('s/'+sid).once('value').then(sn=>{
-        if(!sn.exists())return;
-        const val=sn.val();
-        const fbPages=val.pages||{};
-        const fbOrder=val.order||Object.keys(fbPages);
-        const hasRows=Object.values(fbPages).some(pg=>(pg.rows||[]).some(r=>r.n));
-        if(hasRows){
-          const meta=val.meta||{};
-          const label=`棚卸 ${meta.date||''} ${meta.basho||meta.company||''}（Firebase）`;
-          window._msFbSessionPages=fbPages;
-          window._msFbSessionOrder=fbOrder;
-          window._msFbSessionLabel=label;
+  if(!offline && db){
+    sel.innerHTML = '<option disabled>読み込み中...</option>';
+    const fetches = recents.slice(0,5).map(r =>
+      db.ref('s/'+r.c).once('value').then(sn=>{
+        if(!sn.exists()) return null;
+        const val = sn.val();
+        const fbPages = val.pages || {};
+        const fbOrder = val.order || Object.keys(fbPages);
+        const hasRows = Object.values(fbPages).some(pg=>(pg.rows||[]).some(row=>row.n));
+        if(!hasRows) return null;
+        const meta = val.meta || {};
+        const label = `${meta.date||'日付未設定'} ${meta.basho||meta.company||''} （入力中）`.trim();
+        // グローバルに保存
+        window._msImportSessions[r.c] = {pages: fbPages, order: fbOrder};
+        return {code: r.c, label, pages: fbPages, order: fbOrder};
+      }).catch(()=>null)
+    );
+
+    Promise.all(fetches).then(results=>{
+      const sessions = results.filter(Boolean);
+      // アーカイブも最新化
+      return db.ref('archive').once('value').then(sn=>{
+        if(sn.exists()){
+          const local=getArcList();
+          const localIds=new Set(local.map(a=>a.id));
+          let added=false;
+          Object.values(sn.val()).forEach(a=>{
+            if(a&&a.id&&!localIds.has(a.id)){local.unshift(a);added=true;}
+          });
+          if(added) try{localStorage.setItem(AK,JSON.stringify(local.sort((a,b)=>b.at-a.at).slice(0,50)));}catch(e){}
         }
-      }).catch(()=>{}));
+        buildSel(sessions);
+      }).catch(()=>{ buildSel(sessions); });
+    });
+  } else {
+    // オフライン: メモリと下書きのみ
+    const sessions = [];
+    if(sid && order && order.length && Object.values(pages||{}).some(pg=>(pg.rows||[]).some(r=>r.n))){
+      window._msImportSessions[sid]={pages, order};
+      sessions.push({code:sid, label:'現在の棚卸セッション（入力中）'});
     }
-
-    Promise.all(tasks).then(()=>buildSel(
-      window._msFbSessionPages||null,
-      window._msFbSessionOrder||null,
-      window._msFbSessionLabel||null
-    ));
+    const draft=getDraft();
+    if(draft&&draft.sid&&draft.order&&draft.order.length&&Object.values(draft.pages||{}).some(pg=>(pg.rows||[]).some(r=>r.n))){
+      const m=draft.meta||{};
+      window._msImportSessions['__draft__']={pages:draft.pages,order:draft.order};
+      sessions.push({code:'__draft__', label:`📝 ${m.date||''} ${m.basho||''} （下書き）`});
+    }
+    buildSel(sessions);
   }
 }
+
 
 function msImportSrcChanged(){
   const sel=document.getElementById('msImportSrcSel');
@@ -2084,16 +2093,14 @@ function msImportSrcChanged(){
   if(!val){ pgBox.style.display='none'; return; }
 
   function showPageList(srcPages, srcOrder){
+    if(!srcPages||!srcOrder){ pgBox.style.display='none'; return; }
     const pageItems=srcOrder.map((k,i)=>{
       const pg=srcPages[k]||{};
       const cnt=(pg.rows||[]).filter(r=>r.n).length;
-      // ページ名はtanto（担当名）に保存されている
       const label=pg.tanto||pg.ownerName||`ページ${i+1}`;
       return {k, label, cnt};
     }).filter(p=>p.cnt>0);
-
     if(!pageItems.length){ pgBox.style.display='none'; return; }
-
     pgList.innerHTML=pageItems.map(p=>`
       <label style="display:inline-flex;align-items:center;gap:5px;
         padding:5px 12px;border:1.5px solid #b0d0b8;border-radius:20px;
@@ -2106,17 +2113,20 @@ function msImportSrcChanged(){
     pgBox.style.display='block';
   }
 
-  // ソース決定
-  if(val==='__session__'){
-    showPageList(pages||{}, order||Object.keys(pages||{}));
-  } else if(val==='__fbsession__'){
-    const fp=window._msFbSessionPages||{};
-    const fo=window._msFbSessionOrder||Object.keys(fp);
-    showPageList(fp, fo);
+  // __sess_{code} 形式（Firebase取得済みセッション）
+  if(val.startsWith('__sess_')){
+    const code=val.slice(7);
+    const sess=(window._msImportSessions||{})[code];
+    if(sess){ showPageList(sess.pages, sess.order); }
+    else { pgBox.style.display='none'; }
   } else if(val==='__draft__'){
-    const draft=getDraft();
-    if(!draft){ pgBox.style.display='none'; return; }
-    showPageList(draft.pages||{}, draft.order||Object.keys(draft.pages||{}));
+    const sess=(window._msImportSessions||{})['__draft__'];
+    if(sess){ showPageList(sess.pages, sess.order); }
+    else {
+      const draft=getDraft();
+      if(!draft){ pgBox.style.display='none'; return; }
+      showPageList(draft.pages||{}, draft.order||Object.keys(draft.pages||{}));
+    }
   } else {
     const arc=getArcList().find(a=>a.id===val);
     if(!arc){ pgBox.style.display='none'; return; }
@@ -2138,14 +2148,19 @@ function msImportFromArc(){
 
   // ソース決定
   let srcPages={};
-  if(val==='__session__'){
-    srcPages=pages||{};
-  } else if(val==='__fbsession__'){
-    srcPages=window._msFbSessionPages||{};
+  if(val.startsWith('__sess_')){
+    const code=val.slice(7);
+    const sess=(window._msImportSessions||{})[code];
+    if(!sess){alert('セッションデータが見つかりません。再度読み込み元を選択してください');return;}
+    srcPages=sess.pages||{};
   } else if(val==='__draft__'){
-    const draft=getDraft();
-    if(!draft){alert('下書きデータが見つかりません');return;}
-    srcPages=draft.pages||{};
+    const sess=(window._msImportSessions||{})['__draft__'];
+    if(sess){ srcPages=sess.pages||{}; }
+    else {
+      const draft=getDraft();
+      if(!draft){alert('下書きデータが見つかりません');return;}
+      srcPages=draft.pages||{};
+    }
   } else {
     const arc=getArcList().find(a=>a.id===val);
     if(!arc){alert('アーカイブが見つかりません');return;}
