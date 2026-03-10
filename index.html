@@ -2262,6 +2262,13 @@ function doJoin(){
   }).catch(e=>alert('参加エラー：'+e.message));
 }
 
+function setupFiles(){
+  const af=document.getElementById('airFile');
+  if(af) af.addEventListener('change',ev=>{if(ev.target.files[0])readAirFile(ev.target.files[0]);});
+  const zf=document.getElementById('zFile');
+  if(zf) zf.addEventListener('change',ev=>{if(ev.target.files[0])readZFile(ev.target.files[0]);});
+}
+
 function startApp(){
   document.getElementById('codeDisp').textContent=sid||'OFFLINE';
   document.getElementById('hDate').value=new Date().toISOString().slice(0,10);
