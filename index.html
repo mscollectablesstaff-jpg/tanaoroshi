@@ -1713,64 +1713,52 @@ svg.trend-chart text{font-family:inherit}
     <!-- 🏷 バーコード印刷パネル -->
     <div class="panel" id="pnl-bcprint" style="padding:12px 16px">
 
-      <!-- 自動発番カード -->
-      <div style="background:#fff;border-radius:10px;border:1px solid #dde3ea;padding:14px 16px;margin-bottom:12px">
-        <h2 style="font-size:14px;font-weight:700;color:#0f2744;margin:0 0 10px;padding-bottom:8px;border-bottom:2px solid #f0f2f5">
-          🔢 バーコード自動発番
-        </h2>
-        <div style="display:flex;gap:12px;align-items:center;flex-wrap:wrap">
-          <div style="flex:1;min-width:220px;font-size:12px;color:#555;line-height:1.8;background:#f8faff;border:1px solid #c8d4f0;border-radius:8px;padding:10px 14px">
-            棚卸入力中の商品のうち、<b>バーコード未設定のものに自動で8桁の数字を割り当て</b>ます。<br>
-            発番後はすぐに印刷できます。
+      <!-- 発番カード -->
+      <div style="background:#fff;border-radius:10px;border:1px solid #dde3ea;padding:14px 16px;margin-bottom:14px">
+        <h2 style="font-size:14px;font-weight:700;color:#0f2744;margin:0 0 10px;padding-bottom:8px;border-bottom:2px solid #f0f2f5">🔢 バーコード発番</h2>
+        <div style="display:flex;gap:12px;align-items:flex-start;flex-wrap:wrap">
+          <div style="flex:1;min-width:220px;font-size:12px;color:#555;line-height:1.9;background:#f8faff;border:1px solid #c8d4f0;border-radius:8px;padding:10px 14px">
+            未発番の商品に<b>8桁の番号</b>を自動で割り当てます。<br>
+            一度使った番号は<b>再利用しません。</b><br>
+            発番した番号はAirレジ出力にもそのまま使われます。
           </div>
-          <div style="display:flex;flex-direction:column;gap:8px">
-            <button onclick="bcpAutoAssign()"
-              style="padding:12px 24px;background:#1a6ea6;color:#fff;border:none;border-radius:8px;font-size:13px;font-weight:700;cursor:pointer;font-family:inherit">
-              🔢 未発番の商品に番号を割り当て
-            </button>
-            <button onclick="bcpClearAllBarcodes()"
-              style="padding:8px 16px;background:#fff;color:#c0392b;border:1.5px solid #e0b4b4;border-radius:8px;font-size:12px;font-weight:700;cursor:pointer;font-family:inherit">
-              🗑️ 既存のバーコードをすべて削除
-            </button>
-            <div id="bcpAssignStatus" style="font-size:12px;color:#1a7a4a;display:none"></div>
+          <div style="display:flex;flex-direction:column;gap:8px;min-width:200px">
+            <button onclick="bcpAutoAssignAll()" style="padding:12px 20px;background:#1a6ea6;color:#fff;border:none;border-radius:8px;font-size:13px;font-weight:700;cursor:pointer;font-family:inherit">🔢 未発番商品にまとめて発番</button>
+            <button onclick="bcpClearAllBarcodes()" style="padding:8px 16px;background:#fff;color:#c0392b;border:1.5px solid #e0b4b4;border-radius:8px;font-size:12px;font-weight:700;cursor:pointer;font-family:inherit">🗑️ 既存バーコードをすべて削除</button>
+            <div id="bcpAssignMsg" style="font-size:12px;min-height:18px"></div>
           </div>
         </div>
       </div>
 
-      <!-- 印刷リストカード -->
-      <div style="background:#fff;border-radius:10px;border:1px solid #dde3ea;padding:14px 16px;margin-bottom:12px">
-        <h2 style="font-size:14px;font-weight:700;color:#0f2744;margin:0 0 10px;padding-bottom:8px;border-bottom:2px solid #f0f2f5">🏷 バーコードシール印刷
-          <span style="font-size:10px;font-weight:400;color:#6b7a8d;margin-left:8px">A-one 31397　20mm×8mm　8列×25行（A4縦・200面）</span>
-        </h2>
-
-        <!-- 凡例 -->
-        <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:10px;font-size:11px">
-          <span style="padding:2px 8px;border:1.5px solid #dde3ea;border-radius:10px;color:#6b7a8d">白枠＝入荷登録済み</span>
-          <span style="padding:2px 8px;border:1.5px solid #f0c040;border-radius:10px;color:#856404;background:#fffde7">黄枠＝棚卸入力中</span>
-        </div>
-
-        <!-- フィルター行 -->
-        <div style="margin-bottom:12px">
-          <!-- ページ絞り込みチェックリスト -->
-          <div style="font-size:11px;font-weight:700;color:#6b7a8d;margin-bottom:6px">ページで絞り込み（複数選択可）</div>
-          <div id="bcpPageFilter" style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:10px"></div>
-          <!-- 商品名検索 + ボタン -->
-          <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center">
-            <input id="bcpSearch" type="text" placeholder="商品名で検索..." oninput="bcpFilter()"
-              style="flex:1;min-width:160px;padding:8px 10px;border:1px solid #dde3ea;border-radius:6px;font-size:13px;font-family:inherit;box-sizing:border-box">
-            <button onclick="bcpSelectAll(true)" style="padding:8px 12px;background:#f0f2f5;border:1px solid #dde3ea;border-radius:6px;font-size:12px;font-weight:700;cursor:pointer;font-family:inherit">全選択</button>
-            <button onclick="bcpSelectAll(false)" style="padding:8px 12px;background:#f0f2f5;border:1px solid #dde3ea;border-radius:6px;font-size:12px;font-weight:700;cursor:pointer;font-family:inherit">全解除</button>
-            <button onclick="openLabelPosPicker('bcp')" style="padding:8px 14px;background:#1a4a2e;color:#fff;border:none;border-radius:6px;font-size:13px;font-weight:700;cursor:pointer;font-family:inherit">📍 開始位置を選んで印刷</button>
+      <!-- 印刷カード -->
+      <div style="background:#fff;border-radius:10px;border:1px solid #dde3ea;padding:14px 16px">
+        <div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:8px;margin-bottom:14px;padding-bottom:10px;border-bottom:2px solid #f0f2f5">
+          <h2 style="font-size:14px;font-weight:700;color:#0f2744;margin:0">🏷 バーコードシール印刷
+            <span style="font-size:10px;font-weight:400;color:#6b7a8d;margin-left:8px">A-one 31397　20mm×8mm　8列×25行（A4縦・200面）</span>
+          </h2>
+          <div style="display:flex;gap:6px;align-items:center;flex-wrap:wrap">
+            <button onclick="bcpSelectAllGlobal(true)" style="padding:6px 12px;background:#f0f2f5;border:1px solid #dde3ea;border-radius:6px;font-size:12px;font-weight:700;cursor:pointer;font-family:inherit">全選択</button>
+            <button onclick="bcpSelectAllGlobal(false)" style="padding:6px 12px;background:#f0f2f5;border:1px solid #dde3ea;border-radius:6px;font-size:12px;font-weight:700;cursor:pointer;font-family:inherit">全解除</button>
+            <span id="bcpSelectedCount" style="font-size:12px;color:#6b7a8d;min-width:64px;text-align:right"></span>
+            <button onclick="bcpOpenPicker()" style="padding:8px 16px;background:#1a4a2e;color:#fff;border:none;border-radius:6px;font-size:13px;font-weight:700;cursor:pointer;font-family:inherit">📍 開始位置を選んで印刷</button>
           </div>
         </div>
-
-        <!-- 商品一覧 -->
-        <div style="font-size:11px;color:#6b7a8d;margin-bottom:6px">
-          <span id="bcpCount">0</span>件表示　チェックした商品のシールを印刷します
-        </div>
-        <div id="bcpList" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(220px,1fr));gap:8px;max-height:460px;overflow-y:auto;padding:2px"></div>
-        <div id="bcpEmpty" style="display:none;text-align:center;color:#aab;padding:32px;font-size:13px">商品が見つかりません。</div>
+        <div id="bcpPageSections"></div>
       </div>
+
+      <!-- 開始位置ピッカー -->
+      <div id="bcpPickerOverlay" onclick="bcpClosePicker()" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.5);z-index:8000"></div>
+      <div id="bcpPickerModal" style="display:none;position:fixed;top:50%;left:50%;transform:translate(-50%,-50%);background:#fff;border-radius:14px;padding:20px;z-index:8001;box-shadow:0 8px 40px rgba(0,0,0,.3);max-width:540px;width:95vw">
+        <div style="font-size:15px;font-weight:700;color:#0f2744;margin-bottom:4px">📍 印刷開始位置を選択</div>
+        <div style="font-size:11px;color:#6b7a8d;margin-bottom:12px">使いかけシートの続きから印刷できます。グレー＝使用済み、青＝開始位置</div>
+        <div id="bcpPickerGrid" style="display:grid;grid-template-columns:repeat(8,1fr);gap:2px;margin-bottom:14px;background:#e8edf2;border-radius:6px;padding:4px;overflow:hidden"></div>
+        <div style="display:flex;gap:8px;justify-content:flex-end;align-items:center">
+          <span style="font-size:12px;color:#6b7a8d">開始位置: <b id="bcpPickerPosLabel">1番</b></span>
+          <button onclick="bcpClosePicker()" style="padding:8px 16px;background:#f0f2f5;border:1px solid #dde3ea;border-radius:6px;font-size:13px;cursor:pointer;font-family:inherit">キャンセル</button>
+          <button onclick="bcpDoPrint()" style="padding:8px 20px;background:#1a4a2e;color:#fff;border:none;border-radius:6px;font-size:13px;font-weight:700;cursor:pointer;font-family:inherit">🖨 この位置から印刷</button>
+        </div>
+      </div>
+
     </div>
 
   </div><!-- /main-content -->
@@ -4414,341 +4402,368 @@ function showTab(name){
 // 🏷 バーコード印刷（pgApp内タブ）
 // ============================================================
 // ============================================================
-// 🏷 バーコード印刷（pgApp内タブ）
+// 🏷 バーコード印刷（全面刷新版）
 // ============================================================
-let _bcpFiltered=[];
 
-// ── 自動発番：セッション内のバーコード未設定行に8桁数字を割り当て ──
-function bcpAutoAssign(){
-  const prods=nkGetProducts();
-  const prodMap={};
-  prods.forEach(p=>{if(p.name)prodMap[p.name]=p;});
+let _bcpStartPos = 1;
 
-  // 現在の最大番号を取得（商品マスタ＋セッション全行＋使用済みリスト）
-  // 形式: 8桁純数字 10000001〜
-  const used=getBcUsed();
-  let maxNum=10000000;
-  const numPat=/^(\d{8,})$/;
-  prods.forEach(p=>{
-    const m=p.barcode&&p.barcode.match(numPat);
-    if(m) maxNum=Math.max(maxNum,parseInt(m[1],10));
-  });
-  order.forEach(k=>{
-    (pages[k]?.rows||[]).forEach(r=>{
-      const m=r.bc&&r.bc.match(numPat);
-      if(m) maxNum=Math.max(maxNum,parseInt(m[1],10));
-    });
-  });
-  used.forEach(v=>{ const m=v.match(numPat); if(m) maxNum=Math.max(maxNum,parseInt(m[1],10)); });
+// ─── データ取得 ───────────────────────────────────────────
 
-  // 再利用チェック：これから発番しようとする番号が使用済みでないか検証
-  const newBcList=[];
-  let assigned=0;
-  order.forEach(k=>{
-    const pg=pages[k]||{};
-    (pg.rows||[]).forEach((r,ri)=>{
-      const name=(r.n||'').trim();
+// 全商品をページ別にまとめて返す
+// 戻り値: [{pageKey, pageLabel, items:[{id,name,price,barcode,source,_sessKey,_row}]}]
+function bcpGetPagedData(){
+  const master = nkGetProducts();
+  const masterByName = {};
+  master.forEach(p => { if(p.name) masterByName[p.name] = p; });
+
+  const usedNames = new Set();
+  const result = [];
+
+  // セッションページごとに商品を収集
+  order.forEach(k => {
+    const pg = pages[k] || {};
+    const label = (pg.tanto || k).trim();
+    const items = [];
+    (pg.rows || []).forEach(r => {
+      const name = (r.n || '').trim();
       if(!name) return;
-      if((r.bc||'').trim()) return;
-      // 商品マスタに登録済みでバーコードがあればそちらを使用
-      if(prodMap[name]&&(prodMap[name].barcode||'').trim()){
-        pages[k].rows[ri].bc=prodMap[name].barcode;
-        assigned++; return;
-      }
-      // 新規発番（8桁純数字・使用済みをスキップ）
-      do{ maxNum++; }while(used.has(String(maxNum)));
-      const newBc=String(maxNum);
-      newBcList.push(newBc);
-      pages[k].rows[ri].bc=newBc;
-      if(prodMap[name]){
-        prodMap[name].barcode=newBc;
-      } else {
-        const pc=nkGenProductCode(pages[k]?.catId||'', pages[k]?.tanto||r.cat||'');
-        const np={
-          id:'p'+Date.now()+'_'+Math.random().toString(36).slice(2,5),
-          name, barcode:newBc, productCode:pc,
-          price:r.p||'', costPrice:r.st||'',
-          taxRate:r.z||'10', unit:r.u||'点',
-          category:pages[k]?.tanto||r.cat||'', catId:pages[k]?.catId||'',
-          supplier:'', createdAt:Date.now()
-        };
-        prods.push(np);
-        prodMap[pk]=np; // ✅ name|price キー（同名・別価格は別商品）
-      }
-      assigned++;
-    });
-    if(!offline&&db) db.ref('s/'+sid+'/pages/'+k+'/rows').set(pg.rows);
-  });
-
-  if(newBcList.length) addBcUsed(newBcList);
-  nkSaveProducts(prods);
-  renderAllPages();
-
-  const st=document.getElementById('bcpAssignStatus');
-  if(assigned>0){
-    st.style.display='block'; st.style.color='#1a7a4a';
-    st.textContent=`✅ ${assigned}件に番号を割り当てました`;
-    toast(`${assigned}件に発番しました`);
-  } else {
-    st.style.display='block'; st.style.color='#6b7a8d';
-    st.textContent='すべての商品にすでにバーコードが設定されています';
-  }
-  bcpRender();
-}
-
-// ── 既存バーコードを全クリア（商品マスタ＋セッション全行） ──
-function bcpClearAllBarcodes(){
-  if(!confirm('商品マスタおよび現在のセッション入力行のバーコードをすべて削除します。\n⚠️ 削除した番号は再利用されません。\nよろしいですか？')) return;
-
-  const numPat=/^(\d{8,})$/;
-  const toRetire=[];
-
-  // 削除前に使用済みリストへ退避（再利用防止）
-  const prods=nkGetProducts();
-  prods.forEach(p=>{ if(p.barcode&&p.barcode.match(numPat)) toRetire.push(p.barcode); p.barcode=''; });
-  nkSaveProducts(prods);
-
-  // セッション入力行のバーコードをクリア
-  order.forEach(k=>{
-    const pg=pages[k]||{};
-    let changed=false;
-    (pg.rows||[]).forEach(r=>{ if(r.bc){ if(r.bc.match(numPat)) toRetire.push(r.bc); r.bc=''; changed=true; } });
-    if(changed&&!offline&&db) db.ref('s/'+sid+'/pages/'+k+'/rows').set(pg.rows);
-  });
-
-  if(toRetire.length) addBcUsed(toRetire);
-
-  renderAllPages();
-  bcpRender();
-
-  const st=document.getElementById('bcpAssignStatus');
-  st.style.display='block'; st.style.color='#c0392b';
-  st.textContent=`🗑️ ${toRetire.length}件のバーコードを削除しました（番号は再利用されません）`;
-  toast('バーコードをすべて削除しました');
-}
-
-
-function bcpGetAllSources(){
-  const masterProds=nkGetProducts();
-  const seenNames=new Set();
-  const result=[];
-
-  // 商品名→ページキー(tanto)のマップを棚卸セッションから構築
-  const nameToPage={};
-  order.forEach(k=>{
-    const pg=pages[k]||{};
-    const pageLabel=pg.tanto||'';
-    (pg.rows||[]).forEach(r=>{
-      const name=(r.n||'').trim();
-      if(name&&pageLabel) nameToPage[name]=pageLabel;
-    });
-  });
-
-  masterProds.forEach(p=>{
-    seenNames.add(p.name);
-    result.push({...p, _pageLabel: nameToPage[p.name]||''});
-  });
-
-  // セッション入力行（マスタにない商品をバーコードあり・なし問わず表示）
-  order.forEach(k=>{
-    (pages[k]?.rows||[]).forEach(r=>{
-      const name=(r.n||'').trim();
-      if(!name||seenNames.has(name)) return;
-      seenNames.add(name);
-      result.push({
-        id:'sess_'+name, name, barcode:(r.bc||'').trim(),
-        price:r.p||'', category:r.cat||'',
-        taxRate:r.z||'10', _source:'session',
-        _pageLabel: nameToPage[name]||''
+      usedNames.add(name);
+      const mp = masterByName[name];
+      items.push({
+        id: mp ? mp.id : 'sess_'+name,
+        name,
+        price: mp ? (mp.price || r.p || '') : (r.p || ''),
+        barcode: mp ? ((mp.barcode||'').trim() || (r.bc||'').trim()) : (r.bc||'').trim(),
+        source: 'session',
+        _masterRef: mp || null,
+        _sessKey: k,
+        _row: r
       });
     });
+    if(items.length) result.push({ pageKey: k, pageLabel: label, items });
   });
+
+  // マスタのみの商品（棚卸未入力）
+  const masterOnly = master.filter(p => p.name && !usedNames.has(p.name));
+  if(masterOnly.length){
+    result.push({
+      pageKey: '__master__',
+      pageLabel: '商品マスタ（棚卸未入力）',
+      items: masterOnly.map(p => ({
+        id: p.id, name: p.name, price: p.price || '',
+        barcode: (p.barcode || '').trim(),
+        source: 'master', _masterRef: p, _sessKey: null, _row: null
+      }))
+    });
+  }
   return result;
 }
 
+// ─── 発番管理 ──────────────────────────────────────────────
+
+function bcpGetUsedSet(){
+  try{ return new Set(JSON.parse(localStorage.getItem('tb_bc_used_v1') || '[]')); }
+  catch(e){ return new Set(); }
+}
+function bcpSaveUsedSet(s){
+  localStorage.setItem('tb_bc_used_v1', JSON.stringify([...s]));
+}
+function bcpNextNumber(used){
+  let n = 10000001;
+  while(used.has(String(n))){ n++; if(n > 99999999) throw new Error('番号枯渇'); }
+  return String(n);
+}
+
+// 1商品に発番してマスタ・セッション両方に保存
+function bcpAssignBarcode(item){
+  const used = bcpGetUsedSet();
+  // 既存のバーコードも使用済みに追加
+  nkGetProducts().forEach(p => { if(p.barcode) used.add(p.barcode); });
+  order.forEach(k => { (pages[k]?.rows||[]).forEach(r => { if(r.bc) used.add(r.bc); }); });
+
+  const bc = bcpNextNumber(used);
+  used.add(bc);
+  bcpSaveUsedSet(used);
+
+  // マスタに保存
+  const prods = nkGetProducts();
+  const mp = prods.find(p => p.name === item.name);
+  if(mp){
+    mp.barcode = bc;
+    localStorage.setItem('tb_products_v1', JSON.stringify(prods));
+  }
+  // セッション行にも反映
+  if(item._sessKey && item._row){
+    item._row.bc = bc;
+    const ri = (pages[item._sessKey]?.rows || []).indexOf(item._row);
+    if(ri >= 0 && db && sid) upd(item._sessKey, ri, 'bc', bc);
+  }
+  return bc;
+}
+
+function bcpAutoAssignAll(){
+  const data = bcpGetPagedData();
+  let count = 0;
+  data.forEach(pg => {
+    pg.items.forEach(item => {
+      if(!item.barcode){
+        try{ item.barcode = bcpAssignBarcode(item); count++; }
+        catch(e){ console.error(e); }
+      }
+    });
+  });
+  const msg = document.getElementById('bcpAssignMsg');
+  if(msg) msg.innerHTML = count > 0
+    ? '<span style="color:#1a7a4a">✅ ' + count + '件に番号を割り当てました</span>'
+    : '<span style="color:#888">未発番の商品はありません</span>';
+  bcpRenderSections();
+}
+
+function bcpClearAllBarcodes(){
+  if(!confirm('すべてのバーコードを削除しますか？\n（番号は再利用されません）')) return;
+  const used = bcpGetUsedSet();
+  const prods = nkGetProducts();
+  prods.forEach(p => { if(p.barcode){ used.add(p.barcode); p.barcode = ''; } });
+  localStorage.setItem('tb_products_v1', JSON.stringify(prods));
+  order.forEach(k => {
+    (pages[k]?.rows || []).forEach((r, ri) => {
+      if(r.bc){ used.add(r.bc); r.bc = ''; if(db && sid) upd(k, ri, 'bc', ''); }
+    });
+  });
+  bcpSaveUsedSet(used);
+  bcpRenderSections();
+  toast('バーコードをすべて削除しました');
+}
+
+// ─── 描画 ──────────────────────────────────────────────────
+
 function bcpRender(){
-  const filterDiv=document.getElementById('bcpPageFilter');
-  if(!filterDiv) return;
+  bcpRenderSections();
+}
 
-  // ページ一覧収集
-  const pageSet=new Map(); // key → label
+function bcpRenderSections(){
+  const container = document.getElementById('bcpPageSections');
+  if(!container) return;
 
-  // ① セッションのページ名
-  order.forEach(k=>{
-    const pg=pages[k]||{};
-    const label=(pg.tanto||'').trim();
-    if(label) pageSet.set('page:'+label, label);
-  });
+  const data = bcpGetPagedData();
+  const total = data.reduce((s, pg) => s + pg.items.length, 0);
 
-  // ② マスタ商品のカテゴリー（ページ名と重複しないもの）
-  const pageLabels=new Set(pageSet.values());
-  nkGetProducts().forEach(p=>{
-    const cat=(p.category||'').trim();
-    if(cat && !pageLabels.has(cat)) pageSet.set('cat:'+cat, cat);
-  });
+  if(!total){
+    container.innerHTML = '<div style="text-align:center;color:#aab;padding:32px;font-size:13px">商品がありません。<br>棚卸入力か商品マスタに商品を登録してください。</div>';
+    bcpUpdateCount();
+    return;
+  }
 
-  // 既存チェック状態保存
-  const prevChecked=new Set();
-  filterDiv.querySelectorAll('input[type=checkbox]:checked').forEach(cb=>prevChecked.add(cb.value));
-  const isFirst=filterDiv.innerHTML==='';
-
-  if(pageSet.size===0){
-    filterDiv.innerHTML='<span style="font-size:12px;color:#aaa">（絞り込み項目なし）</span>';
-  } else {
-    filterDiv.innerHTML=[...pageSet.entries()].map(([key,label])=>{
-      // 初回は全チェック、以降は前回状態を維持
-      const chk=isFirst || prevChecked.size===0 || prevChecked.has(key);
-      const bg=chk?'#0f2744':'#f0f4fa';
-      const fg=chk?'#fff':'#333';
-      const bd=chk?'#0f2744':'#dde3ea';
-      return `<label style="display:inline-flex;align-items:center;gap:5px;background:${bg};color:${fg};border:1.5px solid ${bd};border-radius:20px;padding:5px 12px;font-size:12px;font-weight:700;cursor:pointer;user-select:none;transition:.15s" onclick="bcpTogglePageChip(this)">
-        <input type="checkbox" value="${key}" ${chk?'checked':''} style="display:none">${e(label)}
-      </label>`;
+  container.innerHTML = data.map((pg, pi) => {
+    const rows = pg.items.map((item, ii) => {
+      const hasBC = !!item.barcode;
+      const chkId = 'bcpChk_' + pi + '_' + ii;
+      const bcDisp = hasBC
+        ? '<span style="font-family:monospace;font-size:11px;color:#1a6ea6;background:#eef4ff;padding:2px 6px;border-radius:4px">' + e(item.barcode) + '</span>'
+        : '<button onclick="bcpAssignOne(' + pi + ',' + ii + ')" style="padding:3px 10px;background:#e8f4e8;color:#1a7a4a;border:1px solid #a8d4a8;border-radius:4px;font-size:11px;font-weight:700;cursor:pointer;font-family:inherit">＋ 発番</button>';
+      const priceDisp = item.price ? ('¥' + Number(item.price).toLocaleString()) : '—';
+      return '<div style="display:flex;align-items:center;gap:8px;padding:6px 10px;border-bottom:1px solid #f4f6f8">' +
+        '<input type="checkbox" id="' + chkId + '"' + (hasBC ? '' : ' disabled title="発番後に選択できます"') +
+        ' style="width:16px;height:16px;flex-shrink:0;cursor:' + (hasBC ? 'pointer' : 'not-allowed') + ';accent-color:#1a6ea6" onchange="bcpUpdateCount()">' +
+        '<span style="flex:1;font-size:12px;color:#0f2744;font-weight:600;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">' + e(item.name) + '</span>' +
+        '<span style="font-size:12px;color:#555;min-width:64px;text-align:right;flex-shrink:0">' + priceDisp + '</span>' +
+        '<span style="min-width:120px;text-align:right;flex-shrink:0">' + bcDisp + '</span>' +
+        '</div>';
     }).join('');
-  }
-  bcpFilter();
-}
 
-function bcpTogglePageChip(label){
-  const cb=label.querySelector('input');
-  cb.checked=!cb.checked;
-  if(cb.checked){
-    label.style.background='#0f2744'; label.style.color='#fff'; label.style.borderColor='#0f2744';
-  } else {
-    label.style.background='#f0f4fa'; label.style.color='#333'; label.style.borderColor='#dde3ea';
-  }
-  bcpFilter();
-}
-
-function bcpFilter(){
-  const filterDiv=document.getElementById('bcpPageFilter');
-  const kw=(document.getElementById('bcpSearch').value||'').trim().toLowerCase();
-
-  // チェックされているページ/カテゴリーキー
-  const checkedKeys=new Set();
-  if(filterDiv){
-    filterDiv.querySelectorAll('input[type=checkbox]:checked').forEach(cb=>checkedKeys.add(cb.value));
-  }
-
-  // 商品名→ページ名マップ（セッション行から）
-  const nameToPage={};
-  order.forEach(k=>{
-    const pg=pages[k]||{};
-    const label=(pg.tanto||'').trim();
-    (pg.rows||[]).forEach(r=>{
-      const name=(r.n||'').trim();
-      if(name&&label) nameToPage[name]=label;
-    });
-  });
-
-  _bcpFiltered=bcpGetAllSources().filter(p=>{
-    if(kw&&!(p.name||'').toLowerCase().includes(kw)) return false;
-    // チェックなし = 全件表示
-    if(checkedKeys.size===0) return true;
-    const pLabel=nameToPage[p.name]||p._pageLabel||'';
-    const pCat=(p.category||'').trim();
-    for(const key of checkedKeys){
-      if(key.startsWith('page:') && pLabel===key.slice(5)) return true;
-      if(key.startsWith('cat:') && pCat===key.slice(4)) return true;
-    }
-    return false;
-  });
-  bcpRenderList();
-}
-
-function bcpRenderList(){
-  const list=document.getElementById('bcpList');
-  const empty=document.getElementById('bcpEmpty');
-  document.getElementById('bcpCount').textContent=_bcpFiltered.length;
-  if(!_bcpFiltered.length){ list.style.display='none'; empty.style.display='block'; return; }
-  list.style.display='grid'; empty.style.display='none';
-  list.innerHTML=_bcpFiltered.map((p,i)=>{
-    const isSession=p._source==='session';
-    const hasBc=!!(p.barcode||'').trim();
-    const borderColor=isSession?'#f0c040':'#dde3ea';
-    const bgColor=isSession?'#fffde7':'#fff';
-    const badge=isSession?`<span style="font-size:9px;background:#fffde7;color:#856404;border:1px solid #f0c040;padding:1px 5px;border-radius:8px">入力中</span>`:'';
-    const masterBadge=!isSession?`<span style="font-size:9px;background:#e8f5e9;color:#1a5c2e;border:1px solid #a5d6a7;padding:1px 5px;border-radius:8px">マスタ</span>`:'';
-    const cat=p._pageLabel?`<span style="font-size:10px;color:#1a5c2e;background:#e8f5e9;padding:1px 6px;border-radius:10px">${e(p._pageLabel)}</span>`:'';
-    const price=p.price?`<span style="font-size:11px;color:#1a5c2e">¥${Number(p.price).toLocaleString()}</span>`:'';
-    const bcDisplay=hasBc
-      ? `<span style="font-size:10px;color:#888;font-family:monospace">${e(p.barcode)}</span>`
-      : `<button onclick="event.preventDefault();bcpAssignOne('${e(p.id||p.name)}',${i})"
-           style="font-size:10px;background:#fff3cd;color:#856404;border:1px solid #ffc107;border-radius:4px;padding:2px 7px;cursor:pointer;font-family:inherit">
-           🔢 バーコード発番
-         </button>`;
-    return `<label style="display:flex;align-items:flex-start;gap:8px;background:${bgColor};border:1.5px solid ${hasBc?borderColor:'#ffc107'};border-radius:8px;padding:8px 10px;cursor:pointer" id="bcpitem_${i}">
-      <input type="checkbox" id="bcpchk_${i}" ${!hasBc?'disabled':''}
-        style="margin-top:3px;flex-shrink:0;width:15px;height:15px;cursor:${hasBc?'pointer':'not-allowed'}"
-        onchange="bcpUpdateStyle(${i})">
-      <div style="flex:1;min-width:0">
-        <div style="font-size:12px;font-weight:700;color:#0f2744;overflow:hidden;white-space:nowrap;text-overflow:ellipsis" title="${e(p.name)}">${e(p.name)}</div>
-        <div style="display:flex;gap:6px;align-items:center;flex-wrap:wrap;margin-top:3px">${badge}${masterBadge}${cat}${price}</div>
-        <div style="margin-top:4px">${bcDisplay}</div>
-      </div>
-      <div>
-        <input type="number" min="1" max="99" value="1" id="bcpqty_${i}"
-          onclick="event.stopPropagation()" ${!hasBc?'disabled':''}
-          style="width:44px;padding:4px;border:1px solid #dde3ea;border-radius:4px;font-size:12px;text-align:center;font-family:inherit">
-        <div style="font-size:9px;color:#aab;text-align:center">枚</div>
-      </div>
-    </label>`;
+    return '<div style="margin-bottom:10px;border:1px solid #e0e6ed;border-radius:8px;overflow:hidden">' +
+      '<div style="background:#f2f5f9;padding:8px 12px;display:flex;align-items:center;gap:8px;border-bottom:1px solid #e0e6ed">' +
+      '<span style="font-size:13px;font-weight:700;color:#0f2744;flex:1">📋 ' + e(pg.pageLabel) + '</span>' +
+      '<button onclick="bcpSelectPage(' + pi + ',true)" style="padding:3px 10px;font-size:11px;background:#fff;border:1px solid #dde3ea;border-radius:4px;cursor:pointer;font-family:inherit">全選択</button>' +
+      '<button onclick="bcpSelectPage(' + pi + ',false)" style="padding:3px 10px;font-size:11px;background:#fff;border:1px solid #dde3ea;border-radius:4px;cursor:pointer;font-family:inherit">全解除</button>' +
+      '<span style="font-size:11px;color:#6b7a8d">' + pg.items.length + '件</span>' +
+      '</div>' +
+      '<div>' + rows + '</div>' +
+      '</div>';
   }).join('');
+
+  bcpUpdateCount();
 }
 
-function bcpUpdateStyle(i){
-  const chk=document.getElementById('bcpchk_'+i);
-  const item=document.getElementById('bcpitem_'+i);
-  const p=_bcpFiltered[i];
-  if(!item||!chk) return;
-  const isSession=p&&p._source==='session';
-  if(chk.checked){
-    item.style.borderColor='#1a6ea6';
-    item.style.background='#e8f4ff';
-  } else {
-    item.style.borderColor=isSession?'#f0c040':'#dde3ea';
-    item.style.background=isSession?'#fffde7':'#fff';
+function bcpAssignOne(pi, ii){
+  const data = bcpGetPagedData();
+  const pg = data[pi]; if(!pg) return;
+  const item = pg.items[ii]; if(!item) return;
+  try{
+    const bc = bcpAssignBarcode(item);
+    toast('発番しました: ' + bc);
+    bcpRenderSections();
+  } catch(e){ alert(e.message); }
+}
+
+function bcpSelectPage(pi, val){
+  const sections = document.querySelectorAll('#bcpPageSections > div');
+  const sec = sections[pi]; if(!sec) return;
+  sec.querySelectorAll('input[type=checkbox]:not([disabled])').forEach(cb => { cb.checked = val; });
+  bcpUpdateCount();
+}
+
+function bcpSelectAllGlobal(val){
+  document.querySelectorAll('#bcpPageSections input[type=checkbox]:not([disabled])').forEach(cb => { cb.checked = val; });
+  bcpUpdateCount();
+}
+
+function bcpUpdateCount(){
+  const n = document.querySelectorAll('#bcpPageSections input[type=checkbox]:checked').length;
+  const el = document.getElementById('bcpSelectedCount');
+  if(el) el.textContent = n + '件選択中';
+}
+
+// ─── ピッカー ──────────────────────────────────────────────
+
+function bcpOpenPicker(){
+  const n = document.querySelectorAll('#bcpPageSections input[type=checkbox]:checked').length;
+  if(!n){ alert('印刷する商品にチェックを入れてください。\nバーコードのない商品は先に「発番」してください。'); return; }
+
+  _bcpStartPos = 1;
+  const grid = document.getElementById('bcpPickerGrid');
+  grid.innerHTML = '';
+  for(let i = 1; i <= 200; i++){
+    const cell = document.createElement('div');
+    cell.style.cssText = 'aspect-ratio:5/2;background:#fff;border-radius:2px;cursor:pointer;display:flex;align-items:center;justify-content:center;font-size:6px;color:#bbb;transition:.08s';
+    cell.id = 'bcpCell_' + i;
+    cell.title = i + '番';
+    cell.onclick = (function(pos){ return function(){ bcpPickerSelect(pos); }; })(i);
+    grid.appendChild(cell);
+  }
+  bcpPickerSelect(1);
+  document.getElementById('bcpPickerOverlay').style.display = 'block';
+  document.getElementById('bcpPickerModal').style.display = 'block';
+}
+
+function bcpPickerSelect(pos){
+  _bcpStartPos = pos;
+  const lbl = document.getElementById('bcpPickerPosLabel');
+  if(lbl) lbl.textContent = pos + '番';
+  for(let i = 1; i <= 200; i++){
+    const cell = document.getElementById('bcpCell_' + i);
+    if(!cell) continue;
+    if(i < pos){
+      cell.style.background = '#dde3ea'; cell.style.color = '#aaa'; cell.textContent = '済';
+    } else if(i === pos){
+      cell.style.background = '#1a6ea6'; cell.style.color = '#fff'; cell.textContent = '★';
+    } else {
+      cell.style.background = '#fff'; cell.style.color = '#bbb'; cell.textContent = '';
+    }
   }
 }
 
-// 個別バーコード発番
-function bcpAssignOne(idOrName, listIdx){
-  const p=_bcpFiltered[listIdx]; if(!p) return;
-  // 使用済み番号の最大値を取得して+1
-  const used=JSON.parse(localStorage.getItem('tb_bc_used_v1')||'[]').map(Number);
-  const prods=nkGetProducts();
-  const allBcs=[...used,...prods.map(x=>Number(x.barcode||0)).filter(Boolean)];
-  // セッション行のバーコードも収集
-  order.forEach(k=>{(pages[k]?.rows||[]).forEach(r=>{if(r.bc)allBcs.push(Number(r.bc));});});
-  const maxBc=allBcs.length?Math.max(...allBcs):10000000;
-  const newBc=String(maxBc+1).padStart(8,'0');
-
-  if(p._source==='session'){
-    // セッション行に反映
-    order.forEach(k=>{
-      const rows=pages[k]?.rows||[];
-      rows.forEach((r,ri)=>{
-        if((r.n||'').trim()===p.name) upd(k,ri,'bc',newBc);
-      });
-    });
-  } else {
-    // 商品マスタに反映
-    const ps=nkGetProducts();
-    const idx=ps.findIndex(x=>x.id===p.id||x.name===p.name);
-    if(idx>=0){ ps[idx].barcode=newBc; localStorage.setItem(PK,JSON.stringify(ps)); }
-  }
-  // 使用済みに追加
-  used.push(Number(newBc));
-  localStorage.setItem('tb_bc_used_v1',JSON.stringify(used));
-  alert(`✅ バーコードを発番しました\n${p.name}\n→ ${newBc}`);
-  bcpFilter();
+function bcpClosePicker(){
+  document.getElementById('bcpPickerOverlay').style.display = 'none';
+  document.getElementById('bcpPickerModal').style.display = 'none';
 }
 
-function bcpSelectAll(val){
-  _bcpFiltered.forEach((_,i)=>{
-    const chk=document.getElementById('bcpchk_'+i);
-    if(chk&&!chk.disabled){ chk.checked=val; bcpUpdateStyle(i); }
+function bcpDoPrint(){
+  bcpClosePicker();
+  bcpPrint(_bcpStartPos);
+}
+
+// ─── 印刷HTML生成 ──────────────────────────────────────────
+
+function bcpPrint(startPos){
+  const data = bcpGetPagedData();
+  const items = [];
+  document.querySelectorAll('#bcpPageSections input[type=checkbox]:checked').forEach(cb => {
+    const m = cb.id.match(/bcpChk_(\d+)_(\d+)/);
+    if(!m) return;
+    const pg = data[parseInt(m[1])]; if(!pg) return;
+    const item = pg.items[parseInt(m[2])]; if(!item || !item.barcode) return;
+    items.push({ name: item.name, price: item.price, barcode: item.barcode });
   });
+  if(!items.length){ alert('印刷する商品を選択してください'); return; }
+  const html = bcpBuildLabelHtml(items, startPos || 1);
+  const win = window.open('', '_blank', 'width=960,height=760');
+  win.document.write(html);
+  win.document.close();
+}
+
+// A-one 31397: 20×8mm、8列×25行、左余白8mm、上余白9mm
+// 列ピッチ24.86mm、行ピッチ11.33mm
+function bcpBuildLabelHtml(items, startPos){
+  const COLS=8, PER=200;
+  const LW=20, LH=8;
+  const ML=8.0, MT=9.0;
+  const CP=24.86, RP=11.33;
+  const offset = Math.max(0, Math.min(199, (startPos||1)-1));
+
+  const padded = [];
+  for(let i=0;i<offset;i++) padded.push(null);
+  items.forEach(p => padded.push(p));
+
+  let sheetData = '';
+  const totalSheets = Math.ceil(padded.length / PER);
+  for(let s=0;s<totalSheets;s++){
+    const chunk = padded.slice(s*PER, (s+1)*PER);
+    let cells = '';
+    chunk.forEach((p, ci) => {
+      if(!p) return;
+      const row = Math.floor(ci/COLS), col = ci%COLS;
+      const left = (ML + col*CP).toFixed(4);
+      const top  = (MT + row*RP).toFixed(4);
+      const uid  = 'qr_'+s+'_'+ci;
+      const nm   = (p.name||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+      const pr   = p.price ? ('\u00a5'+Number(p.price).toLocaleString()) : '';
+      const bc   = String(p.barcode||'').replace(/&/g,'&amp;');
+      cells += '<div style="position:absolute;left:'+left+'mm;top:'+top+'mm;width:'+LW+'mm;height:'+LH+'mm;overflow:hidden;display:flex;align-items:stretch;box-sizing:border-box;padding:0.3mm 0.5mm;">' +
+        '<div style="flex:1;min-width:0;display:flex;flex-direction:column;justify-content:center;padding-right:0.6mm;overflow:hidden;">' +
+          '<div style="font-size:3.8pt;font-weight:600;color:#111;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;line-height:1.25;">'+nm+'</div>' +
+          '<div style="font-size:6.5pt;font-weight:900;color:#000;white-space:nowrap;letter-spacing:-0.03em;line-height:1.25;margin-top:0.4mm;">'+pr+'</div>' +
+        '</div>' +
+        '<div id="'+uid+'" data-bc="'+bc+'" style="width:6.6mm;height:6.6mm;flex-shrink:0;align-self:center;overflow:hidden;display:flex;align-items:center;justify-content:center;"></div>' +
+        '</div>';
+    });
+    sheetData += '<div class="sheet">'+cells+'</div>';
+  }
+
+  const qrSrc = 'https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js';
+  return '<!DOCTYPE html><html><head><meta charset="UTF-8"><title>QRシール印刷</title>' +
+'<style>' +
+'@page{size:A4 portrait;margin:0}' +
+'*{box-sizing:border-box;margin:0;padding:0}' +
+'body{background:#e8e8e8;font-family:\'Hiragino Kaku Gothic Pro\',\'Meiryo\',sans-serif}' +
+'.toolbar{position:fixed;top:0;left:0;right:0;background:#1a1a2e;color:#fff;padding:8px 14px;display:flex;gap:10px;align-items:center;z-index:9999;flex-wrap:wrap}' +
+'.toolbar button{padding:7px 18px;border:none;border-radius:6px;font-size:13px;font-weight:700;cursor:pointer}' +
+'.adj{display:flex;align-items:center;gap:6px;background:rgba(255,255,255,.12);padding:5px 10px;border-radius:6px}' +
+'.adj label{font-size:11px;color:#cce;white-space:nowrap}' +
+'.adj input[type=range]{width:80px;accent-color:#4caf50}' +
+'.adj span{font-size:11px;min-width:38px;text-align:right;font-family:monospace;color:#aef}' +
+'.hint{font-size:10px;color:#8899aa;line-height:1.5}' +
+'.wrap{padding-top:62px}' +
+'.sheet{position:relative;width:210mm;height:297mm;overflow:hidden;page-break-after:always;background:#fff;margin:8mm auto;box-shadow:0 2px 14px rgba(0,0,0,.2)}' +
+'@media print{.toolbar{display:none!important}.wrap{padding-top:0}.sheet{margin:0;box-shadow:none}}' +
+'</style></head><body>' +
+'<div class="toolbar">' +
+'<div style="font-size:13px;font-weight:700">🖨️ QRシール印刷　' + items.length + '枚　開始: ' + (offset+1) + '番</div>' +
+'<div class="adj"><label>左右調整</label><input type="range" id="adjX" min="-5" max="5" step="0.1" value="0" oninput="applyAdj()"><span id="adjXv">0.0mm</span></div>' +
+'<div class="adj"><label>上下調整</label><input type="range" id="adjY" min="-5" max="5" step="0.1" value="0" oninput="applyAdj()"><span id="adjYv">0.0mm</span></div>' +
+'<button onclick="window.print()" style="background:#1a7a4a;color:#fff">🖨️ 印刷する</button>' +
+'<button onclick="window.close()" style="background:#555;color:#fff">✕ 閉じる</button>' +
+'<div class="hint">余白なし・倍率100%で印刷してください。<br>ずれる場合はスライダーで微調整できます。</div>' +
+'</div>' +
+'<div class="wrap" id="sheetsWrap">'+sheetData+'</div>' +
+'<script src="'+qrSrc+'"><\/script>' +
+'<script>' +
+'var _adjX=0,_adjY=0;' +
+'function applyAdj(){' +
+'  _adjX=parseFloat(document.getElementById("adjX").value)||0;' +
+'  _adjY=parseFloat(document.getElementById("adjY").value)||0;' +
+'  document.getElementById("adjXv").textContent=(_adjX>=0?"+":"")+_adjX.toFixed(1)+"mm";' +
+'  document.getElementById("adjYv").textContent=(_adjY>=0?"+":"")+_adjY.toFixed(1)+"mm";' +
+'  document.querySelectorAll(".sheet").forEach(function(sh){sh.style.transform="translate("+_adjX+"mm,"+_adjY+"mm)";});' +
+'}' +
+'window.onload=function(){' +
+'  document.querySelectorAll("[data-bc]").forEach(function(el){' +
+'    var bc=el.getAttribute("data-bc");if(!bc)return;' +
+'    try{new QRCode(el,{text:bc,width:26,height:26,colorDark:"#000",colorLight:"#fff",correctLevel:QRCode.CorrectLevel.M});}catch(e){}' +
+'  });' +
+'};' +
+'<\/script>' +
+'</body></html>';
 }
 
 
@@ -4825,143 +4840,6 @@ function confirmLabelPos(){
 // ── QRシール印刷共通ロジック（bcpPrint/nkPrintLabels から呼ばれる） ──
 // A-one 31297/31397 F200A4-1 正確寸法
 // ラベル: 20×8mm / 8列×25行
-// 左余白: 8.0mm / 上余白: 9.0mm
-// 列ピッチ: 24.86mm (20+4.86) / 行ピッチ: 11.33mm (8+3.33)
-// → 各ラベルをabsolute位置で配置（grid方式より印刷精度が高い）
-function buildQrLabelHtml(items, startPos){
-  const COLS=8, ROWS=25, PER=200;
-  const LW=20, LH=8;                 // ラベルサイズ mm
-  const ML=8.0, MT=9.0;              // 左・上余白 mm
-  const CP=24.86, RP=11.33;          // 列・行ピッチ mm
-  const offset=Math.max(0, Math.min(199, (startPos||1)-1));
-
-  const padded=[];
-  for(let i=0;i<offset;i++) padded.push(null);
-  items.forEach(p=>padded.push(p));
-
-  let sheetData='';
-  const totalSheets=Math.ceil(padded.length/PER);
-  for(let s=0;s<totalSheets;s++){
-    const chunk=padded.slice(s*PER,(s+1)*PER);
-    let cells='';
-    chunk.forEach((p,ci)=>{
-      if(!p) return;
-      const row=Math.floor(ci/COLS), col=ci%COLS;
-      const left=(ML+col*CP).toFixed(4);
-      const top=(MT+row*RP).toFixed(4);
-      const uid='qr_'+s+'_'+ci;
-      const nm=String(p.name||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
-      const pr=p.price?'\u00a5'+Number(p.price).toLocaleString():'';
-      const bc=String(p.barcode||p.bc||'').replace(/&/g,'&amp;');
-      cells+=`<div style="position:absolute;left:${left}mm;top:${top}mm;width:${LW}mm;height:${LH}mm;overflow:hidden;display:flex;align-items:center;padding:0 0.6mm;gap:0.3mm;box-sizing:border-box;">
-  <div style="flex:1;min-width:0;display:flex;flex-direction:column;justify-content:center;overflow:hidden;line-height:1.2;">
-    <div style="font-size:4.5pt;font-weight:700;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;color:#111;">${nm}</div>
-    <div style="font-size:6.5pt;font-weight:900;color:#000;white-space:nowrap;margin-top:0.3mm;letter-spacing:-0.02em;">${pr}</div>
-  </div>
-  <div id="${uid}" data-bc="${bc}" style="width:6.5mm;height:6.5mm;flex-shrink:0;overflow:hidden;display:flex;align-items:center;justify-content:center;"></div>
-</div>`;
-    });
-    sheetData+=`<div class="sheet">${cells}</div>`;
-  }
-
-  const qrSrc='https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js';
-  return `<!DOCTYPE html><html><head><meta charset="UTF-8">
-<title>QRシール印刷</title>
-<style>
-  @page{ size:A4 portrait; margin:0 }
-  *{ box-sizing:border-box; margin:0; padding:0 }
-  body{ background:#f0f0f0; font-family:'Hiragino Kaku Gothic Pro','Meiryo',sans-serif }
-  .toolbar{
-    position:fixed;top:0;left:0;right:0;background:#1a1a2e;color:#fff;
-    padding:8px 14px;display:flex;gap:10px;align-items:center;z-index:9999;flex-wrap:wrap;
-  }
-  .toolbar button{ padding:7px 18px;border:none;border-radius:6px;font-size:13px;font-weight:700;cursor:pointer }
-  .adj-group{ display:flex;align-items:center;gap:6px;background:rgba(255,255,255,.12);padding:5px 10px;border-radius:6px; }
-  .adj-group label{ font-size:11px;color:#cce;white-space:nowrap }
-  .adj-group input[type=range]{ width:80px;accent-color:#4caf50 }
-  .adj-group span{ font-size:11px;min-width:36px;text-align:right;font-family:monospace;color:#aef }
-  .adj-hint{ font-size:10px;color:#8899aa;line-height:1.4 }
-  .sheets-wrap{ padding-top:60px }
-  .sheet{
-    position:relative;
-    width:210mm;height:297mm;
-    overflow:hidden;page-break-after:always;
-    background:#fff;
-    margin:8mm auto;
-    box-shadow:0 2px 12px rgba(0,0,0,.2);
-  }
-  @media print{
-    .toolbar{ display:none!important }
-    .sheets-wrap{ padding-top:0 }
-    .sheet{ margin:0;box-shadow:none }
-  }
-</style>
-</head><body>
-<div class="toolbar">
-  <div>
-    <div style="font-size:13px;font-weight:700">\uD83D\uDDA8\uFE0F QR\u30b7\u30fc\u30eb\u5370\u5237 &nbsp; ${items.length}\u679a &nbsp;\u958b\u59cb\uff1a${offset+1}\u756a</div>
-  </div>
-  <div class="adj-group">
-    <label>\u5de6\u53f3\u8abf\u6574</label>
-    <input type="range" id="adjX" min="-5" max="5" step="0.1" value="0" oninput="applyAdj()">
-    <span id="adjXv">0.0mm</span>
-  </div>
-  <div class="adj-group">
-    <label>\u4e0a\u4e0b\u8abf\u6574</label>
-    <input type="range" id="adjY" min="-5" max="5" step="0.1" value="0" oninput="applyAdj()">
-    <span id="adjYv">0.0mm</span>
-  </div>
-  <button onclick="window.print()" style="background:#1a7a4a;color:#fff">\uD83D\uDDA8\uFE0F \u5370\u5237\u3059\u308b</button>
-  <button onclick="window.close()" style="background:#555;color:#fff">\u2715 \u9589\u3058\u308b</button>
-  <div class="adj-hint">\u4f59\u767d\u306a\u3057\u30fb\u500d\u738b100%\u3067\u5370\u5237\u3057\u3066\u304f\u3060\u3055\u3044\u3002<br>\u305a\u308c\u3066\u3044\u308b\u5834\u5408\u306f\u300c\u5de6\u53f3\u8abf\u6574\u300d\u300c\u4e0a\u4e0b\u8abf\u6574\u300d\u3067\u5fae\u8abf\u6574\u3057\u3066\u304f\u3060\u3055\u3044</div>
-</div>
-<div class="sheets-wrap" id="sheetsWrap">${sheetData}</div>
-<script src="${qrSrc}"><\/script>
-<script>
-var _adjX=0, _adjY=0;
-function applyAdj(){
-  _adjX=parseFloat(document.getElementById('adjX').value)||0;
-  _adjY=parseFloat(document.getElementById('adjY').value)||0;
-  document.getElementById('adjXv').textContent=(_adjX>=0?'+':'')+_adjX.toFixed(1)+'mm';
-  document.getElementById('adjYv').textContent=(_adjY>=0?'+':'')+_adjY.toFixed(1)+'mm';
-  var sheets=document.querySelectorAll('.sheet');
-  sheets.forEach(function(sh){
-    sh.style.marginLeft = _adjX + 'mm';
-    sh.style.paddingTop = _adjY + 'mm';
-    sh.style.paddingLeft = _adjX + 'mm';
-  });
-}
-window.onload=function(){
-  var els=document.querySelectorAll('[data-bc]');
-  els.forEach(function(el){
-    var bc=el.getAttribute('data-bc'); if(!bc)return;
-    try{
-      new QRCode(el,{text:bc,width:25,height:25,
-        colorDark:'#000',colorLight:'#fff',
-        correctLevel:QRCode.CorrectLevel.M});
-    }catch(e){}
-  });
-};
-<\/script>
-</body></html>`;
-}
-
-// ── QRシール印刷（棚卸タブ）──
-function bcpPrint(startPos){
-  const items=[];
-  _bcpFiltered.forEach((p,i)=>{
-    const chk=document.getElementById('bcpchk_'+i);
-    if(!chk||!chk.checked||!(p.barcode||'').trim()) return;
-    const qty=parseInt((document.getElementById('bcpqty_'+i)||{}).value||1);
-    for(let q=0;q<qty;q++) items.push({name:p.name,price:p.price,barcode:p.barcode,bc:p.bc});
-  });
-  if(!items.length){alert('印刷する商品を選択してください');return;}
-  const html=buildQrLabelHtml(items, startPos||1);
-  const win=window.open('','_blank','width=960,height=760');
-  win.document.write(html);
-  win.document.close();
-}
-
 // ── QRシール印刷（入荷タブ）──
 function nkPrintLabels(startPos){
   const prods=nkGetProducts();
@@ -4976,7 +4854,7 @@ function nkPrintLabels(startPos){
     for(let i=0;i<qty;i++) items.push({name:p.name,price:p.price,barcode:p.barcode});
   });
   if(!items.length){alert('印刷する商品を選択してください');return;}
-  const html=buildQrLabelHtml(items, startPos||1);
+  const html=bcpBuildLabelHtml(items, startPos||1);
   const win=window.open('','_blank','width=960,height=760');
   win.document.write(html);
   win.document.close();
