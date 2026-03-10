@@ -4949,7 +4949,7 @@ function bcpBuildLabelHtml(items, startPos){
       const pr=p.price?('\u00a5'+Number(p.price).toLocaleString()):'';
       const bc=String(p.barcode||'').replace(/[^0-9A-Za-z\-\.\ \$\/\+\%]/g,'');
       cells+=
-        '<div class="lbl" style="left:'+left+'mm;top:'+top+'mm;">' +
+        '<div class="lbl" style="left:'+left+'mm;top:'+top+'mm;" data-bx="'+left+'" data-by="'+top+'">' +
           '<div class="lbl-info">' +
             '<div class="lbl-nm">'+nm+'</div>' +
             '<div class="lbl-pr">'+pr+'</div>' +
@@ -5187,10 +5187,18 @@ function _syncDisplay(){
 }
 
 function _applyStyle(){
+  // 倍率: sheetのzoomで対応（印刷時も効く）
   document.querySelectorAll('.sheet').forEach(function(sh){
-    sh.style.marginLeft = _adjX+'mm';
-    sh.style.marginTop  = _adjY+'mm';
-    sh.style.zoom       = _adjS;
+    sh.style.zoom = _adjS;
+    sh.style.marginLeft = '';
+    sh.style.marginTop  = '';
+  });
+  // 左右・上下: 各ラベルのleft/topを直接ずらす（印刷時も確実に反映）
+  document.querySelectorAll('.lbl').forEach(function(el){
+    var bx = parseFloat(el.getAttribute('data-bx'))||0;
+    var by = parseFloat(el.getAttribute('data-by'))||0;
+    el.style.left = (bx + _adjX) + 'mm';
+    el.style.top  = (by + _adjY) + 'mm';
   });
 }
 <\/script>
