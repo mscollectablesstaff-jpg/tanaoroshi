@@ -5056,7 +5056,14 @@ async function bcpGeneratePdf(startPos){
   try{
     await bcpLoadScript('https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js');
     await bcpLoadScript('https://cdnjs.cloudflare.com/ajax/libs/jsbarcode/3.11.5/JsBarcode.all.min.js');
-  }catch(e){alert('ライブラリの読み込みに失敗しました。ネット接続を確認してください。');return;}
+  }catch(e){
+    alert('ライブラリの読み込みに失敗しました。\nインターネット接続を確認してから再度お試しください。\n\nエラー: '+e);
+    return;
+  }
+  if(!window.jspdf||!window.JsBarcode){
+    alert('ライブラリの読み込みが完了していません。少し待ってから再度お試しください。');
+    return;
+  }
 
   const {jsPDF} = window.jspdf;
   const doc = new jsPDF({orientation:'portrait', unit:'mm', format:'a4'});
@@ -5131,14 +5138,11 @@ async function bcpGeneratePdf(startPos){
     slot++;
   }
 
-  // PDFを新タブで開く（ブラウザのPDFビューアから印刷）
+  // PDFを新タブで開く
   const pdfBlob = doc.output('blob');
   const url = URL.createObjectURL(pdfBlob);
-  const a = document.createElement('a');
-  a.href = url;
-  a.download = 'バーコードラベル_'+new Date().toISOString().slice(0,10)+'.pdf';
-  a.click();
-  toast('✅ PDFをダウンロードしました。「余白なし・倍率100%」で印刷してください。');
+  window.open(url, '_blank');
+  toast('✅ PDFを新しいタブで開きました。「余白なし・倍率100%」で印刷してください。');
 }
 
 function bcpPrint(startPos){
