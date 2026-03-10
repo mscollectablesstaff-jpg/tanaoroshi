@@ -4074,10 +4074,15 @@ function renderTable(){
         <input type="checkbox" class="row-chk" data-ri="${ri}" onchange="onRowCheck()" style="cursor:pointer;width:14px;height:14px">
       </td>
       <td class="sticky-col sticky-del" style="text-align:center;padding:2px">
-        <button class="del-btn" onclick="delRow('${curKey}',${ri})" title="この行を削除">✕</button>
-        ${order.length>1?`<button onclick="openMoveRowModal('${curKey}',${ri})" title="別ページへ移動" style="display:inline-block;margin-top:1px;background:#e8f0fb;color:#1a4a8a;border:none;border-radius:3px;font-size:9px;cursor:pointer;padding:1px 3px;font-family:inherit;line-height:1.2">↗</button>`:''}
+        ${r.bc
+          ? `<button class="del-btn" disabled title="バーコード発番済みのため削除できません" style="opacity:.3;cursor:not-allowed">🔒</button>`
+          : `<button class="del-btn" onclick="delRow('${curKey}',${ri})" title="この行を削除">✕</button>`}
+        ${order.length>1&&!r.bc?`<button onclick="openMoveRowModal('${curKey}',${ri})" title="別ページへ移動" style="display:inline-block;margin-top:1px;background:#e8f0fb;color:#1a4a8a;border:none;border-radius:3px;font-size:9px;cursor:pointer;padding:1px 3px;font-family:inherit;line-height:1.2">↗</button>`:''}
       </td>
-      <td class="sticky-col sticky-name"><input class="ci" value="${e(r.n)}" ${d} onchange="upd('${curKey}',${ri},'n',this.value)" placeholder="商品名"></td>
+      <td class="sticky-col sticky-name">${r.bc
+        ? `<div style="display:flex;align-items:center;gap:4px"><span style="font-size:10px;color:#1a7a4a" title="バーコード発番済みのため変更できません">🔒</span><input class="ci" value="${e(r.n)}" readonly style="background:#f5fff8;color:#0f2744;cursor:default;border-color:#b8dfc8" title="バーコード発番済みのため変更できません"></div>`
+        : `<input class="ci" value="${e(r.n)}" ${d} onchange="upd('${curKey}',${ri},'n',this.value)" placeholder="商品名">`
+      }</td>
       <td><select class="ci c" ${d} onchange="upd('${curKey}',${ri},'z',this.value)">
         <option value="10"${r.z==='10'?' selected':''}>10%</option>
         <option value="8"${r.z==='8'?' selected':''}>8%</option>
@@ -4428,17 +4433,99 @@ function renderAirTable(){
   document.getElementById('airBody').innerHTML=prods.length?prods.map((p,i)=>{
     const c=calc(p), tl=p.z==='8'?'<span class="tax8b">軽減8%</span>':'<span class="tax10b">標準10%</span>';
     const cat = p.catName ? `<span style="font-weight:600;color:#FF6600">${e(p.catName)}</span>${p.cat?`<span style="font-size:10px;color:#aaa;margin-left:4px">ID:${p.cat}</span>`:'<span style="font-size:10px;color:#e74c3c;margin-left:4px">⚠️ID未設定</span>'}` : '<span style="color:#aaa">未設定</span>';
+    const bc=e(p.bc||'').trim();
+    const bcCell = bc
+      ? `<span style="display:inline-flex;align-items:center;gap:4px;background:#e8f5e9;border:1px solid #a5d6b0;border-radius:4px;padding:2px 7px;font-family:monospace;font-size:12px;font-weight:700;color:#1a5c2e">🔒 ${bc}</span>`
+      : `<span style="color:#e74c3c;font-size:11px;font-weight:600">⚠️ 未発番</span>`;
+    const nameLocked = bc
+      ? `<span style="display:inline-flex;align-items:center;gap:3px;font-weight:600;color:#0f2744"><span style="font-size:10px;color:#888">🔒</span>${e(p.n)}</span>`
+      : `<span style="font-weight:600;color:#0f2744">${e(p.n)}</span>`;
     return `<tr>
-      <td class="chkcol"><input type="checkbox" id="ac${i}" checked style="width:15px;height:15px;cursor:pointer;accent-color:#FF6600"></td>
-      <td style="font-weight:600;color:#0f2744">${e(p.n)}</td>
+      <td class="chkcol"><input type="checkbox" id="ac${i}" ${bc?'checked':''} style="width:15px;height:15px;cursor:pointer;accent-color:#FF6600" ${!bc?'title="バーコード未発番のため出力には含めることをお勧めしません"':''}></td>
+      <td>${nameLocked}</td>
       <td style="font-size:11px">${cat}</td><td>${tl}</td>
       <td><span class="aprice">¥${fm(c.p)||0}</span><br><span style="font-size:10px;color:#6b7a8d">内税</span></td>
       <td style="color:#1a7a4a">¥${fm(parseFloat(p.st))||0}</td>
       <td style="text-align:center;background:#e8f5e9;font-weight:700;color:#1a5c2e">${Math.floor(parseFloat(p.k)||0)}</td>
-      <td style="font-size:11px;color:#6b7a8d">${e(p.bc)||'-'}</td>
+      <td>${bcCell}</td>
       <td style="font-size:11px">${e(p.b)}</td>
     </tr>`;
   }).join(''):'<tr><td colspan="9" style="text-align:center;padding:24px;color:#6b7a8d">棚卸入力タブで商品を入力してください</td></tr>';
+}
+
+// Airレジ CSV ダウンロード
+function dlAir(){
+  const prods=getProds();
+  if(!prods.length){alert('商品がありません');return;}
+  const selected=prods.filter((_,i)=>{const cb=document.getElementById('ac'+i);return cb?cb.checked:true;});
+  if(!selected.length){alert('出力対象の商品にチェックを入れてください');return;}
+  // Airレジ 商品登録CSVフォーマット
+  const header='商品コード,商品名,価格,税種別,カテゴリーID,バーコード,単位';
+  const rows=selected.map(p=>{
+    const c=calc(p);
+    const taxType=p.z==='8'?'軽減税率対象':'通常税率';
+    const bc=(p.bc||'').trim();
+    return [
+      bc||'',                                          // 商品コード＝バーコード番号
+      '"'+(p.n||'').replace(/"/g,'""')+'"',            // 商品名
+      c.p||p.p||'',                                    // 税込価格
+      taxType,
+      p.cat||'',                                       // カテゴリーID
+      bc,                                              // バーコード
+      p.u||''                                          // 単位
+    ].join(',');
+  });
+  const csv='\uFEFF'+[header,...rows].join('\r\n');
+  const blob=new Blob([csv],{type:'text/csv;charset=utf-8'});
+  const a=document.createElement('a');
+  a.href=URL.createObjectURL(blob);
+  a.download='Airレジ商品登録_'+new Date().toISOString().slice(0,10)+'.csv';
+  a.click();
+  toast('✅ '+selected.length+'件をCSVでダウンロードしました');
+}
+
+// 在庫数テーブル（スタブ）
+function renderZTable(){
+  const el=document.getElementById('zBody'); if(!el)return;
+  const prods=getProds();
+  el.innerHTML=prods.length?prods.map((p,i)=>{
+    const bc=(p.bc||'').trim();
+    const match=bc?`<span style="color:#1a7a4a;font-weight:700">🔒 BC一致</span>`:'<span style="color:#aaa;font-size:11px">バーコードなし</span>';
+    return `<tr>
+      <td class="chkcol"><input type="checkbox" id="zc${i}" ${bc?'checked':''} style="width:15px;height:15px;cursor:pointer;accent-color:#1a7a4a"></td>
+      <td style="font-weight:600;color:#0f2744">${e(p.n)}</td>
+      <td style="color:#888;font-size:11px">-</td>
+      <td style="text-align:center;background:#e8f5e9;font-weight:700;color:#1a5c2e">${Math.floor(parseFloat(p.k)||0)}</td>
+      <td style="font-size:11px">上書き</td>
+      <td style="font-family:monospace;font-size:11px;color:#1a5c2e">${bc||'-'}</td>
+      <td>${match}</td>
+    </tr>`;
+  }).join(''):'<tr><td colspan="7" style="text-align:center;padding:24px;color:#6b7a8d">棚卸入力タブで商品を入力してください</td></tr>';
+}
+
+// 在庫数CSVダウンロード
+function dlZaiko(){
+  const prods=getProds();
+  if(!prods.length){alert('商品がありません');return;}
+  const selected=prods.filter((_,i)=>{const cb=document.getElementById('zc'+i);return cb?cb.checked:true;});
+  if(!selected.length){alert('出力対象の商品を選択してください');return;}
+  const header='商品コード,商品名,バリエーション,在庫数,更新種別';
+  const rows=selected.map(p=>{
+    const bc=(p.bc||'').trim();
+    return [bc||'','"'+(p.n||'').replace(/"/g,'""')+'"','',Math.floor(parseFloat(p.k)||0),'上書き'].join(',');
+  });
+  const csv='\uFEFF'+[header,...rows].join('\r\n');
+  const blob=new Blob([csv],{type:'text/csv;charset=utf-8'});
+  const a=document.createElement('a');
+  a.href=URL.createObjectURL(blob);
+  a.download='Airレジ在庫数_'+new Date().toISOString().slice(0,10)+'.csv';
+  a.click();
+  toast('✅ '+selected.length+'件の在庫CSVをダウンロードしました');
+}
+
+// カテゴリー割り当て（スタブ）
+function renderCatAssign(){
+  // CSVアップロード後に catAssignBox を表示する処理用（現在はスタブ）
 }
 
 function getProds(){
