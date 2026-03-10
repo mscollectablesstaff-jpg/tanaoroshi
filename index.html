@@ -1754,7 +1754,7 @@ svg.trend-chart text{font-family:inherit}
         <!-- フィルター行 -->
         <div style="display:flex;gap:10px;flex-wrap:wrap;margin-bottom:12px;align-items:flex-end">
           <div style="flex:1;min-width:140px">
-            <div style="font-size:11px;font-weight:700;color:#6b7a8d;margin-bottom:4px">カテゴリーで絞り込み</div>
+            <div style="font-size:11px;font-weight:700;color:#6b7a8d;margin-bottom:4px">カテゴリー／ページで絞り込み</div>
             <select id="bcpCatFilter" onchange="bcpFilter()"
               style="width:100%;padding:8px 10px;border:1px solid #dde3ea;border-radius:6px;font-size:13px;background:#fff;font-family:inherit">
               <option value="">すべてのカテゴリー</option>
@@ -1879,6 +1879,67 @@ function mkRows(){
 // ============================================================
 // 画面切替
 // ============================================================
+
+// ============================================================
+// 行の別ページ移動
+// ============================================================
+let _moveRowSrcKey=null, _moveRowSrcRi=null;
+
+function openMoveRowModal(srcKey, ri){
+  _moveRowSrcKey=srcKey; _moveRowSrcRi=ri;
+  const r=(pages[srcKey]?.rows||[])[ri];
+  if(!r) return;
+  document.getElementById('moveRowName').textContent=(r.n||'（商品名未入力）')+(r.p?' ¥'+Number(r.p).toLocaleString():'');
+  const list=document.getElementById('moveRowPageList');
+  list.innerHTML='';
+  order.forEach(k=>{
+    if(k===srcKey) return; // 同じページは除外
+    const pg=pages[k]||{};
+    const label=pg.tanto||pg.ownerName||k.slice(-4);
+    const btn=document.createElement('button');
+    btn.textContent='→ '+label+'ページ';
+    btn.style.cssText='width:100%;padding:11px 14px;background:#f0f4fa;border:1.5px solid #dde3ea;border-radius:8px;font-size:13px;font-weight:700;cursor:pointer;font-family:inherit;text-align:left;color:#0f2744;transition:.15s';
+    btn.onmouseover=()=>{ btn.style.background='#e8f4ff'; btn.style.borderColor='#1a6ea6'; };
+    btn.onmouseout=()=>{ btn.style.background='#f0f4fa'; btn.style.borderColor='#dde3ea'; };
+    btn.onclick=()=>doMoveRow(k);
+    list.appendChild(btn);
+  });
+  if(!list.children.length){
+    list.innerHTML='<div style="color:#888;font-size:12px;padding:10px">移動先のページがありません</div>';
+  }
+  document.getElementById('moveRowModal').style.display='flex';
+}
+
+function closeMoveRowModal(){
+  document.getElementById('moveRowModal').style.display='none';
+  _moveRowSrcKey=null; _moveRowSrcRi=null;
+}
+
+function doMoveRow(destKey){
+  if(!_moveRowSrcKey||_moveRowSrcRi===null) return;
+  const srcRows=pages[_moveRowSrcKey]?.rows||[];
+  const row=srcRows[_moveRowSrcRi];
+  if(!row){ closeMoveRowModal(); return; }
+
+  // 移動元から削除
+  srcRows.splice(_moveRowSrcRi, 1);
+  pages[_moveRowSrcKey].rows=srcRows;
+
+  // 移動先に追加
+  if(!pages[destKey].rows) pages[destKey].rows=[];
+  pages[destKey].rows.push(row);
+
+  // Firebase同期
+  if(!offline&&db&&sid){
+    db.ref('s/'+sid+'/pages/'+_moveRowSrcKey+'/rows').set(srcRows);
+    db.ref('s/'+sid+'/pages/'+destKey+'/rows').set(pages[destKey].rows);
+  }
+
+  const destLabel=pages[destKey]?.tanto||pages[destKey]?.ownerName||destKey.slice(-4);
+  closeMoveRowModal();
+  renderAll();
+  alert('✅ 「'+(row.n||'商品')+'」を「'+destLabel+'ページ」に移動しました');
+}
 
 // ============================================================
 // CSVデータ復元（商品マスタ初期データ）
@@ -3907,7 +3968,10 @@ function renderTable(){
     h+=`<tr data-ri="${ri}" draggable="true">
       <td class="drag-handle sticky-col sticky-drag" title="ドラッグして並び替え">⠿</td>
       <td class="noc sticky-col sticky-no">${ri+1}</td>
-      <td class="sticky-col sticky-del" style="text-align:center;padding:2px"><button class="del-btn" onclick="delRow('${curKey}',${ri})" title="この行を削除">✕</button></td>
+      <td class="sticky-col sticky-del" style="text-align:center;padding:2px">
+        <button class="del-btn" onclick="delRow('${curKey}',${ri})" title="この行を削除">✕</button>
+        ${order.length>1?`<button onclick="openMoveRowModal('${curKey}',${ri})" title="別ページへ移動" style="display:block;margin-top:2px;width:100%;background:#e8f0fb;color:#1a4a8a;border:none;border-radius:3px;font-size:10px;cursor:pointer;padding:1px 0;font-family:inherit">↗移動</button>`:''}
+      </td>
       <td class="sticky-col sticky-name"><input class="ci" value="${e(r.n)}" ${d} onchange="upd('${curKey}',${ri},'n',this.value)" placeholder="商品名"></td>
       <td><select class="ci c" ${d} onchange="upd('${curKey}',${ri},'z',this.value)">
         <option value="10"${r.z==='10'?' selected':''}>10%</option>
@@ -4458,24 +4522,44 @@ function bcpGetAllSources(){
 function bcpRender(){
   const catSel=document.getElementById('bcpCatFilter');
   const prevCat=catSel.value;
-  // 棚卸セッションのページ名（tanto）をドロップダウンに表示
-  catSel.innerHTML='<option value="">すべてのページ</option>';
+
+  // カテゴリー一覧をマスタ商品から収集
+  const cats=new Map(); // catId/catName → label
+  bcpGetAllSources().forEach(p=>{
+    const cat=(p.category||p.catId||'').trim();
+    if(cat && !cats.has(cat)) cats.set(cat, cat);
+  });
+  // セッションページ名も追加（ページ名で絞りたい場合のため）
   order.forEach(k=>{
     const pg=pages[k]||{};
     const label=pg.tanto||'';
-    if(!label) return;
+    if(label && !cats.has('__page__'+label)) cats.set('__page__'+label, '📋 '+label);
+  });
+
+  catSel.innerHTML='<option value="">すべて表示</option>';
+  cats.forEach((label,key)=>{
     const o=document.createElement('option');
-    o.value=label; o.textContent=label; catSel.appendChild(o);
+    o.value=key; o.textContent=label; catSel.appendChild(o);
   });
   if(catSel.querySelector('option[value="'+prevCat+'"]')) catSel.value=prevCat;
   bcpFilter();
 }
 
 function bcpFilter(){
-  const page=document.getElementById('bcpCatFilter').value;
+  const sel=(document.getElementById('bcpCatFilter').value||'').trim();
   const kw=(document.getElementById('bcpSearch').value||'').trim().toLowerCase();
   _bcpFiltered=bcpGetAllSources().filter(p=>{
-    if(page && (p._pageLabel||'')!==page) return false;
+    if(sel){
+      if(sel.startsWith('__page__')){
+        // ページ名フィルタ
+        const pageName=sel.replace('__page__','');
+        if((p._pageLabel||'')!==pageName) return false;
+      } else {
+        // カテゴリーフィルタ
+        const pCat=(p.category||p.catId||'').trim();
+        if(pCat!==sel) return false;
+      }
+    }
     if(kw&&!(p.name||'').toLowerCase().includes(kw)) return false;
     return true;
   });
@@ -4857,5 +4941,20 @@ document.addEventListener('DOMContentLoaded', function(){
           </div>
         </div>
       </div>
+
+<!-- ★ 行移動モーダル ★ -->
+<div id="moveRowModal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.6);z-index:9300;align-items:center;justify-content:center">
+  <div style="background:#fff;border-radius:16px;width:min(95vw,420px);box-shadow:0 8px 40px rgba(0,0,0,.4);overflow:hidden">
+    <div style="background:#0f2744;color:#fff;padding:14px 18px;display:flex;align-items:center;justify-content:space-between">
+      <span style="font-size:15px;font-weight:700">↗ 行を別ページへ移動</span>
+      <button onclick="closeMoveRowModal()" style="background:rgba(255,255,255,.15);color:#fff;border:none;border-radius:6px;padding:6px 12px;font-size:13px;cursor:pointer;font-family:inherit">✕</button>
+    </div>
+    <div style="padding:16px 18px">
+      <div id="moveRowName" style="font-size:13px;font-weight:700;color:#0f2744;background:#f0f4fa;padding:8px 12px;border-radius:8px;margin-bottom:14px;word-break:break-all"></div>
+      <div style="font-size:12px;color:#666;margin-bottom:8px">移動先のページを選んでください</div>
+      <div id="moveRowPageList" style="display:flex;flex-direction:column;gap:6px;max-height:300px;overflow-y:auto"></div>
+    </div>
+  </div>
+</div>
 
 </body></html>
