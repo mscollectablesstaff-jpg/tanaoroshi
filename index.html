@@ -3679,6 +3679,7 @@ function allTot(){
   return {t10,t8,tz};
 }
 function fm(n){if(!n&&n!==0)return '';return Math.round(n).toLocaleString('ja-JP');}
+function e(s){return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');}
 function fy(n){return '¥'+(n?fm(n):'0');}
 
 // ============================================================
