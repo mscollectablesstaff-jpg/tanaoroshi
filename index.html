@@ -1821,6 +1821,7 @@ svg.trend-chart text{font-family:inherit}
             <button onclick="bcpSelectAllGlobal(true)" style="padding:6px 12px;background:#f0f2f5;border:1px solid #dde3ea;border-radius:6px;font-size:12px;font-weight:700;cursor:pointer;font-family:inherit">全選択</button>
             <button onclick="bcpSelectAllGlobal(false)" style="padding:6px 12px;background:#f0f2f5;border:1px solid #dde3ea;border-radius:6px;font-size:12px;font-weight:700;cursor:pointer;font-family:inherit">全解除</button>
             <span id="bcpSelectedCount" style="font-size:12px;color:#6b7a8d;min-width:64px;text-align:right"></span>
+            <button onclick="bcpExportLabelCsv()" style="padding:8px 16px;background:#0f6699;color:#fff;border:none;border-radius:6px;font-size:13px;font-weight:700;cursor:pointer;font-family:inherit" title="ラベル屋さんに読み込むCSVをダウンロード">📥 ラベル屋さん用CSV</button>
             <button onclick="bcpOpenPicker()" style="padding:8px 16px;background:#1a4a2e;color:#fff;border:none;border-radius:6px;font-size:13px;font-weight:700;cursor:pointer;font-family:inherit">📍 開始位置を選んで印刷</button>
           </div>
         </div>
@@ -1836,7 +1837,7 @@ svg.trend-chart text{font-family:inherit}
         <div style="display:flex;gap:8px;justify-content:flex-end;align-items:center">
           <span style="font-size:12px;color:#6b7a8d">開始位置: <b id="bcpPickerPosLabel">1番</b></span>
           <button onclick="bcpClosePicker()" style="padding:8px 16px;background:#f0f2f5;border:1px solid #dde3ea;border-radius:6px;font-size:13px;cursor:pointer;font-family:inherit">キャンセル</button>
-          <button onclick="bcpDoPrint()" style="padding:8px 20px;background:#1a4a2e;color:#fff;border:none;border-radius:6px;font-size:13px;font-weight:700;cursor:pointer;font-family:inherit">🖨 この位置から印刷</button>
+          <button onclick="bcpDoPrint()" style="padding:8px 20px;background:#1a4a2e;color:#fff;border:none;border-radius:6px;font-size:13px;font-weight:700;cursor:pointer;font-family:inherit">📄 PDFを生成して印刷</button>
         </div>
       </div>
 
@@ -4932,6 +4933,35 @@ function bcpUpdateCount(){
 
 
 
+// ─── ラベル屋さん用CSV出力 ────────────────────────────────────
+// A-one 31397（20mm×8mm）用。ラベル屋さんでバーコードフィールドに「バーコード」列を割り当てて使用。
+function bcpExportLabelCsv(){
+  if(!_bcpSelectedItems.size){ alert('印刷する商品にチェックを入れてください。'); return; }
+  const pages = bcpGetPagedData();
+  const rows = [];
+  pages.forEach(pg => {
+    pg.items.forEach(item => {
+      if(!_bcpSelectedItems.has(item.id)) return;
+      if(!item.barcode) return; // バーコードなしはスキップ
+      const price = item.price ? '¥'+Number(item.price).toLocaleString() : '';
+      rows.push([
+        '"'+String(item.name ||'').replace(/"/g,'""')+'"',
+        '"'+price+'"',
+        '"'+String(item.barcode||'').replace(/"/g,'""')+'"'
+      ].join(','));
+    });
+  });
+  if(!rows.length){ alert('バーコード発番済みの商品がありません。\n先に「発番」を行ってください。'); return; }
+  // ヘッダーはラベル屋さんのフィールド名に合わせる（テンプレート側で「バーコード」列を Code128 に割り当て）
+  const csv = '\uFEFF' + ['商品名,価格,バーコード', ...rows].join('\r\n');
+  const blob = new Blob([csv], {type:'text/csv;charset=utf-8'});
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  a.download = 'ラベル屋さん用_' + new Date().toISOString().slice(0,10) + '.csv';
+  a.click();
+  toast('✅ '+rows.length+'件のCSVをダウンロードしました。ラベル屋さんで読み込んでください。');
+}
+
 // ─── ピッカー ──────────────────────────────────────────────
 
 function bcpOpenPicker(){
@@ -4978,12 +5008,33 @@ function bcpClosePicker(){
 
 function bcpDoPrint(){
   bcpClosePicker();
-  bcpPrint(_bcpStartPos);
+  bcpGeneratePdf(_bcpStartPos);
 }
 
-// ─── 印刷HTML生成 ──────────────────────────────────────────
+// ─── PDF生成（jsPDF + JsBarcode） ─────────────────────────────
+// A-one 31397: 20mm×8mm、8列×25行=200面
+// 左余白:8.0mm 上余白:9.0mm 列ピッチ:24.86mm 行ピッチ:11.33mm
+const LABEL_COLS   = 8;
+const LABEL_ROWS   = 25;
+const LABEL_W      = 20;    // mm
+const LABEL_H      = 8;     // mm
+const LABEL_LEFT   = 8.0;   // mm
+const LABEL_TOP    = 9.0;   // mm
+const LABEL_PITCH_X= 24.86; // mm
+const LABEL_PITCH_Y= 11.33; // mm
+const LABELS_PER_SHEET = LABEL_COLS * LABEL_ROWS; // 200
 
-function bcpPrint(startPos){
+function bcpLoadScript(url){
+  return new Promise((resolve,reject)=>{
+    if(document.querySelector('script[src="'+url+'"]')){resolve();return;}
+    const s=document.createElement('script');
+    s.src=url; s.onload=resolve; s.onerror=reject;
+    document.head.appendChild(s);
+  });
+}
+
+async function bcpGeneratePdf(startPos){
+  // 対象アイテム収集
   const data=bcpGetPagedData();
   const idToItem={};
   data.forEach(pg=>{
@@ -4998,11 +5049,103 @@ function bcpPrint(startPos){
     if(item&&item.barcode) items.push({name:item.name,price:item.price,barcode:item.barcode});
   });
   if(!items.length){alert('印刷する商品を選択してください');return;}
-  const html=bcpBuildLabelHtml(items,startPos||1);
-  const win=window.open('','_blank','width=960,height=760');
-  win.document.write(html);
-  win.document.close();
+
+  toast('📄 PDF生成中…');
+
+  // ライブラリ読み込み
+  try{
+    await bcpLoadScript('https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js');
+    await bcpLoadScript('https://cdnjs.cloudflare.com/ajax/libs/jsbarcode/3.11.5/JsBarcode.all.min.js');
+  }catch(e){alert('ライブラリの読み込みに失敗しました。ネット接続を確認してください。');return;}
+
+  const {jsPDF} = window.jspdf;
+  const doc = new jsPDF({orientation:'portrait', unit:'mm', format:'a4'});
+
+  // offscreen canvas（バーコード描画用）
+  const canvas = document.createElement('canvas');
+  const ctx = canvas.getContext('2d');
+  // 1mm = 約11.81px @ 300dpi相当
+  const DPI = 300;
+  const MM2PX = DPI / 25.4;
+  canvas.width  = Math.ceil(LABEL_W  * MM2PX);
+  canvas.height = Math.ceil(LABEL_H  * MM2PX);
+
+  const pos0 = (startPos||1) - 1; // 0-indexed開始位置
+  let slot = pos0; // 現シート上の位置(0〜199)
+  let pageAdded = false;
+
+  for(let i=0;i<items.length;i++){
+    const it = items[i];
+    if(slot >= LABELS_PER_SHEET){
+      doc.addPage();
+      slot = 0;
+    }
+    const col = slot % LABEL_COLS;
+    const row = Math.floor(slot / LABEL_COLS);
+    const lx = LABEL_LEFT + col * LABEL_PITCH_X; // mm
+    const ly = LABEL_TOP  + row * LABEL_PITCH_Y; // mm
+
+    // バーコード → canvas → PDF画像
+    ctx.clearRect(0,0,canvas.width,canvas.height);
+    ctx.fillStyle='#fff';
+    ctx.fillRect(0,0,canvas.width,canvas.height);
+
+    // 商品名（上段）
+    const nameFontPx = Math.round(3.2 * MM2PX / 2.835); // 3.2pt → px
+    ctx.font = `${nameFontPx}px sans-serif`;
+    ctx.fillStyle='#000';
+    const nameY = Math.round(2.0 * MM2PX);
+    // 省略処理
+    let nameStr = it.name||'';
+    const maxW = canvas.width - 4;
+    while(nameStr.length>1 && ctx.measureText(nameStr).width>maxW) nameStr=nameStr.slice(0,-1);
+    if(nameStr!==it.name) nameStr+='…';
+    ctx.fillText(nameStr, 2, nameY);
+
+    // 価格（上段右）
+    if(it.price){
+      const priceFontPx = Math.round(5.5 * MM2PX / 2.835);
+      ctx.font = `bold ${priceFontPx}px sans-serif`;
+      const priceStr = '¥'+Number(it.price).toLocaleString();
+      const pw = ctx.measureText(priceStr).width;
+      ctx.fillText(priceStr, canvas.width - pw - 2, Math.round(3.4*MM2PX));
+    }
+
+    // バーコード（下段）
+    try{
+      const bcCanvas = document.createElement('canvas');
+      JsBarcode(bcCanvas, it.barcode, {
+        format:'CODE128', displayValue:false,
+        width:2, height:Math.round(3.6*MM2PX), margin:0
+      });
+      // バーコードをcanvasに貼り付け
+      const bcH = Math.round(3.8*MM2PX);
+      const bcY = Math.round(4.0*MM2PX);
+      ctx.drawImage(bcCanvas, 0, bcY, canvas.width, bcH);
+    }catch(e){}
+
+    // canvasをPDFに貼り付け
+    const imgData = canvas.toDataURL('image/png');
+    doc.addImage(imgData,'PNG', lx, ly, LABEL_W, LABEL_H);
+
+    slot++;
+  }
+
+  // PDFを新タブで開く（ブラウザのPDFビューアから印刷）
+  const pdfBlob = doc.output('blob');
+  const url = URL.createObjectURL(pdfBlob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = 'バーコードラベル_'+new Date().toISOString().slice(0,10)+'.pdf';
+  a.click();
+  toast('✅ PDFをダウンロードしました。「余白なし・倍率100%」で印刷してください。');
 }
+
+function bcpPrint(startPos){
+  // 旧HTML印刷方式（後方互換のため残す）
+  bcpGeneratePdf(startPos);
+}
+
 
 
 // A-one 31397: 20×8mm、8列×25行、左余白8mm、上余白9mm
