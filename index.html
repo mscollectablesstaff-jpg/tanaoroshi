@@ -786,10 +786,12 @@ tbody tr:hover td.sticky-name{background:#e8f0f8}
 /* スクロール影（固定列の右端） */
 .sticky-name::after{box-shadow:4px 0 8px rgba(0,0,0,.08);border-right:1px solid #dde3ea}
 
-.qbar{background:#fff;border-radius:10px;padding:12px 18px;box-shadow:0 1px 4px rgba(0,0,0,.08);display:flex;gap:20px;flex-wrap:wrap;align-items:center}
-.qs{text-align:center}
-.qsl{font-size:10px;color:#6b7a8d;font-weight:700}
-.qsv{font-size:15px;font-weight:700;margin-top:2px}
+.qbar{background:#0f2744;border-radius:10px;padding:14px 18px;box-shadow:0 2px 8px rgba(0,0,0,.18);display:flex;gap:0;flex-wrap:wrap;align-items:stretch;margin-top:4px}
+.qs{text-align:center;flex:1;min-width:110px;padding:6px 10px;border-right:1px solid rgba(255,255,255,.15)}
+.qs:last-of-type{border-right:none}
+.qs:last-of-type{border-right:none}
+.qsl{font-size:10px;color:rgba(255,255,255,.65);font-weight:700;letter-spacing:.03em}
+.qsv{font-size:18px;font-weight:900;margin-top:4px;color:#fff}
 
 .scard{background:#fff;border-radius:10px;padding:22px;box-shadow:0 1px 4px rgba(0,0,0,.08);margin-bottom:14px}
 .scard h2{font-size:16px;color:#0f2744;margin-bottom:14px;padding-bottom:8px;border-bottom:2px solid #1a6ea6}
@@ -1224,7 +1226,7 @@ svg.trend-chart text{font-family:inherit}
 </div>
 
 <!-- ===== SETUP PAGE ===== -->
-<div class="page show" id="pgSetup">
+<div class="page" id="pgSetup">
   <div class="card">
     <div class="card-logo">📋 棚卸 × Airレジ</div>
     <div class="card-sub">複数端末リアルタイム同期システム</div>
@@ -1486,31 +1488,6 @@ svg.trend-chart text{font-family:inherit}
     <!-- 入力パネル -->
     <div class="panel on" id="pnl-entry">
 
-      <!-- バーコードスキャナーバー -->
-      <div id="scanBar" style="display:none;background:#0f2744;padding:10px 14px;border-radius:10px;margin-bottom:10px;display:flex;align-items:center;gap:10px;flex-wrap:wrap">
-        <span style="color:#fff;font-size:13px;font-weight:700;white-space:nowrap">📡 スキャンモード</span>
-        <input id="scanInput" type="text" inputmode="none"
-          placeholder="バーコードをスキャン..."
-          style="flex:1;min-width:180px;padding:9px 14px;border:none;border-radius:7px;font-size:14px;font-family:monospace;font-weight:700;letter-spacing:2px;background:#fff;outline:none"
-          onkeydown="if(event.key==='Enter'){scanBarcode(this.value.trim());this.value='';}"
-          autocomplete="off" autocorrect="off" spellcheck="false">
-        <span id="scanMsg" style="color:#a0e0b0;font-size:12px;min-width:140px"></span>
-        <button onclick="toggleScanMode(false)"
-          style="background:rgba(255,255,255,.15);color:#fff;border:none;border-radius:6px;padding:7px 14px;font-size:12px;font-weight:700;cursor:pointer;font-family:inherit;white-space:nowrap">
-          ✕ 閉じる
-        </button>
-      </div>
-      <!-- スキャン入力ボタン（2択） -->
-      <div id="btnScanArea" style="display:flex;gap:8px;margin-bottom:10px;flex-wrap:wrap">
-        <button id="btnScanMode" onclick="toggleScanMode(true)"
-          style="display:flex;align-items:center;gap:6px;padding:9px 18px;background:#1a3a5c;color:#fff;border:none;border-radius:8px;font-size:13px;font-weight:700;cursor:pointer;font-family:inherit">
-          📡 スキャナーで入力
-        </button>
-        <button onclick="openCameraScanner()"
-          style="display:flex;align-items:center;gap:6px;padding:9px 18px;background:#1a6ea6;color:#fff;border:none;border-radius:8px;font-size:13px;font-weight:700;cursor:pointer;font-family:inherit">
-          📷 カメラでスキャン
-        </button>
-      </div>
 
       <!-- カメラスキャナーモーダル -->
 
@@ -1632,13 +1609,19 @@ svg.trend-chart text{font-family:inherit}
         </div>
       </div>
 
+      <!-- 行追加ボタン -->
+      <button onclick="addRow()"
+        style="display:flex;align-items:center;justify-content:center;gap:6px;width:100%;margin:8px 0 4px;padding:10px;background:#e8f5e9;border:1.5px dashed #2d7a4f;border-radius:8px;color:#1a5c2e;font-size:13px;font-weight:700;cursor:pointer;font-family:inherit">
+        ＋ 行を追加
+      </button>
+
       <div class="qbar">
-        <b style="color:#0f2744">📊 ページ小計</b>
-        <div class="qs"><div class="qsl">10%対象（税抜）</div><div class="qsv" style="color:#1a6ea6" id="q10">¥0</div></div>
-        <div class="qs"><div class="qsl">8%対象（税抜）</div><div class="qsv" style="color:#d4a017" id="q8">¥0</div></div>
-        <div class="qs"><div class="qsl">在庫価格合計</div><div class="qsv" style="color:#1a7a4a" id="qz">¥0</div></div>
-        <div class="qs"><div class="qsl">全ページ税抜総合計</div><div class="qsv" style="color:#0f2744" id="qg">¥0</div></div>
-        <div id="roNote" style="margin-left:auto;font-size:11px"></div>
+        <b style="color:#fff;white-space:nowrap;align-self:center;padding-right:16px;font-size:13px">📊 ページ小計</b>
+        <div class="qs"><div class="qsl">10%対象（税抜）</div><div class="qsv" style="color:#7ecfff" id="q10">¥0</div></div>
+        <div class="qs"><div class="qsl">8%対象（税抜）</div><div class="qsv" style="color:#ffd97d" id="q8">¥0</div></div>
+        <div class="qs"><div class="qsl">在庫価格合計</div><div class="qsv" style="color:#7fffb0" id="qz">¥0</div></div>
+        <div class="qs"><div class="qsl">全ページ税抜総合計</div><div class="qsv" style="color:#fff" id="qg">¥0</div></div>
+        <div id="roNote" style="margin-left:auto;font-size:11px;color:rgba(255,255,255,.5)"></div>
       </div>
     </div>
 
@@ -1896,6 +1879,44 @@ function mkRows(){
 // ============================================================
 // 画面切替
 // ============================================================
+// ============================================================
+// 自動起動（保存済みFirebase設定があれば自動接続）
+// ============================================================
+function autoInit(){
+  try{
+    const saved = localStorage.getItem(FK);
+    if(saved){
+      const cfg = JSON.parse(saved);
+      if(cfg && cfg.databaseURL && cfg.apiKey && cfg.projectId){
+        // 設定あり → Firebase自動接続してセッション画面へ
+        document.getElementById('sDbUrl').value  = cfg.databaseURL;
+        document.getElementById('sApiKey').value = cfg.apiKey;
+        document.getElementById('sProjId').value = cfg.projectId;
+        loadFB(()=>{
+          try{
+            if(!window.firebase) throw new Error('no firebase');
+            if(firebase.apps.length>0){ db=firebase.database(); }
+            else { firebase.initializeApp(cfg); db=firebase.database(); }
+            offline=false;
+            document.getElementById('modeLabel').textContent='🔴 リアルタイム同期モード';
+            syncFromFirebase(()=>{
+              showPage('pgHome');
+              renderRecent();
+              hmUpdateStatus('🟢 Firebase接続済み');
+            });
+          }catch(err){
+            // 接続失敗 → 設定画面を表示
+            showPage('pgSetup');
+          }
+        });
+        return;
+      }
+    }
+  }catch(e){}
+  // 設定なし → Firebase設定画面を表示
+  showPage('pgSetup');
+}
+
 function showPage(id){
   ['pgHome','pgSetup','pgSession','pgApp','pgMstock','pgNyuuka'].forEach(p=>{
     const el=document.getElementById(p);
@@ -3687,6 +3708,57 @@ function fy(n){return '¥'+(n?fm(n):'0');}
 // ============================================================
 function renderAll(){renderPTabs();renderTable();renderQbar();}
 
+function addRow(){
+  if(!curKey||!pages[curKey])return;
+  pages[curKey].rows.push({n:'',z:'10',k:'',u:'',p:'',ss:'',sr:'',st:'',b:'',cat:'',bc:'',pt:'通常'});
+  renderTable(); renderQbar();
+  if(!offline&&db&&sid){
+    db.ref('s/'+sid+'/pages/'+curKey+'/rows').set(pages[curKey].rows);
+  }
+  setTimeout(()=>{
+    const rows=document.querySelectorAll('#tbody tr');
+    if(rows.length) rows[rows.length-1].scrollIntoView({behavior:'smooth',block:'nearest'});
+  },100);
+}
+
+// ============================================================
+// 固定スクロールバー（テーブル横スクロールを画面下部に固定表示）
+// ============================================================
+function initFixedScrollbar(){
+  const tscroll = document.querySelector('.tscroll');
+  const fixed   = document.getElementById('fixedScrollbar');
+  const inner   = document.getElementById('fixedScrollbarInner');
+  if(!tscroll||!fixed||!inner) return;
+
+  // 内部widthをテーブルの実幅に合わせる
+  const table = tscroll.querySelector('table');
+  if(table) inner.style.width = table.scrollWidth + 'px';
+
+  // テーブルエリアが画面下部よりはみ出ているときだけ表示
+  const updateVisibility = () => {
+    const rect = tscroll.getBoundingClientRect();
+    fixed.style.display = (rect.bottom > window.innerHeight && tscroll.scrollWidth > tscroll.clientWidth) ? 'block' : 'none';
+    if(table) inner.style.width = table.scrollWidth + 'px';
+  };
+
+  // スクロール同期（相互）
+  let syncing = false;
+  tscroll.addEventListener('scroll', () => {
+    if(syncing) return; syncing = true;
+    fixed.scrollLeft = tscroll.scrollLeft;
+    syncing = false;
+  });
+  fixed.addEventListener('scroll', () => {
+    if(syncing) return; syncing = true;
+    tscroll.scrollLeft = fixed.scrollLeft;
+    syncing = false;
+  });
+
+  window.addEventListener('scroll', updateVisibility);
+  window.addEventListener('resize', updateVisibility);
+  updateVisibility();
+}
+
 function renderPTabs(){
   const el=document.getElementById('ptabs');if(!el)return;
   let h='';
@@ -4659,6 +4731,11 @@ function nkPrintLabels(startPos){
   win.document.write(html);
   win.document.close();
 }
+
+// ページ読み込み完了時に自動起動
+document.addEventListener('DOMContentLoaded', function(){
+  autoInit();
+});
 
 </script>
 
