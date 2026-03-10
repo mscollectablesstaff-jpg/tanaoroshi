@@ -5,7 +5,649 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>棚卸システム v3</title>
 <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+JP:wght@400;700;900&display=swap" rel="stylesheet">
-<script src="https://cdn.jsdelivr.net/npm/encoding-japanese@2.0.0/encoding.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/encoding-japanese@2.0.0/encoding.min.js">// ============================================================
+// 入荷・商品登録管理
+// ============================================================
+const PK  = 'tb_products_v1';  // 商品マスタ
+const NAK = 'tb_arrivals_v1';  // 入荷履歴
+
+function nkGetProducts(){ try{return JSON.parse(localStorage.getItem(PK)||'[]');}catch(e){return[];} }
+function nkSaveProducts(list){ try{localStorage.setItem(PK,JSON.stringify(list));}catch(e){} }
+
+// ── 使用済みバーコード管理（一度発番した番号は永久に再利用しない） ──
+function getBcUsed(){ try{return new Set(JSON.parse(localStorage.getItem(BK)||'[]'));}catch(e){return new Set();} }
+function addBcUsed(nums){
+  const s=getBcUsed();
+  nums.forEach(n=>s.add(String(n)));
+  try{localStorage.setItem(BK,JSON.stringify([...s]));}catch(e){}
+}
+function nkGetArrivals(){ try{return JSON.parse(localStorage.getItem(NAK)||'[]');}catch(e){return[];} }
+function nkSaveArrivals(list){ try{localStorage.setItem(NAK,JSON.stringify(list.slice(0,500)));}catch(e){} }
+
+// バーコード採番（MS + 6桁ゼロ埋め）
+// ── Claude貼り付けインポート ─────────────────────
+
+function nkCopyPrompt(){
+  const txt=document.getElementById('nkPromptBox').textContent;
+  navigator.clipboard.writeText(txt).then(()=>{
+    toast('プロンプトをコピーしました。Claudeに貼り付けてください');
+  }).catch(()=>{
+    // fallback
+    const ta=document.createElement('textarea');
+    ta.value=txt; document.body.appendChild(ta);
+    ta.select(); document.execCommand('copy'); document.body.removeChild(ta);
+    toast('プロンプトをコピーしました');
+  });
+}
+
+function nkImportPaste(){
+  const raw=(document.getElementById('nkPasteArea').value||'').trim();
+  const status=document.getElementById('nkPasteStatus');
+  status.style.display='none';
+
+  if(!raw){ alert('Claudeの出力テキストを貼り付けてください'); return; }
+
+  const lines=raw.split('\n').map(l=>l.trim()).filter(l=>l&&!l.startsWith('//'));
+  const items=[];
+  const errors=[];
+
+  lines.forEach((line,i)=>{
+    // コードブロック記法や空行を無視
+    if(line.startsWith('```')||line.startsWith('#')||line==='-') return;
+
+    // カンマ区切りでパース（全角カンマも対応）
+    const cols=line.split(/[,，]/).map(c=>c.trim());
+    if(cols.length<2){ errors.push(`行${i+1}: 「${line}」（スキップ）`); return; }
+
+    const name=cols[0].replace(/^["「『]|["」』]$/g,'').trim();
+    if(!name){ errors.push(`行${i+1}: 商品名なし（スキップ）`); return; }
+
+    const qty=parseInt(cols[1])||1;
+    const cost=cols[2]?cols[2].replace(/[¥￥,，\s]/g,''):'';
+    const taxRate=(cols[3]||'').replace(/[^0-9]/g,'');
+    const z=(taxRate==='8')?'8':'10';
+
+    items.push({n:name, z, qty, cost, p:'', u:'点', cat:'', catId:'', bc:'', isNew:true});
+  });
+
+  if(!items.length){
+    status.style.display='block';
+    status.style.color='#e74c3c';
+    status.textContent='❌ 読み込める行がありませんでした。Claudeに指定フォーマットで出力させてください。';
+    return;
+  }
+
+  // 既存の空行をクリアして追加
+  nkArrivalRows=nkArrivalRows.filter(r=>r.n.trim());
+  items.forEach(it=>nkArrivalRows.push(it));
+  if(!nkArrivalRows.length) nkAddRow();
+  nkRenderArrival();
+
+  document.getElementById('nkPasteArea').value='';
+  document.getElementById('nkPasteArea').style.borderColor='#c8d4f0';
+
+  status.style.display='block';
+  status.style.color='#1a7a4a';
+  let msg=`✅ ${items.length}件を読み込みました。内容を確認・修正して保存してください。`;
+  if(errors.length) msg+=`　（${errors.length}行スキップ）`;
+  status.textContent=msg;
+
+  toast(`${items.length}件インポートしました`);
+
+  // 入荷情報カードまでスクロール
+  setTimeout(()=>{
+    const el=document.getElementById('nkTbody');
+    if(el) el.closest('.nk-card').scrollIntoView({behavior:'smooth',block:'start'});
+  },200);
+}
+
+
+
+function nkOcrDrop(ev){
+  ev.preventDefault();
+  document.getElementById('nkOcrDrop').classList.remove('drag-on');
+  const file=ev.dataTransfer.files[0]; if(!file)return;
+  nkOcrLoadFile(file);
+}
+function nkOcrFileSelected(input){
+  const file=input.files[0]; if(!file)return;
+  nkOcrLoadFile(file);
+  // 同じファイルを再選択できるようにリセット
+  input.value='';
+}
+
+function nkOcrLoadFile(file){
+  const allowed=['image/jpeg','image/png','image/webp','image/gif','application/pdf'];
+  if(!allowed.includes(file.type)){alert('JPG/PNG/PDF ファイルを選択してください');return;}
+  const reader=new FileReader();
+  reader.onload=ev=>{
+    const dataUrl=ev.target.result;
+    nkOcrFileData={dataUrl, mediaType:file.type, name:file.name};
+    const pa=document.getElementById('nkOcrPreviewArea');
+    const img=document.getElementById('nkOcrPreviewImg');
+    const pdfDiv=document.getElementById('nkOcrPreviewPdf');
+    pa.style.display='block';
+    if(file.type==='application/pdf'){
+      img.style.display='none';
+      pdfDiv.style.display='block';
+      document.getElementById('nkOcrPdfName').textContent=file.name;
+    } else {
+      img.src=dataUrl; img.style.display='block';
+      pdfDiv.style.display='none';
+    }
+    document.getElementById('nkOcrStatus').style.display='none';
+  };
+  reader.readAsDataURL(file);
+}
+
+// ── Tesseract.js OCR（完全無料・ブラウザ内処理）─────────
+async function nkRunOcr(){
+  if(!nkOcrFileData){alert('写真またはファイルを選択してください');return;}
+
+  // Tesseract.js がロードされているか確認
+  if(typeof Tesseract==='undefined'){
+    alert('OCRライブラリの読み込みに失敗しました。\nページを再読み込み（Ctrl+Shift+R）してから再試行してください。');
+    return;
+  }
+
+  const btn=document.getElementById('nkOcrRunBtn');
+  const status=document.getElementById('nkOcrStatus');
+  btn.disabled=true;
+  status.style.display='block';
+
+  const setMsg=(msg,color)=>{
+    status.style.color=color||'#1a6ea6';
+    status.textContent=msg;
+  };
+
+  try{
+    setMsg('📥 日本語OCRデータを準備中（初回は20秒ほどかかります）...');
+    btn.textContent='⏳ 処理中...';
+
+    // v5の推奨API: Tesseract.recognize() を直接呼ぶ
+    const result = await Tesseract.recognize(
+      nkOcrFileData.dataUrl,
+      'jpn+eng',
+      {
+        logger: m=>{
+          if(m.status==='recognizing text'){
+            const pct=Math.round((m.progress||0)*100);
+            btn.textContent=`⏳ 読み取り中 ${pct}%`;
+            setMsg(`🔍 OCR処理中… ${pct}%`);
+          } else if(m.status==='loading language traineddata'){
+            setMsg('📥 日本語データを読み込み中（初回のみ）...');
+            btn.textContent='⏳ ダウンロード中...';
+          } else if(m.status==='initializing tesseract'){
+            setMsg('⚙️ OCRエンジンを起動中...');
+          }
+        }
+      }
+    );
+
+    const text = result.data.text || '';
+
+    if(!text.trim()) throw new Error('文字が読み取れませんでした。写真をもっと明るく・鮮明に撮り直してください。');
+
+    // OCRテキスト全文を確認用に表示
+    nkShowOcrRaw(text);
+
+    // 商品行を抽出
+    const lines = text.split('\n').map(l=>l.trim()).filter(l=>l.length>1);
+    const items = nkParseOcrLines(lines);
+
+    if(items.length===0){
+      setMsg('⚠️ 商品の自動解析が難しい形式でした。下のOCR生テキストを参考に手動で入力してください。', '#e67e00');
+      btn.textContent='🔍 もう一度読み取る';
+      btn.disabled=false;
+      return;
+    }
+
+    // 商品リストに追加
+    nkArrivalRows=nkArrivalRows.filter(r=>r.n.trim());
+    items.forEach(it=>{
+      nkArrivalRows.push({
+        n:it.name, z:'10', qty:it.qty||1,
+        cost:it.cost||'', p:'', u:it.unit||'点',
+        cat:'', catId:'', bc:'', isNew:true
+      });
+    });
+    if(!nkArrivalRows.length) nkAddRow();
+    nkRenderArrival();
+
+    setMsg(`✅ ${items.length}件を読み取りました。内容を確認・修正してから保存してください。`, '#1a7a4a');
+    btn.textContent='🔍 もう一度読み取る';
+
+  }catch(err){
+    status.style.color='#e74c3c';
+    status.textContent='❌ エラー：'+err.message;
+    btn.textContent='🔍 OCRで読み取る';
+    console.error('OCR error:',err);
+  }
+  btn.disabled=false;
+}
+
+// OCR生テキスト表示エリアを作成・更新
+function nkShowOcrRaw(text){
+  let box=document.getElementById('nkOcrRawBox');
+  if(!box){
+    box=document.createElement('div');
+    box.id='nkOcrRawBox';
+    box.style.cssText='margin-top:12px;border:1px solid #dde3ea;border-radius:6px;overflow:hidden';
+    const header=document.createElement('div');
+    header.style.cssText='background:#f0f2f5;padding:6px 12px;font-size:11px;font-weight:700;color:#6b7a8d;cursor:pointer;display:flex;justify-content:space-between;align-items:center';
+    header.innerHTML='📋 OCR生テキスト（参考）<span style="font-size:10px;color:#1a6ea6">▼ タップで開閉</span>';
+    const pre=document.createElement('pre');
+    pre.id='nkOcrRawPre';
+    pre.style.cssText='margin:0;padding:10px 12px;font-size:10px;line-height:1.6;max-height:160px;overflow-y:auto;background:#fafbfc;white-space:pre-wrap;word-break:break-all;display:none;font-family:monospace';
+    header.onclick=()=>{ pre.style.display=pre.style.display==='none'?'block':'none'; };
+    box.appendChild(header);
+    box.appendChild(pre);
+    document.getElementById('nkOcrStatus').after(box);
+  }
+  document.getElementById('nkOcrRawPre').textContent=text;
+}
+
+// OCRテキストから商品行を抽出するパーサー
+function nkParseOcrLines(lines){
+  const items=[];
+  // 数字（価格・数量っぽい）を含む行を候補にする
+  const numRe=/[\d,，]+/;
+  // 明らかにヘッダーや区切りっぽいキーワード
+  const skipRe=/^(no|№|品番|商品名|商品|品名|数量|単価|金額|合計|小計|税|備考|納品|請求|発行|様|御中|〒|tel|fax|株式会|有限会|合同会)/i;
+
+  lines.forEach(line=>{
+    if(skipRe.test(line)) return;
+    if(!numRe.test(line)) return;
+    if(line.length<3) return;
+
+    // 数字部分を抽出
+    const nums=(line.match(/[\d,，]+/g)||[])
+      .map(n=>parseInt(n.replace(/[,，]/g,''),10))
+      .filter(n=>n>0&&n<10000000);
+
+    // 商品名部分（数字・記号以外）
+    const namePart=line.replace(/[\d,，¥￥\s\|｜\/\\×x\*]+/g,' ').replace(/\s+/g,' ').trim();
+    if(namePart.length<2) return;
+
+    // qty: 小さい数（1〜999）、cost: 大きめの数（100〜）
+    const qty=nums.find(n=>n>=1&&n<=999)||1;
+    const cost=nums.filter(n=>n>=100).sort((a,b)=>a-b)[0]||'';
+
+    items.push({name:namePart, qty, cost:cost||''});
+  });
+
+  return items;
+}
+
+
+
+  const hint=(document.getElementById('nkOcrHint').value||'').trim();
+  const hintText=hint?`\n\n補足指示：${hint}`:'';
+
+  const prompt=`この納品書・請求書・入荷リストから商品情報を読み取り、以下のJSON形式で返してください。
+商品名・数量・仕入単価（税抜き）・税率を読み取れる範囲で抽出してください。
+読み取れない項目はnullにしてください。
+仕入先・会社名がわかれば supplierに入れてください。
+
+出力形式（JSONのみ、説明文なし）：
+{
+  "supplier": "仕入先名またはnull",
+  "date": "YYYY-MM-DD形式またはnull",
+  "items": [
+    {"name": "商品名", "qty": 数量, "cost": 税抜単価または税込単価, "taxRate": "10"または"8", "unit": "単位"}
+  ]
+}${hintText}`;
+
+  try{
+    // PDF は document タイプ、画像は image タイプで送る
+    const contentBlock = nkOcrFileData.mediaType==='application/pdf'
+      ? {type:'document', source:{type:'base64', media_type:'application/pdf', data:nkOcrFileData.base64}}
+      : {type:'image',    source:{type:'base64', media_type:nkOcrFileData.mediaType, data:nkOcrFileData.base64}};
+
+    const resp=await fetch('https://api.anthropic.com/v1/messages',{
+      method:'POST',
+      headers:{
+        'Content-Type':'application/json',
+        'anthropic-dangerous-direct-browser-access':'true'
+      },
+      body:JSON.stringify({
+        model:'claude-sonnet-4-5-20251001',
+        max_tokens:1000,
+        messages:[{role:'user', content:[contentBlock,{type:'text',text:prompt}]}]
+      })
+    });
+    const data=await resp.json();
+    const text=(data.content||[]).map(b=>b.text||'').join('');
+
+    // JSONを抽出してパース
+    const jsonMatch=text.match(/\{[\s\S]*\}/);
+    if(!jsonMatch) throw new Error('JSONが見つかりませんでした');
+    const parsed=JSON.parse(jsonMatch[0]);
+
+    // 仕入先・日付を自動入力
+    if(parsed.supplier){
+      const sup=document.getElementById('nkSupplier');
+      if(sup&&!sup.value) sup.value=parsed.supplier;
+    }
+    if(parsed.date){
+      const dt=document.getElementById('nkDate');
+      if(dt&&!dt.value) dt.value=parsed.date;
+    }
+
+    // 商品リストに追加
+    const items=parsed.items||[];
+    if(!items.length) throw new Error('商品が読み取れませんでした');
+
+    // 既存の空行をクリアして差し替え
+    nkArrivalRows=nkArrivalRows.filter(r=>r.n.trim());
+    items.forEach(it=>{
+      nkArrivalRows.push({
+        n:it.name||'',
+        z:it.taxRate==='8'?'8':'10',
+        qty:it.qty||1,
+        cost:it.cost||'',
+        p:'', u:it.unit||'点',
+        cat:'', catId:'', bc:'', isNew:true
+      });
+    });
+    if(!nkArrivalRows.length) nkAddRow();
+    nkRenderArrival();
+
+    status.textContent=`✅ ${items.length}件の商品を読み取りました。内容を確認・修正してから保存してください。`;
+    status.style.color='#1a7a4a';
+    btn.textContent='🤖 もう一度読み取る';
+  }catch(err){
+    status.textContent='❌ 読み取りエラー：'+err.message;
+    status.style.color='#e74c3c';
+    btn.textContent='🤖 AIで読み取る';
+    console.error(err);
+  }
+  btn.disabled=false;
+}
+
+
+// ページ起動
+function doNyuuka(){
+  showPage('pgNyuuka');
+  document.getElementById('nkDate').value=new Date().toISOString().slice(0,10);
+  nkArrivalRows=[];
+  nkAddRow();
+  nkShowTab('arrival');
+}
+
+// タブ切り替え
+function nkShowTab(name){
+  ['arrival','products','labels','history'].forEach(n=>{
+    const p=document.getElementById('nkpnl-'+n);
+    const t=document.getElementById('nktab-'+n);
+    if(p) p.style.display=(n===name?'block':'none');
+    if(t) t.classList.toggle('on',n===name);
+  });
+  if(name==='products') nkRenderProducts();
+  if(name==='labels')   nkRenderLabelList();
+  if(name==='history')  nkRenderHistory();
+}
+
+// ── 入荷入力 ──────────────────────────────────
+let nkArrivalRows=[];
+
+function nkAddRow(){
+  nkArrivalRows.push({n:'',z:'10',qty:1,cost:'',p:'',u:'点',cat:'',catId:'',bc:'',isNew:true});
+  nkRenderArrival();
+}
+
+function nkRenderArrival(){
+  const tbody=document.getElementById('nkTbody'); if(!tbody)return;
+  tbody.innerHTML=nkArrivalRows.map((r,i)=>`<tr>
+    <td style="text-align:center">
+      <button onclick="nkDelRow(${i})" style="background:none;border:1px solid #e74c3c;color:#e74c3c;border-radius:4px;padding:1px 6px;cursor:pointer;font-size:11px">✕</button>
+    </td>
+    <td style="min-width:150px">
+      <input class="nk-ci" value="${e(r.n)}" placeholder="商品名を入力" style="min-width:140px"
+        oninput="nkArrivalRows[${i}].n=this.value" onblur="nkAutoFill(${i})">
+    </td>
+    <td><select class="nk-ci" onchange="nkArrivalRows[${i}].z=this.value">
+      <option value="10"${r.z==='10'?' selected':''}>10%</option>
+      <option value="8"${r.z==='8'?' selected':''}>8%</option>
+    </select></td>
+    <td><input class="nk-ci" type="number" min="1" value="${r.qty}"
+      oninput="nkArrivalRows[${i}].qty=this.value" style="text-align:right"></td>
+    <td><input class="nk-ci" type="number" value="${r.cost}" placeholder="原価"
+      oninput="nkArrivalRows[${i}].cost=this.value" style="text-align:right"></td>
+    <td style="background:#e8faf0">
+      <input class="nk-ci" type="number" value="${r.p}" placeholder="売価"
+        oninput="nkArrivalRows[${i}].p=this.value" style="text-align:right;font-weight:700;color:#1a5c2e">
+    </td>
+    <td><input class="nk-ci" value="${e(r.u)}" placeholder="点"
+      oninput="nkArrivalRows[${i}].u=this.value" style="width:50px"></td>
+    <td><select class="nk-ci" style="color:${r.catId?'#FF6600':'#888'};font-weight:${r.catId?'700':'400'}"
+      onchange="nkArrivalRows[${i}].catId=this.value;nkArrivalRows[${i}].cat=(CATS.find(c=>c.id===this.value)||{}).l||'';this.style.color=this.value?'#FF6600':'#888';this.style.fontWeight=this.value?'700':'400'">
+      ${CATS.map(c=>`<option value="${e(c.id)}"${r.catId===c.id?' selected':''}>${e(c.l)}</option>`).join('')}
+    </select></td>
+    <td><input class="nk-ci" value="${e(r.catId)}" placeholder="ID" style="width:70px;font-size:11px"
+      oninput="nkArrivalRows[${i}].catId=this.value"></td>
+    <td style="text-align:center">
+      ${r.bc
+        ?`<span style="font-family:monospace;font-size:10px;font-weight:700;background:#e8f5e9;color:#1a5c2e;padding:3px 6px;border-radius:4px">${e(r.bc)}</span>`
+        :`<span style="font-size:10px;color:#aab">保存時発行</span>`}
+    </td>
+  </tr>`).join('');
+}
+
+function nkDelRow(i){
+  nkArrivalRows.splice(i,1);
+  if(!nkArrivalRows.length) nkAddRow();
+  else nkRenderArrival();
+}
+
+// 既存商品マスタからオートフィル
+function nkAutoFill(i){
+  const name=nkArrivalRows[i].n.trim(); if(!name)return;
+  const found=nkGetProducts().find(p=>p.name===name);
+  if(!found)return;
+  const r=nkArrivalRows[i];
+  if(!r.p)    r.p=found.price||'';
+  if(r.z==='10') r.z=found.taxRate||'10';
+  if(!r.catId) r.catId=found.catId||'';
+  if(!r.cat)  r.cat=found.category||'';
+  if(r.u==='点') r.u=found.unit||'点';
+  r.bc=found.barcode||'';
+  r.isNew=false;
+  nkRenderArrival();
+  toast(`「${name}」の情報を補完しました`);
+}
+
+// 入荷保存・バーコード発行
+function nkSaveArrival(){
+  const rows=nkArrivalRows.filter(r=>r.n.trim());
+  if(!rows.length){alert('商品を1件以上入力してください');return;}
+  const date=document.getElementById('nkDate').value;
+  const supplier=document.getElementById('nkSupplier').value.trim();
+  const memo=document.getElementById('nkMemo').value.trim();
+
+  const prods=nkGetProducts();
+  const prodMap={};
+  // 同名・別価格は別商品として扱うため name|price をキーに
+  prods.forEach(p=>{ const k=p.name+'|'+(p.price||''); prodMap[k]=p; });
+
+  let newCount=0, updCount=0;
+  const savedItems=[];
+  rows.forEach(r=>{
+    const name=r.n.trim(); if(!name)return;
+    if(prodMap[name]){
+      // 既存商品を更新
+      const p=prodMap[name];
+      if(r.p)    p.price=r.p;
+      if(r.cost) p.costPrice=r.cost;
+      if(r.catId){p.catId=r.catId;}
+      if(r.cat)  p.category=r.cat;
+      if(r.z)    p.taxRate=r.z;
+      if(r.u)    p.unit=r.u;
+      if(supplier) p.supplier=supplier;
+      r.bc=p.barcode;
+      updCount++;
+    } else {
+      // 新商品：バーコード採番
+      const bc=nkNextBarcode();
+      addBcUsed([bc]); // 発番した番号を即座に使用済み登録（重複防止）
+      const pc=nkGenProductCode(r.catId||'', r.cat||'');
+      const np={
+        id:'p'+Date.now()+'_'+Math.random().toString(36).slice(2,5),
+        name, barcode:bc, productCode:pc,
+        price:r.p||'', costPrice:r.cost||'',
+        taxRate:r.z||'10', unit:r.u||'点',
+        category:r.cat||'', catId:r.catId||'',
+        supplier:supplier||'', createdAt:Date.now()
+      };
+      prods.push(np);
+      prodMap[name+'|'+(r.p||'')]=np;
+      r.bc=bc;
+      newCount++;
+    }
+    savedItems.push({name,barcode:r.bc,qty:isNaN(parseInt(r.qty))?1:parseInt(r.qty),cost:r.cost,price:r.p});
+  });
+
+  nkSaveProducts(prods);
+  const arrivals=nkGetArrivals();
+  arrivals.unshift({id:'a'+Date.now(),date,supplier,memo,items:savedItems,at:Date.now()});
+  nkSaveArrivals(arrivals);
+
+  nkRenderArrival();
+  toast(`新規${newCount}件登録・${updCount}件更新しました`);
+
+  if(confirm(`保存しました。\n新規：${newCount}件　更新：${updCount}件\n\nバーコードシール印刷画面を開きますか？`)){
+    nkShowTab('labels');
+  }
+}
+
+// ── 商品一覧 ──────────────────────────────────
+function nkRenderProducts(){
+  const list=document.getElementById('nkProdList'); if(!list)return;
+  const q=(document.getElementById('nkProdSearch')||{}).value||'';
+  let prods=nkGetProducts();
+  if(q) prods=prods.filter(p=>p.name.includes(q)||p.barcode.includes(q));
+  const cnt=document.getElementById('nkProdCount');
+  if(cnt) cnt.textContent=`（${prods.length}件）`;
+  if(!prods.length){
+    list.innerHTML='<div style="text-align:center;color:#aab;padding:32px">商品がまだ登録されていません。<br>入荷入力から登録してください。</div>';
+    return;
+  }
+  list.innerHTML=prods.map(p=>`
+    <div class="nk-prod-item">
+      <span class="nk-prod-bc" title="バーコード番号 (Code128)">${e(p.barcode)}</span>
+      <span class="nk-prod-name">${e(p.name)}</span>
+      ${p.category?`<span class="nk-prod-cat">${e(p.category)}</span>`:''}
+      <span class="nk-prod-price">${p.price?'¥'+Number(p.price).toLocaleString():'価格未設定'}</span>
+      <span style="font-size:11px;color:#aab">${p.unit||''}</span>
+      <button onclick="nkDeleteProduct('${p.id}')"
+        style="border:1px solid #e74c3c;color:#e74c3c;background:none;border-radius:4px;padding:2px 8px;font-size:11px;cursor:pointer;margin-left:auto">削除</button>
+    </div>
+  `).join('');
+}
+
+function nkDeleteProduct(id){
+  if(!confirm('この商品を削除しますか？')) return;
+  nkSaveProducts(nkGetProducts().filter(p=>p.id!==id));
+  nkRenderProducts();
+}
+
+// ── Airレジ CSV出力 ──────────────────────────
+// 既存商品に商品コードが未設定のものへ一括付与
+function nkAssignAllProductCodes(){
+  const prods=nkGetProducts();
+  let cnt=0;
+  prods.forEach(p=>{
+    if(p.productCode) return;
+    p.productCode=nkGenProductCode(p.catId||'', p.category||'');
+    cnt++;
+  });
+  if(!cnt){ toast('すべての商品にすでに商品コードが設定されています'); return; }
+  nkSaveProducts(prods);
+  nkRenderProducts();
+  toast(`✅ ${cnt}件に商品コードを付与しました`);
+}
+
+function nkExportAir(){
+  const prods=nkGetProducts();
+  if(!prods.length){alert('登録済み商品がありません');return;}
+  // エアレジ商品登録CSVフォーマット（商品コード,商品名,価格,税種別,カテゴリーID,バーコード,単位）
+  const header='商品コード,商品名,価格,税種別,カテゴリーID,バーコード,単位';
+  const rows=prods.map(p=>{
+    const taxType=p.taxRate==='8'?'軽減税率対象':'通常税率';
+    return [
+      p.barcode||'',
+      `"${(p.name||'').replace(/"/g,'""')}"`,
+      p.price||'',
+      taxType,
+      p.catId||'',
+      p.barcode||'',
+      p.unit||''
+    ].join(',');
+  });
+  const csv='\uFEFF'+[header,...rows].join('\r\n');
+  const blob=new Blob([csv],{type:'text/csv;charset=utf-8'});
+  const a=document.createElement('a');
+  a.href=URL.createObjectURL(blob);
+  a.download=`airレジ商品登録_${new Date().toISOString().slice(0,10)}.csv`;
+  a.click();
+  toast(`${prods.length}件のCSVをダウンロードしました`);
+}
+
+// ── バーコードシール印刷 ──────────────────────
+function nkRenderLabelList(){
+  const el=document.getElementById('nkLabelList'); if(!el)return;
+  const prods=nkGetProducts();
+  if(!prods.length){
+    el.innerHTML='<div style="text-align:center;color:#aab;padding:32px;grid-column:1/-1">商品がありません。入荷入力から登録してください。</div>';
+    return;
+  }
+  el.innerHTML=prods.map((p,i)=>`
+    <div class="nk-label-item">
+      <label class="nk-label-check">
+        <input type="checkbox" id="lchk_${i}" value="${p.id}" checked style="accent-color:#0f2744;width:14px;height:14px">
+        <span style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap;flex:1;font-size:12px">${e(p.name)}</span>
+      </label>
+      <div style="font-size:10px;color:#888;font-family:monospace;text-align:center">${e(p.barcode)}</div>
+      ${p.price?`<div style="font-size:12px;font-weight:700;color:#c00;text-align:center">¥${Number(p.price).toLocaleString()}</div>`:''}
+      <div style="display:flex;align-items:center;justify-content:center;gap:6px;font-size:11px;color:#6b7a8d">
+        印刷枚数:
+        <input type="number" min="1" max="99" value="1" id="lqty_${i}"
+          style="width:48px;text-align:center;border:1px solid #dde3ea;border-radius:4px;padding:4px;font-size:13px;font-family:inherit">
+      </div>
+    </div>
+  `).join('');
+}
+
+function nkSelectAllLabels(val){
+  document.querySelectorAll('#nkLabelList input[type=checkbox]').forEach(cb=>cb.checked=val);
+}
+
+// ── 入荷履歴 ──────────────────────────────────
+function nkRenderHistory(){
+  const el=document.getElementById('nkHistList'); if(!el)return;
+  const list=nkGetArrivals();
+  if(!list.length){
+    el.innerHTML='<div style="text-align:center;color:#aab;padding:32px">入荷履歴がありません</div>';
+    return;
+  }
+  el.innerHTML=list.map(a=>`
+    <div class="nk-arr-item">
+      <div class="nk-arr-head">
+        <span class="nk-arr-date">${e(a.date)}</span>
+        ${a.supplier?`<span class="nk-arr-sup">📦 ${e(a.supplier)}</span>`:''}
+        ${a.memo?`<span style="font-size:11px;color:#aab">${e(a.memo)}</span>`:''}
+        <span style="margin-left:auto;font-size:11px;color:#1a5c2e;font-weight:700">${(a.items||[]).length}品目</span>
+      </div>
+      <div class="nk-arr-items">
+        ${(a.items||[]).map(it=>`
+          <span class="nk-arr-tag">${e(it.name)}×${it.qty||1}</span>
+        `).join('')}
+      </div>
+    </div>
+  `).join('');
+}
+
+
 <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
 <style>
 *{margin:0;padding:0;box-sizing:border-box}
@@ -297,173 +939,52 @@ tbody tr:hover td.sticky-name{background:#e8f0f8}
   /* ── トースト通知 ── */
   .toast{bottom:70px;right:10px;left:10px;text-align:center;font-size:12px}
 }
-
-/* ===== 印刷メディア（横向きA4） ===== */
 @media print{
-  @page{ size:A4 landscape; margin:8mm 10mm 8mm 14mm }
-  body *{ visibility:hidden }
-  #printArea,#printArea *{ visibility:visible }
-  #printArea{ position:fixed;inset:0;background:#fff;z-index:99999 }
-  .print-toolbar,.no-print{ display:none!important }
-  .print-doc{ box-shadow:none!important;margin:0!important;padding:0!important;width:100%!important }
-  .print-sheet{ page-break-after:always; padding:0 }
-  .print-sheet:last-child{ page-break-after:avoid }
+  body *{visibility:hidden}
+  #printArea,#printArea *{visibility:visible}
+  #printArea{position:fixed;inset:0;background:#fff;z-index:99999;overflow:auto}
+  .no-print{display:none!important}
 }
 
-/* ===== 印刷プレビューUI ===== */
-#printArea{
-  display:none;position:fixed;inset:0;background:#e0e4ea;
-  z-index:9500;overflow-y:auto;
-  font-family:'Hiragino Kaku Gothic ProN','Yu Gothic','Meiryo',sans-serif;
-  color:#000;font-size:10px;
-}
-.print-toolbar{
-  background:#2c2c2c;color:#fff;
-  padding:10px 20px;display:flex;align-items:center;gap:10px;
-  position:sticky;top:0;z-index:10;
-}
-.print-toolbar button{
-  border:none;border-radius:6px;padding:8px 20px;
-  font-size:13px;font-weight:700;cursor:pointer;font-family:inherit
-}
-.print-doc{
-  /* A4横 = 297mm × 210mm、プレビュー用スケール */
-  width:297mm;margin:16px auto;
-  background:#fff;box-shadow:0 4px 20px rgba(0,0,0,.25);
-}
-
-/* ===== 1枚（シート）単位 ===== */
-.print-sheet{
-  width:297mm;min-height:210mm;box-sizing:border-box;
-  padding:8mm 10mm 7mm 14mm; /* 左に綴じ代 */
-  position:relative;overflow:hidden;
-  display:flex;flex-direction:column;
-}
-
-/* ── ヘッダー（各シート上部） ── */
-.ps-head{
-  display:flex;align-items:stretch;gap:0;
-  border:1.5px solid #1a1a1a;margin-bottom:5px;
-}
-.ps-head-title{
-  background:#0f2744;color:#fff;
-  writing-mode:horizontal-tb;
-  padding:4px 12px;
-  font-size:14px;font-weight:900;letter-spacing:3px;
-  display:flex;align-items:center;white-space:nowrap;
-}
-.ps-head-meta{
-  flex:1;display:grid;
-  grid-template-columns:auto 1fr auto 1fr auto 1fr auto 1fr;
-  border-left:1px solid #1a1a1a;
-}
-.ps-hm-k{
-  background:#f2f2f2;font-size:9px;font-weight:700;
-  padding:3px 8px;border-right:1px solid #ccc;border-bottom:1px solid #ccc;
-  display:flex;align-items:center;white-space:nowrap;color:#333;
-}
-.ps-hm-v{
-  font-size:10px;font-weight:600;padding:3px 10px;
-  border-right:1px solid #ccc;border-bottom:1px solid #ccc;
-  display:flex;align-items:center;
-}
-.ps-hm-k:nth-child(n+9),.ps-hm-v:nth-child(n+9){ border-bottom:none }
-.ps-head-sign{
-  display:grid;grid-template-columns:repeat(4,42px);
-  border-left:1.5px solid #1a1a1a;
-}
-.ps-sign-cell{ border-left:1px solid #ccc;text-align:center }
-.ps-sign-cell:first-child{ border-left:none }
-.ps-sign-label{
-  font-size:8px;font-weight:700;background:#f2f2f2;
-  border-bottom:1px solid #ccc;padding:2px 0;
-}
-.ps-sign-box{ height:28px }
-
-/* ── セクションタイトル ── */
-.ps-sec{
-  font-size:9px;font-weight:700;color:#0f2744;
-  border-left:3px solid #0f2744;padding:2px 6px;
-  margin:5px 0 3px;letter-spacing:.5px;
-}
-
-/* ── 集計サマリー行 ── */
-.ps-summary{
-  display:grid;grid-template-columns:repeat(8,1fr);
-  gap:4px;margin-bottom:5px;
-}
-.ps-sbox{
-  border:1px solid #bbb;text-align:center;padding:3px 4px;
-}
-.ps-sbox.hi{ background:#0f2744;color:#fff }
-.ps-sbox.mid{ background:#e8f0f8 }
-.ps-sl{ font-size:8px;color:inherit;opacity:.8;margin-bottom:2px;white-space:nowrap }
-.ps-sv{ font-size:12px;font-weight:900;white-space:nowrap }
-.ps-sbox.hi .ps-sl{ opacity:.7 }
-
-/* ── ページ別小計テーブル ── */
-.ps-ptbl{
-  width:100%;border-collapse:collapse;
-  font-size:9px;margin-bottom:4px;
-}
-.ps-ptbl th{
-  background:#0f2744;color:#fff;
-  padding:3px 6px;border:1px solid #444;
-  font-size:8.5px;white-space:nowrap;
-}
-.ps-ptbl th.r,.ps-ptbl td.r{ text-align:right }
-.ps-ptbl th.c,.ps-ptbl td.c{ text-align:center }
-.ps-ptbl td{
-  padding:2.5px 6px;border:1px solid #d0d0d0;
-  white-space:nowrap;overflow:hidden;text-overflow:ellipsis;
-}
-.ps-ptbl tr:nth-child(even) td{ background:#fafafa }
-.ps-ptbl tr.sub td{
-  background:#dce4f0;font-weight:700;
-  border-top:1.5px solid #0f2744;
-}
-
-/* ── 商品明細テーブル（メイン） ── */
-.ps-dtbl{
-  width:100%;border-collapse:collapse;
-  font-size:9px;flex:1;
-  table-layout:fixed;
-}
-.ps-dtbl th{
-  background:#0f2744;color:#fff;
-  padding:3px 3px;border:1px solid #444;
-  font-size:8.5px;white-space:nowrap;overflow:hidden;
-  position:sticky;top:0;
-}
-.ps-dtbl th.r{ text-align:right }
-.ps-dtbl th.c{ text-align:center }
-.ps-dtbl td{
-  padding:2px 3px;border:1px solid #d5d5d5;
-  white-space:nowrap;overflow:hidden;text-overflow:ellipsis;
-  line-height:1.4;height:18px;
-}
-.ps-dtbl td.r{ text-align:right }
-.ps-dtbl td.c{ text-align:center }
-.ps-dtbl tr:nth-child(even) td{ background:#fafafa }
-.ps-dtbl tr.pg-head td{
-  background:#1a5c8a;color:#fff;font-weight:700;
-  font-size:9px;border-color:#0f4a75;
-}
-.ps-dtbl tr.pg-sub td{
-  background:#dce4f0;font-weight:700;
-  border-top:1.5px solid #0f2744;font-size:9px;
-}
-.tax10{ color:#1a6ea6;font-size:8px;font-weight:700 }
-.tax8 { color:#c8860a;font-size:8px;font-weight:700 }
-
-/* ── フッター ── */
-.ps-foot{
-  margin-top:auto;padding-top:4px;
-  border-top:1px solid #bbb;
-  display:flex;justify-content:space-between;align-items:center;
-  font-size:8px;color:#666;
-}
-
+/* ===== 印刷プレビュー ===== */
+#printArea{display:none;position:fixed;inset:0;background:#fff;z-index:9500;overflow-y:auto;font-family:'Hiragino Kaku Gothic ProN','Yu Gothic','Meiryo',sans-serif;color:#000}
+.print-toolbar{background:#0f2744;color:#fff;padding:10px 20px;display:flex;align-items:center;gap:10px;position:sticky;top:0;z-index:10}
+.print-toolbar button{border:none;border-radius:6px;padding:8px 18px;font-size:13px;font-weight:700;cursor:pointer;font-family:inherit}
+.print-doc{width:210mm;min-height:297mm;margin:20px auto;background:#fff;padding:18mm 15mm 15mm;box-sizing:border-box;box-shadow:0 2px 12px rgba(0,0,0,.15)}
+/* 表紙 */
+.print-cover{border:2px solid #000;padding:20px;margin-bottom:20px}
+.print-title{font-size:22px;font-weight:900;text-align:center;letter-spacing:4px;margin-bottom:18px;border-bottom:3px double #000;padding-bottom:10px}
+.print-meta-grid{display:grid;grid-template-columns:1fr 1fr;gap:0;border:1px solid #000}
+.print-meta-row{display:contents}
+.print-meta-label{background:#f0f0f0;padding:7px 12px;font-size:12px;font-weight:700;border:1px solid #000;border-top:none;border-left:none}
+.print-meta-val{padding:7px 12px;font-size:12px;border:1px solid #000;border-top:none;border-left:none;border-right:none}
+/* 承認欄 */
+.print-sign{display:grid;grid-template-columns:repeat(4,1fr);gap:0;border:1px solid #000;margin-top:16px}
+.print-sign-cell{text-align:center;border-right:1px solid #000;padding:4px}
+.print-sign-cell:last-child{border-right:none}
+.print-sign-title{font-size:10px;font-weight:700;background:#f0f0f0;padding:4px;border-bottom:1px solid #000}
+.print-sign-box{height:40px}
+/* サマリー */
+.print-section-title{font-size:14px;font-weight:700;background:#0f2744;color:#fff;padding:6px 12px;margin:18px 0 8px;letter-spacing:1px}
+.print-sum-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:8px;margin-bottom:14px}
+.print-sum-box{border:1px solid #000;text-align:center;padding:8px 6px}
+.print-sum-label{font-size:10px;color:#555;margin-bottom:4px}
+.print-sum-val{font-size:16px;font-weight:900}
+.print-sum-box.total{background:#0f2744;color:#fff}
+/* ページ別テーブル */
+.print-page-header{display:flex;align-items:center;gap:12px;background:#f8f8f8;border:1px solid #ccc;padding:6px 12px;margin:14px 0 4px;font-size:13px;font-weight:700}
+.print-page-sub{font-size:11px;color:#555;margin-left:auto}
+.print-tbl{width:100%;border-collapse:collapse;font-size:11px;page-break-inside:avoid}
+.print-tbl th{background:#0f2744;color:#fff;padding:5px 6px;text-align:center;border:1px solid #555;font-size:10px;white-space:nowrap}
+.print-tbl td{padding:4px 6px;border:1px solid #ccc;vertical-align:middle}
+.print-tbl td.r{text-align:right}
+.print-tbl td.c{text-align:center}
+.print-tbl tr:nth-child(even){background:#fafafa}
+.print-tbl tr.subtotal{background:#e8edf5;font-weight:700}
+/* ページ区切り */
+.print-page-break{page-break-before:always;padding-top:10mm}
+/* フッター */
+.print-footer{margin-top:20px;border-top:1px solid #000;padding-top:8px;font-size:10px;color:#555;text-align:right}
 
 
 /* バーコードスキャナー */
@@ -522,8 +1043,6 @@ tbody tr:hover td.sticky-name{background:#e8f0f8}
 .ms-save-btn{background:#2d7a4f;color:#fff;border:none;border-radius:8px;padding:11px 24px;font-size:14px;font-weight:700;cursor:pointer;font-family:inherit;transition:.15s}
 .ms-save-btn:hover{background:#1a5c3a}
 .ms-del-btn{background:#fee;color:#e74c3c;border:1px solid #fcc;border-radius:5px;padding:4px 10px;font-size:11px;cursor:pointer;font-family:inherit}
-.ms-drag-handle:hover{color:#2d7a4f}
-#masterTbody tr.ms-drag-over{background:#e8f5e9;outline:2px dashed #2d7a4f}
 
 .hist-card{background:#fff;border-radius:10px;padding:18px;box-shadow:0 1px 4px rgba(0,0,0,.08);margin-bottom:12px}
 .hist-card h2{font-size:15px;color:#0f2744;margin-bottom:14px;padding-bottom:8px;border-bottom:2px solid #1a6ea6;display:flex;align-items:center;gap:8px}
@@ -629,6 +1148,25 @@ svg.trend-chart text{font-family:inherit}
 .hm-card-arr{color:#ccc;font-size:22px}
 .hm-foot{margin-top:24px;display:flex;gap:10px;flex-wrap:wrap;justify-content:center}
 .hm-foot button{background:rgba(255,255,255,.1);color:rgba(255,255,255,.7);border:1px solid rgba(255,255,255,.2);padding:9px 18px;border-radius:20px;font-size:12px;font-weight:700;cursor:pointer;font-family:inherit}
+.hm-foot button:hover{background:rgba(255,255,255,.2)}
+
+/* ===== ホーム画面 ===== */
+#pgHome.show{display:flex;flex-direction:column;align-items:center;justify-content:flex-start;min-height:100vh;background:linear-gradient(160deg,#0f2744 0%,#1a3a5c 100%);padding:0 0 40px}
+.hm-top{text-align:center;color:#fff;padding:40px 20px 20px;width:100%}
+.hm-top h1{font-size:22px;font-weight:900;margin:8px 0 4px}
+.hm-top p{font-size:12px;opacity:.65;margin:0}
+.hm-status{font-size:11px;margin-top:6px;opacity:.8}
+.hm-cards{display:grid;gap:14px;padding:4px 20px;width:100%;max-width:480px}
+.hm-card{background:#fff;border-radius:16px;padding:22px 20px;cursor:pointer;transition:.15s;box-shadow:0 4px 20px rgba(0,0,0,.2);display:flex;align-items:center;gap:16px;border:2px solid transparent}
+.hm-card:hover{transform:translateY(-2px);box-shadow:0 8px 28px rgba(0,0,0,.25);border-color:rgba(255,255,255,.15)}
+.hm-card:active{transform:scale(.98)}
+.hm-card-icon{font-size:36px;flex-shrink:0}
+.hm-card-body{flex:1}
+.hm-card-title{font-size:16px;font-weight:900;color:#0f2744;margin-bottom:4px}
+.hm-card-desc{font-size:11px;color:#6b7a8d;line-height:1.7}
+.hm-card-arr{color:#ccc;font-size:22px;font-weight:300}
+.hm-foot{margin-top:20px;display:flex;gap:10px;flex-wrap:wrap;justify-content:center}
+.hm-foot button{background:rgba(255,255,255,.1);color:rgba(255,255,255,.7);border:1px solid rgba(255,255,255,.2);padding:9px 18px;border-radius:20px;font-size:12px;font-weight:700;cursor:pointer;font-family:inherit;transition:.15s}
 .hm-foot button:hover{background:rgba(255,255,255,.2)}
 </style>
 <script src="https://unpkg.com/@zxing/library@0.19.1/umd/index.min.js"></script>
@@ -876,11 +1414,10 @@ svg.trend-chart text{font-family:inherit}
         </div>
         <table class="master-tbl">
           <thead><tr>
-            <th style="width:28px"></th>
-            <th style="width:38%">商品名</th>
-            <th style="width:14%">単位</th>
-            <th style="width:19%">規格・メモ</th>
-            <th style="width:14%">初期在庫数</th>
+            <th style="width:40%">商品名</th>
+            <th style="width:15%">単位</th>
+            <th style="width:20%">規格・メモ</th>
+            <th style="width:15%">初期在庫数</th>
             <th style="width:10%"></th>
           </tr></thead>
           <tbody id="masterTbody"></tbody>
@@ -949,6 +1486,68 @@ svg.trend-chart text{font-family:inherit}
     <!-- 入力パネル -->
     <div class="panel on" id="pnl-entry">
 
+      <!-- バーコードスキャナーバー -->
+      <div id="scanBar" style="display:none;background:#0f2744;padding:10px 14px;border-radius:10px;margin-bottom:10px;display:flex;align-items:center;gap:10px;flex-wrap:wrap">
+        <span style="color:#fff;font-size:13px;font-weight:700;white-space:nowrap">📡 スキャンモード</span>
+        <input id="scanInput" type="text" inputmode="none"
+          placeholder="バーコードをスキャン..."
+          style="flex:1;min-width:180px;padding:9px 14px;border:none;border-radius:7px;font-size:14px;font-family:monospace;font-weight:700;letter-spacing:2px;background:#fff;outline:none"
+          onkeydown="if(event.key==='Enter'){scanBarcode(this.value.trim());this.value='';}"
+          autocomplete="off" autocorrect="off" spellcheck="false">
+        <span id="scanMsg" style="color:#a0e0b0;font-size:12px;min-width:140px"></span>
+        <button onclick="toggleScanMode(false)"
+          style="background:rgba(255,255,255,.15);color:#fff;border:none;border-radius:6px;padding:7px 14px;font-size:12px;font-weight:700;cursor:pointer;font-family:inherit;white-space:nowrap">
+          ✕ 閉じる
+        </button>
+      </div>
+      <!-- スキャン入力ボタン（2択） -->
+      <div id="btnScanArea" style="display:flex;gap:8px;margin-bottom:10px;flex-wrap:wrap">
+        <button id="btnScanMode" onclick="toggleScanMode(true)"
+          style="display:flex;align-items:center;gap:6px;padding:9px 18px;background:#1a3a5c;color:#fff;border:none;border-radius:8px;font-size:13px;font-weight:700;cursor:pointer;font-family:inherit">
+          📡 スキャナーで入力
+        </button>
+        <button onclick="openCameraScanner()"
+          style="display:flex;align-items:center;gap:6px;padding:9px 18px;background:#1a6ea6;color:#fff;border:none;border-radius:8px;font-size:13px;font-weight:700;cursor:pointer;font-family:inherit">
+          📷 カメラでスキャン
+        </button>
+      </div>
+
+      <!-- カメラスキャナーモーダル -->
+
+
+
+
+      <div id="camModal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.85);z-index:9000;flex-direction:column;align-items:center;justify-content:center">
+        <div style="background:#0f2744;border-radius:16px;padding:16px;width:min(95vw,480px);box-shadow:0 8px 40px rgba(0,0,0,.5)">
+          <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px">
+            <span style="color:#fff;font-size:15px;font-weight:700">📷 カメラでバーコードスキャン</span>
+            <button onclick="closeCameraScanner()"
+              style="background:rgba(255,255,255,.15);color:#fff;border:none;border-radius:6px;padding:6px 14px;font-size:13px;font-weight:700;cursor:pointer;font-family:inherit">✕ 閉じる</button>
+          </div>
+          <!-- カメラ映像 -->
+          <div style="position:relative;border-radius:10px;overflow:hidden;background:#000;aspect-ratio:4/3">
+            <video id="camVideo" style="width:100%;height:100%;object-fit:cover" playsinline muted></video>
+            <!-- 照準線 -->
+            <div style="position:absolute;inset:0;pointer-events:none;display:flex;align-items:center;justify-content:center">
+              <div style="width:70%;height:30%;border:2px solid rgba(46,204,113,.8);border-radius:6px;box-shadow:0 0 0 2000px rgba(0,0,0,.25)"></div>
+            </div>
+            <div id="camScanFlash" style="position:absolute;inset:0;background:rgba(46,204,113,.3);opacity:0;transition:opacity .15s;pointer-events:none;border-radius:10px"></div>
+          </div>
+          <!-- カメラ切替・状態 -->
+          <div style="display:flex;align-items:center;justify-content:space-between;margin-top:10px;flex-wrap:wrap;gap:8px">
+            <span id="camStatus" style="color:#a0e0b0;font-size:12px">カメラ起動中...</span>
+            <div style="display:flex;gap:8px;align-items:center">
+              <select id="camSelect" onchange="switchCamera(this.value)"
+                style="padding:6px 10px;border-radius:6px;border:none;font-size:12px;font-family:inherit;background:rgba(255,255,255,.1);color:#fff;max-width:160px">
+              </select>
+              <button onclick="toggleTorch()"  id="btnTorch"
+                style="display:none;background:rgba(255,255,255,.15);color:#fff;border:none;border-radius:6px;padding:6px 12px;font-size:12px;cursor:pointer;font-family:inherit">🔦</button>
+            </div>
+          </div>
+          <div id="camResult" style="margin-top:10px;padding:10px 12px;background:rgba(0,0,0,.3);border-radius:8px;font-size:13px;color:#fff;min-height:40px;display:none"></div>
+        </div>
+      </div>
+
       <!-- バーコードスキャナーバー (Socket Mobile D750 HIDモード対応) -->
       <div id="scanBar" style="display:none;background:#0f2744;border-radius:10px;margin-bottom:10px;overflow:hidden">
         <!-- メインバー -->
@@ -991,52 +1590,10 @@ svg.trend-chart text{font-family:inherit}
           <span style="color:rgba(255,255,255,.3);font-size:11px">スキャンすると自動で行に追加されます</span>
         </div>
       </div>
-      <!-- スキャン入力ボタン（2択） -->
-      <div id="btnScanArea" style="display:flex;gap:8px;margin-bottom:10px;flex-wrap:wrap">
-        <button id="btnScanMode" onclick="toggleScanMode(true)"
-          style="display:flex;align-items:center;gap:6px;padding:9px 18px;background:#1a3a5c;color:#fff;border:none;border-radius:8px;font-size:13px;font-weight:700;cursor:pointer;font-family:inherit">
-          📡 スキャナーで入力
-        </button>
-        <button onclick="openCameraScanner()"
-          style="display:flex;align-items:center;gap:6px;padding:9px 18px;background:#1a6ea6;color:#fff;border:none;border-radius:8px;font-size:13px;font-weight:700;cursor:pointer;font-family:inherit">
-          📷 カメラでスキャン
-        </button>
-      </div>
-
-      <!-- カメラスキャナーモーダル -->
-
-
-      <div id="camModal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.85);z-index:9000;flex-direction:column;align-items:center;justify-content:center">
-        <div style="background:#0f2744;border-radius:16px;padding:16px;width:min(95vw,480px);box-shadow:0 8px 40px rgba(0,0,0,.5)">
-          <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px">
-            <span style="color:#fff;font-size:15px;font-weight:700">📷 カメラでバーコードスキャン</span>
-            <button onclick="closeCameraScanner()"
-              style="background:rgba(255,255,255,.15);color:#fff;border:none;border-radius:6px;padding:6px 14px;font-size:13px;font-weight:700;cursor:pointer;font-family:inherit">✕ 閉じる</button>
-          </div>
-          <!-- カメラ映像 -->
-          <div style="position:relative;border-radius:10px;overflow:hidden;background:#000;aspect-ratio:4/3">
-            <video id="camVideo" style="width:100%;height:100%;object-fit:cover" playsinline muted></video>
-            <!-- 照準線 -->
-            <div style="position:absolute;inset:0;pointer-events:none;display:flex;align-items:center;justify-content:center">
-              <div style="width:70%;height:30%;border:2px solid rgba(46,204,113,.8);border-radius:6px;box-shadow:0 0 0 2000px rgba(0,0,0,.25)"></div>
-            </div>
-            <div id="camScanFlash" style="position:absolute;inset:0;background:rgba(46,204,113,.3);opacity:0;transition:opacity .15s;pointer-events:none;border-radius:10px"></div>
-          </div>
-          <!-- カメラ切替・状態 -->
-          <div style="display:flex;align-items:center;justify-content:space-between;margin-top:10px;flex-wrap:wrap;gap:8px">
-            <span id="camStatus" style="color:#a0e0b0;font-size:12px">カメラ起動中...</span>
-            <div style="display:flex;gap:8px;align-items:center">
-              <select id="camSelect" onchange="switchCamera(this.value)"
-                style="padding:6px 10px;border-radius:6px;border:none;font-size:12px;font-family:inherit;background:rgba(255,255,255,.1);color:#fff;max-width:160px">
-              </select>
-              <button onclick="toggleTorch()"  id="btnTorch"
-                style="display:none;background:rgba(255,255,255,.15);color:#fff;border:none;border-radius:6px;padding:6px 12px;font-size:12px;cursor:pointer;font-family:inherit">🔦</button>
-            </div>
-          </div>
-          <div id="camResult" style="margin-top:10px;padding:10px 12px;background:rgba(0,0,0,.3);border-radius:8px;font-size:13px;color:#fff;min-height:40px;display:none"></div>
-        </div>
-      </div>
-
+      <button id="btnScanMode" onclick="toggleScanMode(true)"
+        style="display:flex;align-items:center;gap:6px;margin-bottom:10px;padding:9px 18px;background:#1a3a5c;color:#fff;border:none;border-radius:8px;font-size:13px;font-weight:700;cursor:pointer;font-family:inherit">
+        📡 バーコードスキャンで入力
+      </button>
       <div class="hcard">
         <div><div class="hl">会社名・店舗名</div><input class="hi" id="hCompany" placeholder="例：MS collectables" oninput="syncMeta()"></div>
         <div><div class="hl">棚卸日</div><input class="hi" type="date" id="hDate" oninput="syncMeta()"></div>
@@ -1072,12 +1629,6 @@ svg.trend-chart text{font-family:inherit}
             <tbody id="tbody"></tbody>
             <tfoot id="tfoot"></tfoot>
           </table>
-        </div>
-        <!-- 行追加ボタン -->
-        <div style="display:flex;gap:8px;padding:8px 12px;background:#f8fafc;border-top:1px solid #eef0f3;border-radius:0 0 10px 10px">
-          <button onclick="addRows(5)"  style="flex:1;padding:8px;border:1.5px dashed #1a6ea6;border-radius:6px;background:#fff;color:#1a6ea6;font-size:12px;font-weight:700;cursor:pointer;font-family:inherit">＋5行追加</button>
-          <button onclick="addRows(10)" style="flex:1;padding:8px;border:1.5px dashed #1a6ea6;border-radius:6px;background:#fff;color:#1a6ea6;font-size:12px;font-weight:700;cursor:pointer;font-family:inherit">＋10行追加</button>
-          <button onclick="addRows(25)" style="flex:1;padding:8px;border:1.5px dashed #1a6ea6;border-radius:6px;background:#fff;color:#1a6ea6;font-size:12px;font-weight:700;cursor:pointer;font-family:inherit">＋25行追加</button>
         </div>
       </div>
 
@@ -1120,23 +1671,22 @@ svg.trend-chart text{font-family:inherit}
           <button class="tbtn tbtn-air" onclick="dlAir()">💾 ダウンロード</button>
         </div>
         <div class="ibox">バックオフィス →「商品設定」→「商品をCSVで編集する」からアップロード</div>
-
         <div class="uarea" onclick="document.getElementById('airFile').click()">
           <div class="ui">📁</div>
-          <p><b>カテゴリーID確認用ファイル</b> または <b>既存商品CSV</b> をアップロード<br>
-          <span style="font-size:11px;color:#aaa">どちらでも自動で判別します</span></p>
+          <p>カテゴリーID確認用ファイル <b style="color:#FF6600">または</b> 既存商品CSV をアップロード<br>
+          <span style="font-size:11px;color:#aaa">どちらをアップしても自動で判別します</span></p>
           <input type="file" id="airFile" accept=".csv" style="display:none">
         </div>
         <div class="minfo" id="airMergeInfo"></div>
 
-        <!-- カテゴリー割り当てUI（アップロード後に表示） -->
-        <div id="catAssignBox" style="display:none;margin-top:12px;margin-bottom:8px;background:#fff8f0;border:1.5px solid #FF6600;border-radius:8px;padding:14px">
+        <!-- カテゴリー割り当てUI -->
+        <div id="catAssignBox" style="display:none;margin-top:12px;margin-bottom:4px;background:#fff8f0;border:1.5px solid #FF6600;border-radius:8px;padding:14px">
           <div style="font-weight:700;color:#FF6600;margin-bottom:10px;font-size:13px">🏷 ページとカテゴリーを対応づける</div>
           <div id="catAssignRows"></div>
-          <div style="margin-top:10px;font-size:11px;color:#888">選択したカテゴリーIDが商品CSVに反映されます</div>
+          <div style="margin-top:10px;font-size:11px;color:#888">選択したカテゴリーが商品CSVに反映されます</div>
         </div>
 
-        <div style="overflow-x:auto;margin-top:6px"><table class="atbl"><thead><tr>
+        <div style="overflow-x:auto"><table class="atbl"><thead><tr>
           <th class="chkcol">出力</th><th>商品名</th><th>カテゴリー</th><th>税率</th>
           <th>税込価格</th><th>原価</th><th>在庫数</th><th>バーコード</th><th>備考</th>
         </tr></thead><tbody id="airBody"></tbody></table></div>
@@ -1263,22 +1813,12 @@ svg.trend-chart text{font-family:inherit}
 // 定数
 // ============================================================
 const CATS = [
-  {id:'',l:'── カテゴリー未設定 ──'},
-  {id:'0002',l:'はちみつ'},
-  {id:'0001',l:'雑貨'},
-  {id:'0006',l:'エムズオリジナル'},
-  {id:'0004',l:'ミツロウ'},
-  {id:'0003',l:'靴'},
-  {id:'0009',l:'個人作家'},
-  {id:'0005',l:'服・靴下'},
-  {id:'0008',l:'食品'},
-  {id:'0010',l:'送料・袋・包装'},
-  {id:'0012',l:'ドライフラワー・植物'},
-  {id:'0013',l:'委託'},
-  {id:'0014',l:'企画展'}
+  {id:'',l:'カテゴリー未設定'},{id:'0002',l:'0002:はちみつ'},{id:'0001',l:'0001:雑貨'},
+  {id:'0006',l:'0006:エムズオリジナル'},{id:'0004',l:'0004:ミツロウ'},{id:'0003',l:'0003:靴'},
+  {id:'0009',l:'0009:個人作家'},{id:'0005',l:'0005:服・靴下'},{id:'0008',l:'0008:食品'},
+  {id:'0010',l:'0010:送料・袋・包装'},{id:'0012',l:'0012:ドライフラワー・植物'},
+  {id:'0013',l:'0013:委託'},{id:'0014',l:'0014:企画展'}
 ];
-// カテゴリー一覧（初期値はCATS、カテゴリーID確認用ファイルで上書き可能）
-let airCats = CATS.filter(c=>c.id).map(c=>({id:c.id, name:c.l}));
 const R = 25;
 const FK = 'tb_fb_v3';
 const RK = 'tb_recent_v3';
@@ -1691,7 +2231,7 @@ function doCreate(){
   myName=document.getElementById('myNameInp').value.trim()||'担当者';
   sid=genCode();
   const pk='p'+Math.random().toString(36).slice(2,8);
-  const pg={tanto:myName,ownerId:myId,ownerName:myName,cat:"",rows:mkRows(),at:Date.now()};
+  const pg={tanto:myName,ownerId:myId,ownerName:myName,cat:'',rows:mkRows(),at:Date.now()};
   pages={[pk]:pg}; order=[pk]; curKey=pk;
   startApp();
   if(!offline&&db){
@@ -2001,11 +2541,10 @@ function msDeleteDept(id){
 }
 function msRenderMasterTable(){
   const el=document.getElementById('masterTbody'); if(!el)return;
-  if(!msCurDept){el.innerHTML='<tr><td colspan="6" style="text-align:center;color:#aab;padding:16px">部門を選択してください</td></tr>';return;}
+  if(!msCurDept){el.innerHTML='<tr><td colspan="5" style="text-align:center;color:#aab;padding:16px">部門を選択してください</td></tr>';return;}
   const data=msGetDepts();
   const masters=data.masters[msCurDept]||[];
-  el.innerHTML=masters.map((m,i)=>`<tr draggable="true" data-mid="${m.id}" style="cursor:default">
-    <td style="text-align:center;cursor:grab;color:#bbb;font-size:16px;padding:4px 2px;user-select:none" class="ms-drag-handle" title="ドラッグして並び替え">⠿</td>
+  el.innerHTML=masters.map((m,i)=>`<tr>
     <td><input value="${e(m.name)}" placeholder="商品名" oninput="msUpdateMaster('${m.id}','name',this.value)"></td>
     <td><select oninput="msUpdateMaster('${m.id}','unit',this.value)">
       ${['kg','g','L','ml','本','袋','個','枚','缶','箱','パック','種'].map(u=>`<option${m.unit===u?' selected':''}>${u}</option>`).join('')}
@@ -2014,59 +2553,6 @@ function msRenderMasterTable(){
     <td><input type="number" step="any" value="${e(m.init||'')}" placeholder="0" oninput="msUpdateMaster('${m.id}','init',this.value)" style="text-align:right"></td>
     <td style="text-align:center"><button class="ms-del-btn" onclick="msDeleteMasterRow('${m.id}')">削除</button></td>
   </tr>`).join('');
-  msBindMasterDrag(el);
-}
-
-// ── マスタ行ドラッグ並び替え ────────────────────────
-let _msDragSrc=null;
-function msBindMasterDrag(tbody){
-  let dragSrcEl=null;
-
-  Array.from(tbody.querySelectorAll('tr')).forEach(tr=>{
-    tr.addEventListener('dragstart',ev=>{
-      // ハンドル列以外からのドラッグは無効
-      if(!ev.target.classList.contains('ms-drag-handle')&&!ev.target.closest('tr').querySelector('.ms-drag-handle').contains(ev.target)){
-        // inputやselectからは開始させない
-        if(['INPUT','SELECT','BUTTON'].includes(ev.target.tagName)){ ev.preventDefault(); return; }
-      }
-      dragSrcEl=tr;
-      tr.style.opacity='0.4';
-      ev.dataTransfer.effectAllowed='move';
-    });
-    tr.addEventListener('dragend',()=>{
-      tr.style.opacity='';
-      tbody.querySelectorAll('tr').forEach(r=>r.classList.remove('ms-drag-over'));
-    });
-    tr.addEventListener('dragover',ev=>{
-      ev.preventDefault();
-      ev.dataTransfer.dropEffect='move';
-      tbody.querySelectorAll('tr').forEach(r=>r.classList.remove('ms-drag-over'));
-      if(tr!==dragSrcEl) tr.classList.add('ms-drag-over');
-    });
-    tr.addEventListener('dragleave',()=>tr.classList.remove('ms-drag-over'));
-    tr.addEventListener('drop',ev=>{
-      ev.preventDefault();
-      if(!dragSrcEl||dragSrcEl===tr) return;
-      tr.classList.remove('ms-drag-over');
-
-      // DOM上の順番からID順を取得して保存
-      const srcId=dragSrcEl.dataset.mid;
-      const dstId=tr.dataset.mid;
-
-      const data=msGetDepts();
-      const masters=data.masters[msCurDept]||[];
-      const srcIdx=masters.findIndex(m=>m.id===srcId);
-      const dstIdx=masters.findIndex(m=>m.id===dstId);
-      if(srcIdx<0||dstIdx<0) return;
-
-      const [moved]=masters.splice(srcIdx,1);
-      masters.splice(dstIdx,0,moved);
-      data.masters[msCurDept]=masters;
-      msSaveDepts(data);
-      msRenderMasterTable();
-      toast('順番を変更しました');
-    });
-  });
 }
 
 // インポート用セレクトを更新（最近のセッションをFirebaseから直接取得）
@@ -2725,6 +3211,12 @@ function closePrint(){
   document.body.style.overflow = '';
 }
 
+function fmDate(d){
+  if(!d) return '';
+  const p = d.split('-');
+  if(p.length===3) return p[0]+'年'+parseInt(p[1])+'月'+parseInt(p[2])+'日';
+  return d;
+}
 
 function doExit(){
   if(!confirm('退出しますか？'))return;
@@ -2846,7 +3338,7 @@ function doCreateFromArc(id){
     if(!srcPg)return;
     const newRows=(srcPg.rows||[]).map(r=>({
       n:r.n||'', z:r.z||'10', k:'', u:r.u||'', p:r.p||'',
-      ss:r.ss||'', sr:r.sr||'', st:r.st||'', b:r.b||'',
+      ss:r.ss||'', sr:r.sr||'', st:'', b:r.b||'',
       cat:r.cat||'', bc:r.bc||'', pt:r.pt||'通常'
     }));
     // 空行を追加（既存商品の後に25行追加）
@@ -3071,6 +3563,10 @@ function toggleJoinPanel(){
   const p=document.getElementById('joinPanel');
   if(p) p.style.display=p.style.display==='none'?'block':'none';
 }
+function toggleJoinPanel(){
+  const p=document.getElementById('joinPanel');
+  if(p) p.style.display=p.style.display==='none'?'block':'none';
+}
 
 // ============================================================
 // メタ同期
@@ -3097,7 +3593,7 @@ function setH(id,v){const e=document.getElementById(id);if(e&&document.activeEle
 // ============================================================
 function addPage(){
   const pk='p'+Math.random().toString(36).slice(2,8);
-  const pg={tanto:myName,ownerId:myId,ownerName:myName,cat:"",rows:mkRows(),at:Date.now()};
+  const pg={tanto:myName,ownerId:myId,ownerName:myName,rows:mkRows(),at:Date.now()};
   pages[pk]=pg; order.push(pk); curKey=pk;
   if(!offline&&db){
     db.ref('s/'+sid+'/pages/'+pk).set(pg);
@@ -3138,398 +3634,15 @@ let debT={};
 function upd(k,ri,f,v){
   if(!pages[k])return;
   pages[k].rows[ri][f]=v;
-  // 最終行に入力したら自動で1行追加
-  if(ri===pages[k].rows.length-1 && v.trim()!==''){
-    pages[k].rows.push({n:'',z:'10',k:'',u:'',p:'',ss:'',sr:'',st:'',b:'',cat:'',bc:'',pt:'通常'});
-  }
   renderTable(); renderQbar();
   const dk=k+'_'+ri+'_'+f;
   clearTimeout(debT[dk]);
   debT[dk]=setTimeout(()=>{
     if(!offline&&db){
-      db.ref('s/'+sid+'/pages/'+k+'/rows').set(pages[k].rows);
+      db.ref('s/'+sid+'/pages/'+k+'/rows/'+ri+'/'+f).set(v);
       db.ref('s/'+sid+'/pages/'+k+'/at').set(Date.now());
     }
-    saveDraft();
   },400);
-}
-
-// ============================================================
-// 📡 バーコードスキャン入力 (Socket Mobile D750 HIDモード対応)
-// ============================================================
-let _scanBuf='';           // スキャン文字バッファ
-let _scanBufTimer=null;    // バッファタイムアウト
-let _scanFocusTimer=null;  // フォーカス維持タイマー
-
-function toggleScanMode(on){
-  const bar=document.getElementById('scanBar');
-  const area=document.getElementById('btnScanArea');
-  if(on){
-    bar.style.display='block';
-    if(area) area.style.display='none';
-    scanFocus();
-    // フォーカス維持（iPadでD750スキャン時にフォーカスが外れることがある）
-    _scanFocusTimer=setInterval(()=>{
-      const inp=document.getElementById('scanInput');
-      if(inp&&document.activeElement!==inp) inp.focus();
-    },1500);
-    setScanDot(true);
-    setScanMsg('待機中');
-    setScanDisplay('');
-  } else {
-    bar.style.display='none';
-    if(area) area.style.display='flex';
-    clearInterval(_scanFocusTimer);
-    _scanBuf='';
-    clearTimeout(_scanBufTimer);
-  }
-}
-
-function scanFocus(){
-  const inp=document.getElementById('scanInput');
-  if(inp){ inp.focus(); }
-  setScanDisplay('');
-  setScanMsg('待機中');
-}
-
-function setScanMsg(msg,ok){
-  const el=document.getElementById('scanMsg');
-  if(!el) return;
-  el.textContent=msg;
-  el.style.color=(ok===false)?'#ffcc66':'#a0e0b0';
-}
-
-function setScanDisplay(txt){
-  const el=document.getElementById('scanDisplayTxt');
-  if(!el) return;
-  if(txt){
-    el.textContent=txt; el.style.opacity='1';
-  } else {
-    el.textContent='スキャン待機中... ここをタップ'; el.style.opacity='.5';
-  }
-}
-
-function setScanDot(active){
-  const d=document.getElementById('scanDot');
-  if(d) d.style.background=active?'#2ecc71':'#ff6b6b';
-}
-
-// D750 HIDモード：文字をキー入力として1文字ずつ送信 → Enterで確定
-function scanKeydown(e){
-  if(e.key==='Enter'){
-    e.preventDefault();
-    const bc=_scanBuf.trim();
-    _scanBuf='';
-    clearTimeout(_scanBufTimer);
-    setScanDisplay('');
-    const inp=document.getElementById('scanInput');
-    if(inp) inp.value='';
-    if(bc) scanBarcode(bc);
-  } else if(e.key.length===1){
-    _scanBuf+=e.key;
-    setScanDisplay(_scanBuf);
-    // 300ms以内にEnterが来なければバッファをリセット（ノイズ対策）
-    clearTimeout(_scanBufTimer);
-    _scanBufTimer=setTimeout(()=>{ _scanBuf=''; setScanDisplay(''); },1500);
-  }
-}
-
-// inputイベントでも拾う（一部環境でkeydownが発火しない場合の保険）
-function scanOnInput(val){
-  if(!val) return;
-  // Enterサフィックスが含まれる場合（改行コード）
-  const bc=val.replace(/[\r\n]/g,'').trim();
-  if(bc){ _scanBuf=bc; }
-  const inp=document.getElementById('scanInput');
-  if(inp) inp.value='';
-}
-
-function scanBarcode(bc){
-  if(!bc) return;
-  setScanDot(false);
-  setTimeout(()=>setScanDot(true),120);
-
-  if(!curKey||!pages[curKey]){
-    setScanMsg('⚠️ ページ未選択',false); return;
-  }
-
-  const prods=nkGetProducts();
-  const found=prods.find(p=>(p.barcode||'').trim()===bc);
-  const rows=pages[curKey].rows;
-
-  if(found){
-    const existIdx=rows.findIndex(r=>(r.n||'').trim()===found.name);
-    if(existIdx>=0){
-      // 既存行：個数+1
-      const cur=parseFloat(rows[existIdx].k)||0;
-      rows[existIdx].k=String(cur+1);
-      renderTable(); renderQbar(); saveDraftDebounced();
-      if(!offline&&db) db.ref('s/'+sid+'/pages/'+curKey+'/rows').set(rows);
-      setScanMsg('✅ '+found.name+'（'+rows[existIdx].k+'個）');
-      setTimeout(()=>{
-        const tbody=document.getElementById('tbody');
-        if(tbody){
-          const tr=tbody.querySelectorAll('tr')[existIdx];
-          if(tr){
-            tr.style.transition='background .1s';
-            tr.style.background='#c8f0da';
-            setTimeout(()=>{ tr.style.background=''; },700);
-            tr.scrollIntoView({behavior:'smooth',block:'center'});
-          }
-        }
-      },50);
-      toast('📡 '+found.name+' → '+rows[existIdx].k+'個');
-    } else {
-      // 新規行追加（商品情報を自動入力）
-      const newRow={
-        n:found.name, z:found.taxRate||'10', k:'1',
-        u:found.unit||'点', p:found.price||'',
-        ss:found.supplier||'', sr:'', st:'',
-        b:'', cat:found.category||found.catId||'',
-        bc:found.barcode||'', pt:'通常'
-      };
-      const emptyIdx=rows.findIndex(r=>!(r.n||'').trim());
-      if(emptyIdx>=0){ rows[emptyIdx]={...newRow}; }
-      else { rows.push({...newRow}); }
-      renderTable(); renderQbar(); saveDraftDebounced();
-      if(!offline&&db) db.ref('s/'+sid+'/pages/'+curKey+'/rows').set(rows);
-      setScanMsg('✅ '+found.name+' 追加');
-      toast('📡 '+found.name+' を追加');
-    }
-  } else {
-    // 未登録バーコード
-    setScanMsg('⚠️ 未登録: '+bc, false);
-    toast('⚠️ 未登録バーコード: '+bc);
-    const blank={n:'',z:'10',k:'1',u:'点',p:'',ss:'',sr:'',st:'',b:'【要確認】'+bc,cat:'',bc:bc,pt:'通常'};
-    const emptyIdx=rows.findIndex(r=>!(r.n||'').trim());
-    if(emptyIdx>=0){ rows[emptyIdx]={...blank}; }
-    else { rows.push({...blank}); }
-    renderTable(); renderQbar(); saveDraftDebounced();
-    if(!offline&&db) db.ref('s/'+sid+'/pages/'+curKey+'/rows').set(rows);
-  }
-}
-
-
-// ============================================================
-// 📷 カメラスキャン (ZXing / BarcodeDetector)
-// ============================================================
-let _camStream=null, _camReader=null, _camDevices=[], _camActive=false, _camLastBc='', _camLastTime=0;
-
-async function openCameraScanner(){
-  const modal=document.getElementById('camModal');
-  modal.style.display='flex';
-  document.getElementById('camResult').style.display='none';
-  await startCamera();
-}
-
-async function startCamera(deviceId){
-  stopCamera();
-  _camActive=true;
-  const status=document.getElementById('camStatus');
-  status.textContent='カメラ起動中...'; status.style.color='#a0e0b0';
-  try{
-    const constraints={video: deviceId ? {deviceId:{exact:deviceId}} : {facingMode:'environment'}, audio:false};
-    _camStream=await navigator.mediaDevices.getUserMedia(constraints);
-    const video=document.getElementById('camVideo');
-    video.srcObject=_camStream;
-    await video.play();
-    status.textContent='スキャン中...バーコードをカメラに向けてください';
-    // カメラ一覧を取得してセレクトに反映
-    await populateCamSelect(deviceId);
-    // スキャン開始
-    startDecode(video);
-  }catch(err){
-    status.textContent='⚠️ カメラが使えません: '+err.message;
-    status.style.color='#ffcc66';
-  }
-}
-
-async function populateCamSelect(activeId){
-  try{
-    const devices=await navigator.mediaDevices.enumerateDevices();
-    _camDevices=devices.filter(d=>d.kind==='videoinput');
-    const sel=document.getElementById('camSelect');
-    sel.innerHTML='';
-    _camDevices.forEach(d=>{
-      const o=document.createElement('option');
-      o.value=d.deviceId;
-      o.textContent=d.label||('カメラ '+(sel.options.length+1));
-      if(d.deviceId===activeId) o.selected=true;
-      sel.appendChild(o);
-    });
-    // 背面カメラをデフォルト選択
-    if(!activeId){
-      const back=_camDevices.find(d=>/back|rear|環境/i.test(d.label));
-      if(back) sel.value=back.deviceId;
-    }
-  }catch(e){}
-}
-
-function switchCamera(deviceId){ if(deviceId) startCamera(deviceId); }
-
-function startDecode(video){
-  // キャンバスを確保
-  let canvas=document.getElementById('_scanCanvas');
-  if(!canvas){
-    canvas=document.createElement('canvas');
-    canvas.id='_scanCanvas';
-    canvas.style.display='none';
-    document.body.appendChild(canvas);
-  }
-  const ctx=canvas.getContext('2d',{willReadFrequently:true});
-
-  // BarcodeDetector API（Android Chrome / macOS Safari 対応）
-  if('BarcodeDetector' in window){
-    let supported=['code_128','ean_13','ean_8','upc_a','upc_e','qr_code','code_39','code_93','itf','data_matrix'];
-    // getSupportedFormats があれば絞り込む
-    const tryDet=async()=>{
-      try{
-        if(BarcodeDetector.getSupportedFormats){
-          const sf=await BarcodeDetector.getSupportedFormats();
-          supported=supported.filter(f=>sf.includes(f));
-        }
-      }catch(e){}
-      const det=new BarcodeDetector({formats:supported});
-      const loop=async()=>{
-        if(!_camActive) return;
-        try{
-          if(video.readyState>=2){
-            canvas.width=video.videoWidth||640;
-            canvas.height=video.videoHeight||480;
-            ctx.drawImage(video,0,0,canvas.width,canvas.height);
-            const results=await det.detect(canvas);
-            if(results.length) camGotBarcode(results[0].rawValue);
-          }
-        }catch(e){}
-        if(_camActive) setTimeout(loop,120);
-      };
-      loop();
-    };
-    tryDet();
-
-  } else if(window.ZXing){
-    // ZXing: canvasポーリング方式（decodeFromVideoElementより安定）
-    const zxHints=new Map();
-    const reader=new ZXing.BrowserMultiFormatReader();
-    _camReader=reader;
-    const loop=()=>{
-      if(!_camActive) return;
-      try{
-        if(video.readyState>=2){
-          canvas.width=video.videoWidth||640;
-          canvas.height=video.videoHeight||480;
-          ctx.drawImage(video,0,0,canvas.width,canvas.height);
-          const imgData=ctx.getImageData(0,0,canvas.width,canvas.height);
-          const luminanceSource=new ZXing.HTMLCanvasElementLuminanceSource(canvas);
-          const binaryBitmap=new ZXing.BinaryBitmap(new ZXing.HybridBinarizer(luminanceSource));
-          try{
-            const result=reader.decodeBitmap(binaryBitmap);
-            if(result) camGotBarcode(result.getText());
-          }catch(notFound){}
-        }
-      }catch(e){}
-      if(_camActive) setTimeout(loop,150);
-    };
-    loop();
-  } else {
-    document.getElementById('camStatus').textContent='⚠️ スキャン機能を読み込み中…しばらくお待ちください';
-    // ZXing CDN ロード待ちで再試行
-    let retry=0;
-    const wait=setInterval(()=>{
-      retry++;
-      if(window.ZXing){ clearInterval(wait); startDecode(video); }
-      if(retry>20){ clearInterval(wait); document.getElementById('camStatus').textContent='⚠️ スキャン機能の読み込みに失敗しました。リロードしてください'; }
-    },500);
-  }
-}
-
-function camGotBarcode(bc){
-  if(!bc) return;
-  const now=Date.now();
-  // 同じバーコードを1秒以内に連続検出しないようにする
-  if(bc===_camLastBc && now-_camLastTime<1500) return;
-  _camLastBc=bc; _camLastTime=now;
-  // フラッシュ演出
-  const flash=document.getElementById('camScanFlash');
-  if(flash){ flash.style.opacity='1'; setTimeout(()=>flash.style.opacity='0',150); }
-  // 結果表示
-  const res=document.getElementById('camResult');
-  res.style.display='block';
-  // 商品マスタ検索
-  const prods=nkGetProducts();
-  const found=prods.find(p=>(p.barcode||'').trim()===bc.trim());
-  if(found){
-    res.innerHTML=`<span style="color:#2ecc71;font-weight:700">✅ ${e(found.name)}</span><br><span style="font-size:11px;color:#aaa">${bc}</span>`;
-    res.style.borderLeft='3px solid #2ecc71';
-  } else {
-    res.innerHTML=`<span style="color:#ffcc66;font-weight:700">⚠️ 未登録バーコード</span><br><span style="font-size:12px;color:#aaa">${bc}</span>`;
-    res.style.borderLeft='3px solid #ffcc66';
-  }
-  // 棚卸テーブルに登録してモーダルを閉じる
-  scanBarcode(bc.trim());
-  // 1.2秒後に自動でスキャン継続（同じバーコードは1.5秒抑制済み）
-  setTimeout(()=>{ if(res) res.style.display='none'; },1200);
-}
-
-async function toggleTorch(){
-  if(!_camStream) return;
-  const track=_camStream.getVideoTracks()[0];
-  if(!track) return;
-  try{
-    const cap=track.getCapabilities();
-    if(!cap.torch) return;
-    const cur=track.getSettings().torch;
-    await track.applyConstraints({advanced:[{torch:!cur}]});
-    document.getElementById('btnTorch').textContent=cur?'🔦':'💡';
-  }catch(e){}
-}
-
-function stopCamera(){
-  _camActive=false;
-  if(_camReader){ try{_camReader.reset();}catch(e){} _camReader=null; }
-  if(_camStream){ _camStream.getTracks().forEach(t=>t.stop()); _camStream=null; }
-  const video=document.getElementById('camVideo');
-  if(video){ video.srcObject=null; }
-}
-
-function closeCameraScanner(){
-  stopCamera();
-  document.getElementById('camModal').style.display='none';
-}
-
-// トーチボタン対応チェック
-function checkTorchSupport(){
-  if(!_camStream) return;
-  const track=_camStream.getVideoTracks()[0];
-  if(!track) return;
-  try{
-    const cap=track.getCapabilities();
-    if(cap.torch){ document.getElementById('btnTorch').style.display='inline-block'; }
-  }catch(e){}
-}
-let _scanDraftTimer=null;
-function saveDraftDebounced(){
-  clearTimeout(_scanDraftTimer);
-  _scanDraftTimer=setTimeout(()=>saveDraft(),400);
-}
-
-function addRows(n){
-  if(!curKey||!pages[curKey])return;
-  const blank={n:'',z:'10',k:'',u:'',p:'',ss:'',sr:'',st:'',b:'',cat:'',bc:'',pt:'通常'};
-  for(let i=0;i<n;i++) pages[curKey].rows.push({...blank});
-  renderTable(); renderQbar();
-  if(!offline&&db){
-    db.ref('s/'+sid+'/pages/'+curKey+'/rows').set(pages[curKey].rows);
-    db.ref('s/'+sid+'/pages/'+curKey+'/at').set(Date.now());
-  }
-  // 追加した最初の行へスクロール
-  const tbody=document.getElementById('tbody');
-  if(tbody){
-    const rows=tbody.querySelectorAll('tr');
-    const target=rows[rows.length-n];
-    if(target) target.scrollIntoView({behavior:'smooth',block:'center'});
-  }
-  toast(n+'行追加しました');
 }
 
 // ============================================================
@@ -3572,24 +3685,18 @@ function renderPTabs(){
   order.forEach((k,i)=>{
     const pg=pages[k]||{}, on=k===curKey;
     const t=pg.tanto||'', catId=pg.catId||'';
-    const catLabel=((CATS.find(c=>c.id===catId)||{}).l||catId||'未設定');
-    const opts=CATS.map(c=>`<option value="${e(c.id)}"${catId===c.id?' selected':''}>${e(c.l)}</option>`).join('');
-    h+=`<div class="ptab" draggable="true" data-pk="${k}"
-      ondragstart="ptabDragStart(event,'${k}')"
-      ondragover="ptabDragOver(event)"
-      ondragend="ptabDragEnd(event)"
-      ondrop="ptabDrop(event,'${k}')">
-      <div class="ptab-top${on?' on':''}">
-        <span class="ptab-drag-handle" title="ドラッグして並び替え" style="cursor:grab;color:#aab;padding:0 4px;font-size:14px;user-select:none">⠿</span>
-        <span onclick="switchPage('${k}')" style="cursor:pointer">${i+1}P</span>
-        <span onclick="switchPage('${k}')" style="cursor:pointer;font-size:11px;max-width:110px;overflow:hidden;text-overflow:ellipsis">${e(t)||'未設定'}</span>
-        ${catId?`<span style="font-size:9px;background:#FF6600;color:#fff;border-radius:3px;padding:1px 5px">${e(catLabel)}</span>`:''}
+    h+=`<div class="ptab">
+      <div class="ptab-top${on?' on':''}" onclick="switchPage('${k}')">
+        <span>${i+1}P</span>
+        <span style="font-size:11px;max-width:110px;overflow:hidden;text-overflow:ellipsis">${e(t)||'未設定'}</span>
+        ${catId?`<span style="font-size:9px;background:#FF6600;color:#fff;border-radius:3px;padding:1px 5px">ID:${catId}</span>`:'<span style="font-size:9px;background:#aaa;color:#fff;border-radius:3px;padding:1px 5px">ID未設定</span>'}
       </div>
       <div class="ptab-bot" style="flex-wrap:wrap;gap:4px;padding:5px 6px">
-        <input class="ptinp" style="width:90px" value="${e(t)}" placeholder="ブランド名" onchange="updTanto('${k}',this.value)">
-        <select class="ptinp" style="width:170px;color:${catId?'#FF6600':'#888'};font-weight:${catId?'700':'400'}" onchange="updPageCatId('${k}',this.value)">
-          ${opts}
-        </select>
+        <input class="ptinp" style="width:100px" value="${e(t)}" placeholder="ブランド名（=カテゴリー名）" onchange="updTanto('${k}',this.value)" title="このページのブランド名がエアレジのカテゴリー名になります">
+        <div style="display:flex;align-items:center;gap:3px">
+          <span style="font-size:10px;color:#888;white-space:nowrap">カテゴリーID:</span>
+          <input class="ptinp" style="width:55px;font-family:monospace;color:#FF6600;font-weight:700" value="${e(catId)}" placeholder="例:0015" onchange="updPageCatId('${k}',this.value)" title="エアレジで新規作成するカテゴリーのID（4桁推奨）">
+        </div>
         ${order.length>1?`<button class="ptdel" onclick="delPage('${k}')">✕</button>`:''}
       </div>
     </div>`;
@@ -3598,132 +3705,6 @@ function renderPTabs(){
   el.innerHTML=h;
   initPtabTouchListeners();
 }
-
-// ページタブのドラッグ＆ドロップ並び替え
-// ============================================================
-// ページタブ並び替え（PC マウス + iPad/スマホ タッチ 統合）
-// ============================================================
-let ptabDraggingKey=null;
-
-/* ── マウス用（PC） ── */
-function ptabDragStart(ev,k){
-  ptabDraggingKey=k;
-  ev.dataTransfer.effectAllowed='move';
-  ev.currentTarget.style.opacity='.4';
-}
-function ptabDragOver(ev){
-  ev.preventDefault();
-  ev.dataTransfer.dropEffect='move';
-  ev.currentTarget.style.outline='2px solid #E8630A';
-}
-function ptabDragEnd(ev){
-  ev.currentTarget.style.opacity='';
-  document.querySelectorAll('.ptab').forEach(el=>{el.style.outline='';});
-}
-function ptabDrop(ev,targetKey){
-  ev.preventDefault();
-  ev.currentTarget.style.outline='';
-  ptabReorder(targetKey);
-}
-
-/* ── タッチ用（iPad / スマホ）── */
-let _ptTouch={key:null,clone:null,origEl:null,startX:0,startY:0,moved:false};
-
-function ptabTouchStart(ev,k){
-  // ハンドル以外からのタッチは無視
-  if(!ev.target.classList.contains('ptab-drag-handle')) return;
-  const el=ev.currentTarget;
-  const t=ev.touches[0];
-  _ptTouch.key=k;
-  _ptTouch.origEl=el;
-  _ptTouch.startX=t.clientX;
-  _ptTouch.startY=t.clientY;
-  _ptTouch.moved=false;
-
-  // クローンを作ってbodyに貼る
-  const rect=el.getBoundingClientRect();
-  const clone=el.cloneNode(true);
-  clone.style.cssText=`position:fixed;z-index:9999;left:${rect.left}px;top:${rect.top}px;
-    width:${rect.width}px;opacity:.85;pointer-events:none;
-    box-shadow:0 6px 20px rgba(0,0,0,.25);border-radius:6px;`;
-  document.body.appendChild(clone);
-  _ptTouch.clone=clone;
-  el.style.opacity='.3';
-}
-
-function ptabTouchMove(ev){
-  if(!_ptTouch.key) return;
-  ev.preventDefault(); // スクロールを止める
-  const t=ev.touches[0];
-  const dx=t.clientX-_ptTouch.startX;
-  const dy=t.clientY-_ptTouch.startY;
-  _ptTouch.moved=true;
-
-  // クローンを追従
-  if(_ptTouch.clone){
-    const rect=_ptTouch.origEl.getBoundingClientRect();
-    _ptTouch.clone.style.left=(rect.left+dx)+'px';
-    _ptTouch.clone.style.top=(rect.top+dy)+'px';
-  }
-
-  // 現在カーソル下のタブを探してハイライト
-  document.querySelectorAll('.ptab').forEach(el=>{el.style.outline='';});
-  const under=ptabElementAt(t.clientX,t.clientY);
-  if(under&&under!==_ptTouch.origEl) under.style.outline='2px solid #E8630A';
-}
-
-function ptabTouchEnd(ev){
-  if(!_ptTouch.key) return;
-  const t=ev.changedTouches[0];
-
-  // クローン除去
-  if(_ptTouch.clone){ _ptTouch.clone.remove(); _ptTouch.clone=null; }
-  if(_ptTouch.origEl) _ptTouch.origEl.style.opacity='';
-  document.querySelectorAll('.ptab').forEach(el=>{el.style.outline='';});
-
-  if(_ptTouch.moved){
-    const under=ptabElementAt(t.clientX,t.clientY);
-    if(under){
-      const targetKey=under.dataset.pk;
-      ptabReorder(targetKey);
-    }
-  }
-  _ptTouch={key:null,clone:null,origEl:null,startX:0,startY:0,moved:false};
-}
-
-// 座標からタブ要素を返す（クローンを一時非表示にして取得）
-function ptabElementAt(x,y){
-  if(_ptTouch.clone) _ptTouch.clone.style.display='none';
-  const el=document.elementFromPoint(x,y);
-  if(_ptTouch.clone) _ptTouch.clone.style.display='';
-  return el ? el.closest('.ptab') : null;
-}
-
-// 実際の順序変更（マウス・タッチ共通）
-function ptabReorder(targetKey){
-  if(!ptabDraggingKey&&!_ptTouch.key) return;
-  const fromKey=ptabDraggingKey||_ptTouch.key;
-  ptabDraggingKey=null;
-  if(!fromKey||fromKey===targetKey) return;
-  const fromIdx=order.indexOf(fromKey);
-  const toIdx=order.indexOf(targetKey);
-  if(fromIdx<0||toIdx<0) return;
-  order.splice(fromIdx,1);
-  order.splice(toIdx,0,fromKey);
-  if(!offline&&db&&sid) db.ref('s/'+sid+'/order').set(order);
-  renderPTabs();
-  toast('ページ順を変更しました');
-}
-
-// renderPTabs後にタッチリスナーをセット
-function initPtabTouchListeners(){
-  document.querySelectorAll('.ptab').forEach(el=>{
-    el.addEventListener('touchstart',ev=>ptabTouchStart(ev,el.dataset.pk),{passive:false});
-    el.addEventListener('touchmove',ptabTouchMove,{passive:false});
-    el.addEventListener('touchend',ptabTouchEnd);
-  });
-}
-
 
 function renderTable(){
   if(!curKey||!pages[curKey])return;
@@ -4081,14 +4062,11 @@ function renderAirTable(){
   const prods=getProds();
   document.getElementById('airBody').innerHTML=prods.length?prods.map((p,i)=>{
     const c=calc(p), tl=p.z==='8'?'<span class="tax8b">軽減8%</span>':'<span class="tax10b">標準10%</span>';
-    const cat = airCats.find(x=>x.id===p.cat);
-    const catDisp = p.cat
-      ? `<span style="font-weight:600;color:#FF6600">${e(cat?.name||p.cat)}</span>`
-      : '<span style="color:#aaa">未設定</span>';
+    const cat = p.catName ? `<span style="font-weight:600;color:#FF6600">${e(p.catName)}</span>${p.cat?`<span style="font-size:10px;color:#aaa;margin-left:4px">ID:${p.cat}</span>`:'<span style="font-size:10px;color:#e74c3c;margin-left:4px">⚠️ID未設定</span>'}` : '<span style="color:#aaa">未設定</span>';
     return `<tr>
       <td class="chkcol"><input type="checkbox" id="ac${i}" checked style="width:15px;height:15px;cursor:pointer;accent-color:#FF6600"></td>
       <td style="font-weight:600;color:#0f2744">${e(p.n)}</td>
-      <td style="font-size:11px">${catDisp}</td><td>${tl}</td>
+      <td style="font-size:11px">${cat}</td><td>${tl}</td>
       <td><span class="aprice">¥${fm(c.p)||0}</span><br><span style="font-size:10px;color:#6b7a8d">内税</span></td>
       <td style="color:#1a7a4a">¥${fm(parseFloat(p.st))||0}</td>
       <td style="text-align:center;background:#e8f5e9;font-weight:700;color:#1a5c2e">${Math.floor(parseFloat(p.k)||0)}</td>
@@ -4137,11 +4115,7 @@ let _bcpFiltered=[];
 function bcpAutoAssign(){
   const prods=nkGetProducts();
   const prodMap={};
-  // キー = 商品名|価格（同名・価格違いは別商品として扱う）
-  prods.forEach(p=>{if(p.name){
-    const k=p.name+'|'+(p.price||'');
-    prodMap[k]=p;
-  }});
+  prods.forEach(p=>{if(p.name)prodMap[p.name]=p;});
 
   // 現在の最大番号を取得（商品マスタ＋セッション全行＋使用済みリスト）
   // 形式: 8桁純数字 10000001〜
@@ -4169,10 +4143,9 @@ function bcpAutoAssign(){
       const name=(r.n||'').trim();
       if(!name) return;
       if((r.bc||'').trim()) return;
-      // 商品マスタに登録済みでバーコードがあればそちらを使用（名前+価格で照合）
-      const pk=name+'|'+(r.p||'');
-      if(prodMap[pk]&&(prodMap[pk].barcode||'').trim()){
-        pages[k].rows[ri].bc=prodMap[pk].barcode;
+      // 商品マスタに登録済みでバーコードがあればそちらを使用
+      if(prodMap[name]&&(prodMap[name].barcode||'').trim()){
+        pages[k].rows[ri].bc=prodMap[name].barcode;
         assigned++; return;
       }
       // 新規発番（8桁純数字・使用済みをスキップ）
@@ -4180,8 +4153,8 @@ function bcpAutoAssign(){
       const newBc=String(maxNum);
       newBcList.push(newBc);
       pages[k].rows[ri].bc=newBc;
-      if(prodMap[pk]){
-        prodMap[pk].barcode=newBc;
+      if(prodMap[name]){
+        prodMap[name].barcode=newBc;
       } else {
         const pc=nkGenProductCode(pages[k]?.catId||'', pages[k]?.tanto||r.cat||'');
         const np={
@@ -4440,218 +4413,130 @@ function confirmLabelPos(){
   else nkPrintLabels(_lpSelected);
 }
 
-// ── QRシール PDF生成（A-one 31297/31397 完全対応） ──
-// ブラウザ印刷のスケーリング問題を回避するため jsPDF でPDF直接生成
-// 300DPIキャンバスにレンダリング → PDF埋め込み → ダウンロード
-// これによりラベル屋さんと同等の印刷精度を実現
+// ── QRシール印刷共通ロジック（bcpPrint/nkPrintLabels から呼ばれる） ──
+// A-one 31297/31397 F200A4-1 正確寸法
+// ラベル: 20×8mm / 8列×25行
+// 左余白: 8.0mm / 上余白: 9.0mm
+// 列ピッチ: 24.86mm (20+4.86) / 行ピッチ: 11.33mm (8+3.33)
+// → 各ラベルをabsolute位置で配置（grid方式より印刷精度が高い）
 function buildQrLabelHtml(items, startPos){
-  const offset = Math.max(0, Math.min(199, (startPos||1)-1));
-  // JSONエスケープ（</script>対策）
-  const itemsJson = JSON.stringify(items.map(p=>({
-    name:   String(p.name||''),
-    price:  p.price!=null ? String(p.price) : '',
-    barcode:String(p.barcode||p.bc||'')
-  }))).replace(/<\//g,'<\\/');
+  const COLS=8, ROWS=25, PER=200;
+  const LW=20, LH=8;                 // ラベルサイズ mm
+  const ML=8.0, MT=9.0;              // 左・上余白 mm
+  const CP=24.86, RP=11.33;          // 列・行ピッチ mm
+  const offset=Math.max(0, Math.min(199, (startPos||1)-1));
 
+  const padded=[];
+  for(let i=0;i<offset;i++) padded.push(null);
+  items.forEach(p=>padded.push(p));
+
+  let sheetData='';
+  const totalSheets=Math.ceil(padded.length/PER);
+  for(let s=0;s<totalSheets;s++){
+    const chunk=padded.slice(s*PER,(s+1)*PER);
+    let cells='';
+    chunk.forEach((p,ci)=>{
+      if(!p) return;
+      const row=Math.floor(ci/COLS), col=ci%COLS;
+      const left=(ML+col*CP).toFixed(4);
+      const top=(MT+row*RP).toFixed(4);
+      const uid='qr_'+s+'_'+ci;
+      const nm=String(p.name||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+      const pr=p.price?'\u00a5'+Number(p.price).toLocaleString():'';
+      const bc=String(p.barcode||p.bc||'').replace(/&/g,'&amp;');
+      cells+=`<div style="position:absolute;left:${left}mm;top:${top}mm;width:${LW}mm;height:${LH}mm;overflow:hidden;display:flex;align-items:center;padding:0 0.6mm;gap:0.3mm;box-sizing:border-box;">
+  <div style="flex:1;min-width:0;display:flex;flex-direction:column;justify-content:center;overflow:hidden;line-height:1.2;">
+    <div style="font-size:4.5pt;font-weight:700;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;color:#111;">${nm}</div>
+    <div style="font-size:6.5pt;font-weight:900;color:#000;white-space:nowrap;margin-top:0.3mm;letter-spacing:-0.02em;">${pr}</div>
+  </div>
+  <div id="${uid}" data-bc="${bc}" style="width:6.5mm;height:6.5mm;flex-shrink:0;overflow:hidden;display:flex;align-items:center;justify-content:center;"></div>
+</div>`;
+    });
+    sheetData+=`<div class="sheet">${cells}</div>`;
+  }
+
+  const qrSrc='https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js';
   return `<!DOCTYPE html><html><head><meta charset="UTF-8">
-<title>QRシールPDF生成中...</title>
+<title>QRシール印刷</title>
 <style>
-  body{margin:0;background:#1a1a2e;color:#fff;font-family:'Meiryo','Hiragino Kaku Gothic Pro',sans-serif;
-       display:flex;flex-direction:column;align-items:center;justify-content:center;min-height:100vh;gap:16px}
-  #msg{font-size:18px;font-weight:700}
-  #sub{font-size:13px;color:#88aacc}
-  #prog-wrap{width:320px;background:#333;border-radius:8px;overflow:hidden;height:12px}
-  #prog{height:12px;background:#1a7a4a;width:0%;transition:width .2s}
-  #dlBtn{display:none;padding:14px 32px;background:#1a7a4a;color:#fff;border:none;border-radius:10px;
-         font-size:16px;font-weight:800;cursor:pointer;margin-top:8px}
-  #dlBtn:hover{background:#145c38}
-  #errMsg{color:#ff8888;font-size:13px;display:none}
+  @page{ size:A4 portrait; margin:0 }
+  *{ box-sizing:border-box; margin:0; padding:0 }
+  body{ background:#f0f0f0; font-family:'Hiragino Kaku Gothic Pro','Meiryo',sans-serif }
+  .toolbar{
+    position:fixed;top:0;left:0;right:0;background:#1a1a2e;color:#fff;
+    padding:8px 14px;display:flex;gap:10px;align-items:center;z-index:9999;flex-wrap:wrap;
+  }
+  .toolbar button{ padding:7px 18px;border:none;border-radius:6px;font-size:13px;font-weight:700;cursor:pointer }
+  .adj-group{ display:flex;align-items:center;gap:6px;background:rgba(255,255,255,.12);padding:5px 10px;border-radius:6px; }
+  .adj-group label{ font-size:11px;color:#cce;white-space:nowrap }
+  .adj-group input[type=range]{ width:80px;accent-color:#4caf50 }
+  .adj-group span{ font-size:11px;min-width:36px;text-align:right;font-family:monospace;color:#aef }
+  .adj-hint{ font-size:10px;color:#8899aa;line-height:1.4 }
+  .sheets-wrap{ padding-top:60px }
+  .sheet{
+    position:relative;
+    width:210mm;height:297mm;
+    overflow:hidden;page-break-after:always;
+    background:#fff;
+    margin:8mm auto;
+    box-shadow:0 2px 12px rgba(0,0,0,.2);
+  }
+  @media print{
+    .toolbar{ display:none!important }
+    .sheets-wrap{ padding-top:0 }
+    .sheet{ margin:0;box-shadow:none }
+  }
 </style>
 </head><body>
-<div id="msg">&#x1F4C4; PDF&#x751F;&#x6210;&#x4E2D;...</div>
-<div id="sub">&#x3057;&#x3070;&#x3089;&#x304F;&#x304A;&#x5F85;&#x3061;&#x304F;&#x3060;&#x3055;&#x3044;</div>
-<div id="prog-wrap"><div id="prog"></div></div>
-<button id="dlBtn" onclick="doDownload()">&#x2B07;&#xFE0F; PDF&#x3092;&#x30C0;&#x30A6;&#x30F3;&#x30ED;&#x30FC;&#x30C9;</button>
-<div id="errMsg"></div>
-<canvas id="qrTmp" style="display:none"></canvas>
-
-<script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"><\/script>
-<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"><\/script>
+<div class="toolbar">
+  <div>
+    <div style="font-size:13px;font-weight:700">\uD83D\uDDA8\uFE0F QR\u30b7\u30fc\u30eb\u5370\u5237 &nbsp; ${items.length}\u679a &nbsp;\u958b\u59cb\uff1a${offset+1}\u756a</div>
+  </div>
+  <div class="adj-group">
+    <label>\u5de6\u53f3\u8abf\u6574</label>
+    <input type="range" id="adjX" min="-5" max="5" step="0.1" value="0" oninput="applyAdj()">
+    <span id="adjXv">0.0mm</span>
+  </div>
+  <div class="adj-group">
+    <label>\u4e0a\u4e0b\u8abf\u6574</label>
+    <input type="range" id="adjY" min="-5" max="5" step="0.1" value="0" oninput="applyAdj()">
+    <span id="adjYv">0.0mm</span>
+  </div>
+  <button onclick="window.print()" style="background:#1a7a4a;color:#fff">\uD83D\uDDA8\uFE0F \u5370\u5237\u3059\u308b</button>
+  <button onclick="window.close()" style="background:#555;color:#fff">\u2715 \u9589\u3058\u308b</button>
+  <div class="adj-hint">\u4f59\u767d\u306a\u3057\u30fb\u500d\u738b100%\u3067\u5370\u5237\u3057\u3066\u304f\u3060\u3055\u3044\u3002<br>\u305a\u308c\u3066\u3044\u308b\u5834\u5408\u306f\u300c\u5de6\u53f3\u8abf\u6574\u300d\u300c\u4e0a\u4e0b\u8abf\u6574\u300d\u3067\u5fae\u8abf\u6574\u3057\u3066\u304f\u3060\u3055\u3044</div>
+</div>
+<div class="sheets-wrap" id="sheetsWrap">${sheetData}</div>
+<script src="${qrSrc}"><\/script>
 <script>
-var _pdfBlob = null;
-var _items   = ${itemsJson};
-var _offset  = ${offset};
-
-// ── 定数 ──────────────────────────────────────
-var DPI = 300;
-var MM  = DPI / 25.4;          // 1mm → px (11.811)
-var COLS=8, PER=200;
-// A-one 31297 正確寸法
-var ML=8.0, MT=9.0;            // 左・上余白 mm
-var CP=24.86, RP=11.33;        // 列ピッチ・行ピッチ mm
-var LW=20,   LH=8;             // ラベル幅・高さ mm
-var QR_MM=6.5;                 // QRコード正方形サイズ mm
-// フォントサイズ: pt→px = pt * (DPI/72)
-var F_NAME  = Math.round(4.5 * DPI/72);   // ~19px
-var F_PRICE = Math.round(6.5 * DPI/72);   // ~27px
-
-function setProgress(pct, text){
-  document.getElementById('prog').style.width = pct+'%';
-  if(text) document.getElementById('sub').textContent = text;
-}
-function setMsg(t){ document.getElementById('msg').textContent = t; }
-
-// QRコードをDataURLとして取得
-function qrToDataUrl(text){
-  return new Promise(function(resolve, reject){
-    var wrap = document.createElement('div');
-    wrap.style.cssText='position:absolute;left:-9999px;top:-9999px';
-    document.body.appendChild(wrap);
-    var size = Math.round(QR_MM*MM*1.5); // 少し大きめに生成してから縮小
-    try{
-      new QRCode(wrap,{text:text, width:size, height:size,
-        colorDark:'#000', colorLight:'#fff',
-        correctLevel:QRCode.CorrectLevel.M});
-    }catch(e){ document.body.removeChild(wrap); resolve(null); return; }
-    // QRCodeはすぐcanvas/imgを生成
-    setTimeout(function(){
-      var c = wrap.querySelector('canvas');
-      var img = wrap.querySelector('img');
-      var url = c ? c.toDataURL('image/png') : (img ? img.src : null);
-      document.body.removeChild(wrap);
-      resolve(url);
-    }, 80);
+var _adjX=0, _adjY=0;
+function applyAdj(){
+  _adjX=parseFloat(document.getElementById('adjX').value)||0;
+  _adjY=parseFloat(document.getElementById('adjY').value)||0;
+  document.getElementById('adjXv').textContent=(_adjX>=0?'+':'')+_adjX.toFixed(1)+'mm';
+  document.getElementById('adjYv').textContent=(_adjY>=0?'+':'')+_adjY.toFixed(1)+'mm';
+  var sheets=document.querySelectorAll('.sheet');
+  sheets.forEach(function(sh){
+    sh.style.marginLeft = _adjX + 'mm';
+    sh.style.paddingTop = _adjY + 'mm';
+    sh.style.paddingLeft = _adjX + 'mm';
   });
 }
-
-async function generate(){
-  try{
-    var { jsPDF } = window.jspdf;
-    var padded = new Array(_offset).fill(null).concat(_items);
-    var total  = padded.length;
-    var sheets = Math.ceil(total / PER);
-    var doc    = new jsPDF({unit:'mm', format:'a4', orientation:'portrait'});
-
-    // フォント設定（jsPDFはデフォルトでlatinのみ → テキストをcanvasで描画して画像埋め込み）
-    // 全ラベルをページ単位でキャンバスにレンダリング
-    var W_PX = Math.round(210 * MM);
-    var H_PX = Math.round(297 * MM);
-
-    for(var s=0; s<sheets; s++){
-      if(s>0) doc.addPage();
-      var chunk = padded.slice(s*PER, (s+1)*PER);
-
-      // ページ用キャンバス作成
-      var cv = document.createElement('canvas');
-      cv.width = W_PX; cv.height = H_PX;
-      var ctx = cv.getContext('2d');
-      ctx.fillStyle='#ffffff';
-      ctx.fillRect(0,0,W_PX,H_PX);
-
-      for(var ci=0; ci<chunk.length; ci++){
-        var p = chunk[ci];
-        if(!p) continue;
-
-        setProgress(Math.round(((s*PER+ci)/(total||1))*85)+5,
-          (s+1)+'/'+ sheets +' ページ目処理中... ('+(ci+1)+'/'+Math.min(chunk.length,PER)+')');
-
-        var row = Math.floor(ci/COLS), col = ci%COLS;
-        var lx  = Math.round((ML + col*CP)*MM);   // ラベル左端 px
-        var ly  = Math.round((MT + row*RP)*MM);    // ラベル上端 px
-        var lw  = Math.round(LW*MM);
-        var lh  = Math.round(LH*MM);
-        var qrSz= Math.round(QR_MM*MM);
-        var txtW= lw - qrSz - Math.round(1.5*MM); // テキスト幅
-
-        // ── 商品名 ──
-        ctx.save();
-        ctx.font = 'bold '+F_NAME+'px "Hiragino Kaku Gothic Pro","Meiryo","Yu Gothic",sans-serif';
-        ctx.fillStyle='#111111';
-        ctx.textBaseline='top';
-        // クリップしてはみ出し防止
-        ctx.beginPath();
-        ctx.rect(lx + Math.round(0.5*MM), ly + Math.round(0.8*MM), txtW, Math.round(3.5*MM));
-        ctx.clip();
-        ctx.fillText(p.name||'', lx + Math.round(0.5*MM), ly + Math.round(0.8*MM));
-        ctx.restore();
-
-        // ── 価格 ──
-        if(p.price){
-          ctx.save();
-          ctx.font = 'bold '+F_PRICE+'px "Hiragino Kaku Gothic Pro","Meiryo","Yu Gothic",sans-serif';
-          ctx.fillStyle='#000000';
-          ctx.textBaseline='top';
-          ctx.beginPath();
-          ctx.rect(lx + Math.round(0.5*MM), ly + Math.round(4.2*MM), txtW, Math.round(3.5*MM));
-          ctx.clip();
-          ctx.fillText('\u00A5'+Number(p.price).toLocaleString(),
-            lx + Math.round(0.5*MM), ly + Math.round(4.2*MM));
-          ctx.restore();
-        }
-
-        // ── QRコード ──
-        if(p.barcode){
-          var qrUrl = await qrToDataUrl(p.barcode);
-          if(qrUrl){
-            var qrImg = new Image();
-            await new Promise(function(res){
-              qrImg.onload = res;
-              qrImg.onerror = res;
-              qrImg.src = qrUrl;
-            });
-            var qrX = lx + lw - qrSz - Math.round(0.5*MM);
-            var qrY = ly + Math.round((lh - qrSz)/2);
-            ctx.drawImage(qrImg, qrX, qrY, qrSz, qrSz);
-          }
-        }
-      }// end chunk
-
-      // キャンバス→PNG→PDFページに埋め込み
-      setProgress(Math.round(((s+1)/sheets)*90), 'PDF変換中...');
-      var imgData = cv.toDataURL('image/png');
-      doc.addImage(imgData,'PNG',0,0,210,297);
-
-    }// end sheets
-
-    setProgress(98, 'PDF出力中...');
-    _pdfBlob = doc.output('blob');
-    setProgress(100, '完了！');
-    setMsg('\u2705 PDF\u751F\u6210\u5B8C\u4E86');
-    document.getElementById('dlBtn').style.display='block';
-    doDownload(); // 自動ダウンロード
-  }catch(err){
-    document.getElementById('errMsg').textContent = '⚠️ エラー: '+err.message;
-    document.getElementById('errMsg').style.display='block';
-    setMsg('エラーが発生しました');
-    console.error(err);
-  }
-}
-
-function doDownload(){
-  if(!_pdfBlob) return;
-  var a = document.createElement('a');
-  a.href = URL.createObjectURL(_pdfBlob);
-  a.download = 'QR\u30b7\u30fc\u30eb.pdf';
-  a.click();
-}
-
-window.onload = function(){
-  // ライブラリ読み込み確認してから開始
-  var tries=0;
-  var check = setInterval(function(){
-    if(window.jspdf && window.QRCode){
-      clearInterval(check);
-      generate();
-    } else if(++tries>60){
-      clearInterval(check);
-      document.getElementById('errMsg').textContent='ライブラリの読み込みに失敗しました。ネットワークを確認してください。';
-      document.getElementById('errMsg').style.display='block';
-    }
-  },100);
+window.onload=function(){
+  var els=document.querySelectorAll('[data-bc]');
+  els.forEach(function(el){
+    var bc=el.getAttribute('data-bc'); if(!bc)return;
+    try{
+      new QRCode(el,{text:bc,width:25,height:25,
+        colorDark:'#000',colorLight:'#fff',
+        correctLevel:QRCode.CorrectLevel.M});
+    }catch(e){}
+  });
 };
 <\/script>
 </body></html>`;
 }
+
 // ── QRシール印刷（棚卸タブ）──
 function bcpPrint(startPos){
   const items=[];
@@ -4663,882 +4548,12 @@ function bcpPrint(startPos){
   });
   if(!items.length){alert('印刷する商品を選択してください');return;}
   const html=buildQrLabelHtml(items, startPos||1);
-  const win=window.open('','_blank','width=900,height=700');
+  const win=window.open('','_blank','width=960,height=760');
   win.document.write(html);
   win.document.close();
 }
 
-
-
-
-
-// ============================================================
-// Airレジ CSV
-// ============================================================
-function setupFiles(){
-  const af=document.getElementById('airFile');
-  if(af) af.addEventListener('change',ev=>{if(ev.target.files[0])readAirFile(ev.target.files[0]);});
-  const zf=document.getElementById('zFile');
-  if(zf) zf.addEventListener('change',ev=>{if(ev.target.files[0])readZFile(ev.target.files[0]);});
-}
-
-function readAirFile(f){
-  const rd=new FileReader();
-  rd.onload=ev=>{
-    const arr=new Uint8Array(ev.target.result); let csv='';
-    try{const u=Encoding.convert(arr,{to:'UNICODE',from:'SJIS'});for(let i=0;i<u.length;i++)csv+=String.fromCharCode(u[i]);}
-    catch(_){csv=new TextDecoder('utf-8').decode(arr);}
-
-    const rawLines=csv.split('\n');
-    // バージョン行があれば取得（1行目がカンマなし＝バージョン文字列）
-    const hasVer = rawLines[0]&&!rawLines[0].includes(',');
-    const headLine = rawLines[hasVer?1:0]||'';
-    const heads = parseCsv(headLine);
-
-    // ---- ファイル種別の自動判定 ----
-    // カテゴリーID確認用ファイル: 列数が少ない（≤4）かつヘッダーが「カテゴリーID」「カテゴリー名」
-    const isCatFile = heads.length <= 4 ||
-      (heads[0]&&(heads[0].includes('カテゴリー')||heads[0]==='ID'));
-
-    const el=document.getElementById('airMergeInfo');
-    el.style.display='block';
-
-    if(isCatFile){
-      // カテゴリーID確認用ファイル
-      airCats=[];
-      const startLine = hasVer ? 2 : 1;
-      for(let i=startLine;i<rawLines.length;i++){
-        const l=rawLines[i].trim(); if(!l) continue;
-        const cols=parseCsv(l);
-        const id=(cols[0]||'').trim();
-        const name=(cols[1]||cols[0]||'').trim();
-        if(id && id!=='カテゴリーID' && id!=='ID') airCats.push({id,name});
-      }
-      el.style.background='#e8f4fd'; el.style.borderColor='#1a6ea6'; el.style.color='#0f2744';
-      el.textContent='✅ カテゴリー '+airCats.length+'件を読み込みました：'+airCats.map(c=>c.name+(c.name!==c.id?' ('+c.id+')':'')).join('、');
-      toast('カテゴリー '+airCats.length+'件読み込み完了');
-    } else {
-      // 商品一括編集CSV
-      airExist=[];
-      if(hasVer) airVer=rawLines[0].trim();
-      const catIdCol = Math.max(0, heads.findIndex(h=>h.includes('カテゴリーID')));
-      const startLine = hasVer ? 2 : 1;
-      for(let i=startLine;i<rawLines.length;i++){
-        const l=rawLines[i].trim();if(!l) continue;
-        const r=parseCsv(l);
-        if(r.length>=5&&r[0]) airExist.push(r);
-      }
-      // 商品CSVからもカテゴリーを抽出（名前なし・IDのみ）
-      if(!airCats.length){
-        const catMap={};
-        airExist.forEach(r=>{const cid=(r[catIdCol]||'').trim();if(cid)catMap[cid]=true;});
-        airCats=Object.keys(catMap).sort().map(id=>({id,name:id}));
-      }
-      el.style.background=''; el.style.borderColor=''; el.style.color='';
-      el.textContent='✅ 既存CSV '+airExist.length+'件を読み込みました';
-      toast('既存CSV '+airExist.length+'件読み込み完了');
-    }
-
-    renderCatAssign();
-    renderAirTable();
-  };
-  rd.readAsArrayBuffer(f);
-}
-
-function renderCatAssign(){
-  const box=document.getElementById('catAssignBox');
-  const rowsEl=document.getElementById('catAssignRows');
-  if(!box||!rowsEl) return;
-  if(!airCats.length){box.style.display='none'; return;}
-  box.style.display='block';
-
-  let h='';
-  order.forEach(k=>{
-    const pg=pages[k]||{};
-    const name=pg.tanto||'（名前未設定）';
-    const cur=pg.catId||'';
-    const curCat=airCats.find(c=>c.id===cur);
-    const opts=['<option value="">── カテゴリーなし ──</option>',
-      ...airCats.map(c=>`<option value="${e(c.id)}"${cur===c.id?' selected':''}>${e(c.name)}（ID:${e(c.id)}）</option>`)
-    ].join('');
-    h+=`<div style="display:flex;align-items:center;gap:10px;padding:8px 0;border-bottom:1px solid #fde0c0;flex-wrap:wrap">
-      <div style="min-width:120px;font-weight:700;color:#0f2744;font-size:13px">${e(name)}</div>
-      <div style="color:#ccc;font-size:16px">→</div>
-      <select style="flex:1;min-width:200px;padding:7px 10px;border:1.5px solid #FF6600;border-radius:6px;font-size:13px;color:#FF6600;font-weight:700;font-family:inherit;background:#fff"
-        onchange="setPageCatId('${k}',this.value)">${opts}</select>
-      <div style="font-size:11px;white-space:nowrap;color:${cur?'#1a7a4a':'#e74c3c'}">
-        ${cur?'✅ '+(curCat?curCat.name:cur):'⚠️ 未設定'}
-      </div>
-    </div>`;
-  });
-  rowsEl.innerHTML=h;
-}
-
-function setPageCatId(k, val){
-  if(!pages[k]) return;
-  pages[k].catId = val;
-  if(!offline&&db) db.ref('s/'+sid+'/pages/'+k+'/catId').set(val);
-  renderCatAssign();
-  renderPTabs();
-  renderAirTable();
-}
-
-const AHEADS=['商品ID','バリエーションID','削除設定 ※削除の場合のみ入力','カテゴリーID',
-  '【必須】商品名 ※49文字','商品名（レシート用） ※49文字 ・未設定の場合は商品名が印字されます。',
-  '商品名（商品入力用） ※49文字 ・未設定の場合は商品名が印字されます。',
-  'バリエーション（種別1） ※32文字','バリエーション（種別2） ※32文字',
-  '税設定 ※「外税」「内税」のいずれかを入力',
-  '適用税率 ※「標準税率」「軽減税率」「注文時に選択」「非課税」のいずれかを入力',
-  '税率別価格 ※適用税率が「注文時に選択」で税設定が「内税」の場合に「統一した価格を設定」「税率別に価格を設定」のいずれかを入力',
-  '価格設定 ※「通常」「部門打ち」「量り売り」のいずれかを入力','販売単位ID',
-  '【必須】価格 ※半角数字','価格2 ※税率別に価格を指定する場合に入力',
-  '原価 ※半角数字','商品コード ※24文字',
-  '自動発番（バーコード）※自動発番はJAN(EAN)コードで発番されます。','バーコード',
-  'ポイント付与対象 ※「対象」「対象外」のいずれかを入力',
-  '表示/非表示 ※「表示」「非表示」のいずれかを入力',
-  'レシート印字設定 ※「印字する」「印字しない」のいずれかを入力',
-  '登録番号印字設定 ※「印字する」「印字しない」のいずれかを入力',
-  '備考 ※1000文字','旧商品コード ※通常入力しません','分析タグID ※通常入力しません'];
-
-// カテゴリープレビュー描画
-function renderCatTable(){
-  const tbody = document.getElementById('catBody');
-  if(!tbody) return;
-  const rows = order.map(k=>{
-    const pg = pages[k]||{};
-    const name = pg.tanto||'';
-    const catId = pg.catId||'';
-    if(!name) return null;
-    const ok = catId ? '✅ OK' : '⚠️ IDを入力してください';
-    const okColor = catId ? '#1a7a4a' : '#e74c3c';
-    return `<tr>
-      <td style="font-weight:700;color:#0f2744">${e(name)}</td>
-      <td style="font-family:monospace;color:#FF6600;font-weight:700">${catId||'—'}</td>
-      <td style="color:${okColor};font-size:12px">${ok}</td>
-    </tr>`;
-  }).filter(Boolean);
-  tbody.innerHTML = rows.length
-    ? rows.join('')
-    : '<tr><td colspan="3" style="color:#aaa;text-align:center;padding:16px">ページを追加してブランド名を入力してください</td></tr>';
-}
-
-// カテゴリーCSV出力（エアレジ カテゴリーCSV形式）
-function dlCatCsv(){
-  const missing = order.filter(k => pages[k]?.tanto && !pages[k]?.catId);
-  if(missing.length){
-    toast('⚠️ カテゴリーIDが未入力のページがあります');
-    return;
-  }
-  const cats = order.map(k=>{
-    const pg = pages[k]||{};
-    if(!pg.tanto) return null;
-    return {id: pg.catId||'', name: pg.tanto};
-  }).filter(Boolean);
-  if(!cats.length){ toast('カテゴリーがありません'); return; }
-
-  // エアレジ カテゴリーCSV形式: カテゴリーID, カテゴリー名
-  let csv = 'カテゴリーID,カテゴリー名\n';
-  cats.forEach(c=>{ csv += ec(c.id)+','+ec(c.name)+'\n'; });
-  dlSJIS(csv, 'カテゴリー_'+new Date().toISOString().slice(0,10).replace(/-/g,'')+'.csv');
-  toast('カテゴリーCSVを出力しました（'+cats.length+'件）');
-}
-
-function dlAir(){
-  const prods=getProds();
-  if(!prods.length&&!airExist.length){toast('出力する商品がありません');return}
-  const rows=[];
-  prods.forEach((p,i)=>{
-    const chk=document.getElementById('ac'+i);
-    if(chk&&!chk.checked) return;
-    const c=calc(p), tax=p.z==='8'?'軽減税率':'標準税率', pr=Math.round(c.p);
-    // 商品マスタからproductCodeを取得
-    const _mProd=nkGetProducts().find(mp=>mp.barcode&&mp.barcode===p.bc)||
-                 nkGetProducts().find(mp=>mp.name&&mp.name===p.n)||{};
-    const _pc=_mProd.productCode||'';
-    const _row=new Array(27).fill('');
-    _row[3] =p.cat;                                    // カテゴリーID
-    _row[4] =p.n; _row[5]=p.n; _row[6]=p.n;           // 商品名×3
-    _row[9] ='内税';                                   // 税設定
-    _row[10]=tax;                                      // 適用税率
-    _row[12]=p.pt||'通常';                             // 価格設定
-    _row[13]=p.u||'';                                  // 販売単位ID
-    _row[14]=p.pt==='部門打ち'?'0':String(pr);         // 価格
-    _row[16]=p.st||'';                                 // 原価
-    _row[17]=_pc;                                      // ★ 商品コード
-    _row[19]=p.bc||'';                                 // ★ バーコード
-    _row[20]='対象'; _row[21]='表示';
-    _row[22]='印字する'; _row[23]='印字する';
-    _row[24]=p.b||'';
-    rows.push(_row);
-  });
-  let csv=airVer+'\n'+AHEADS.map(ec).join(',')+'\n';
-  airExist.forEach(r=>{csv+=r.map(ec).join(',')+'\n';});
-  rows.forEach(r=>{csv+=r.map(ec).join(',')+'\n';});
-  dlSJIS(csv,'商品一括編集_'+new Date().toISOString().slice(0,10).replace(/-/g,'')+'.csv');
-  toast('商品登録CSV出力完了（既存'+airExist.length+'件＋新規'+rows.length+'件）');
-}
-
-function readZFile(f){
-  const rd=new FileReader();
-  rd.onload=ev=>{
-    const arr=new Uint8Array(ev.target.result); let csv='';
-    try{const u=Encoding.convert(arr,{to:'UNICODE',from:'SJIS'});for(let i=0;i<u.length;i++)csv+=String.fromCharCode(u[i]);}
-    catch(_){csv=new TextDecoder('utf-8').decode(arr);}
-    const lines=csv.split('\n'); zBase=[];zHead=[];zVer='';
-    let ds=1;
-    if(lines[0]&&!lines[0].includes(',')){zVer=lines[0].trim();zHead=parseCsv(lines[1]||'');ds=2;}
-    else{zHead=parseCsv(lines[0]||'');ds=1;}
-    for(let i=ds;i<lines.length;i++){const l=lines[i].trim();if(l){const r=parseCsv(l);if(r.length>=2&&r[0])zBase.push(r);}}
-    const el=document.getElementById('zMergeInfo');
-    el.style.display='block'; el.textContent='✅ 在庫CSV '+zBase.length+'件を読み込みました';
-    renderZTable(); toast('在庫CSV '+zBase.length+'件読み込み完了');
-  };
-  rd.readAsArrayBuffer(f);
-}
-
-function renderZTable(){
-  const prods=getProds(), h=zHead;
-  const ci={n:h.findIndex(v=>v.includes('商品名')),v:h.findIndex(v=>v.includes('バリエーション（種別1）')||v.includes('バリエーション(種別1)')),
-    bc:h.findIndex(v=>v.includes('バーコード')),uz:h.findIndex(v=>v.includes('更新在庫数')),
-    ut:h.findIndex(v=>v.includes('更新種別')),um:h.findIndex(v=>v.includes('更新メモ'))};
-  document.getElementById('zBody').innerHTML=zBase.length?zBase.map((row,i)=>{
-    const sn=ci.n>=0?row[ci.n]:'', v1=ci.v>=0?row[ci.v]:'', bc=ci.bc>=0?row[ci.bc]:'';
-    const m=prods.find(p=>(p.n&&sn&&p.n===sn)||(p.bc&&bc&&p.bc===bc));
-    const kv=m?Math.floor(parseFloat(m.k)||0):'';
-    return `<tr>
-      <td class="chkcol"><input type="checkbox" id="zc${i}" ${m?'checked':''} style="width:15px;height:15px;accent-color:#1a7a4a"></td>
-      <td style="font-weight:600">${e(sn)}</td><td style="font-size:11px;color:#6b7a8d">${e(v1)||'-'}</td>
-      <td style="text-align:center;background:#e8f5e9">
-        <input type="number" id="zv${i}" value="${kv}" style="width:70px;text-align:center;border:1px solid #ccc;border-radius:4px;padding:4px;font-weight:700;color:#1a5c2e;font-family:inherit">
-      </td>
-      <td style="font-size:11px;color:#6b7a8d">棚卸し・在庫確認</td>
-      <td style="font-size:11px;color:#6b7a8d">${e(bc)||'-'}</td>
-      <td style="font-size:11px">${m?'<span style="color:#1a7a4a;font-weight:700">✅ 照合済み</span>':'<span style="color:#6b7a8d">－ 未照合</span>'}</td>
-    </tr>`;
-  }).join(''):'<tr><td colspan="7" style="text-align:center;padding:20px;color:#6b7a8d">上のエリアにエアレジの在庫一括編集CSVをアップロードしてください</td></tr>';
-}
-
-function dlZaiko(){
-  if(!zBase.length){toast('先にエアレジの在庫一括編集CSVをアップロードしてください');return}
-  const h=zHead;
-  const ci={uz:h.findIndex(v=>v.includes('更新在庫数')),ut:h.findIndex(v=>v.includes('更新種別')),um:h.findIndex(v=>v.includes('更新メモ'))};
-  const rows=zBase.map((row,i)=>{
-    const chk=document.getElementById('zc'+i), vEl=document.getElementById('zv'+i);
-    const nr=[...row];
-    if(chk&&chk.checked&&vEl){
-      if(ci.uz>=0) nr[ci.uz]=vEl.value;
-      if(ci.ut>=0) nr[ci.ut]='棚卸し・在庫確認';
-      if(ci.um>=0) nr[ci.um]='棚卸 '+document.getElementById('hDate').value;
-    }
-    return nr;
-  });
-  let csv='';
-  if(zVer) csv+=zVer+'\n';
-  csv+=zHead.map(ec).join(',')+'\n';
-  rows.forEach(r=>{csv+=r.map(ec).join(',')+'\n';});
-  dlSJIS(csv,'在庫一括編集_棚卸'+document.getElementById('hDate').value.replace(/-/g,'')+'.csv');
-  toast('在庫CSVをダウンロードしました');
-}
-
-// ============================================================
-// Excel出力
-// ============================================================
-function doExcel(){
-  const wb=XLSX.utils.book_new();
-  order.forEach((k,pi)=>{
-    const pg=pages[k]||{}, rows=pg.rows||[], sub=pageSub(rows);
-    const t=pg.tanto||pg.ownerName||'';
-    const ar=[
-      [`${document.getElementById('hDate').value} 棚卸台帳`,'','','',`場所：${document.getElementById('hBasho').value}`],
-      [`担当：${t}`],[`責任者：${document.getElementById('hTanto').value}　業務：${document.getElementById('hGyomu').value}`],[],
-      ['No','商品名','税率','個数','単位','税込単価','税抜単価','10%仕入計','8%仕入計','仕入先','仕入率','仕入単価','在庫価格','備考'],
-      ...rows.map((r,ri)=>{const c=calc(r);return[ri+1,r.n,r.z==='8'?'○(8%)':'10%',r.k||'',r.u,r.p||'',c.ok?Math.round(c.zt):'',c.j||'',c.h||'',r.ss,r.sr||'',r.st||'',c.zk||'',r.b];}),
-      ['','','','','','','','頁小計','',sub.p10||'','',sub.p8||'','在庫',sub.z||'']
-    ];
-    const ws=XLSX.utils.aoa_to_sheet(ar);
-    ws['!cols']=[{wch:4},{wch:22},{wch:8},{wch:6},{wch:6},{wch:10},{wch:10},{wch:12},{wch:12},{wch:12},{wch:8},{wch:10},{wch:12},{wch:14}];
-    XLSX.utils.book_append_sheet(wb,ws,`${pi+1}P_${t||'担当未設定'}`);
-  });
-  XLSX.writeFile(wb,'棚卸台帳_'+document.getElementById('hDate').value.replace(/-/g,'')+'.xlsx');
-  toast('Excelをダウンロードしました');
-}
-
-// ============================================================
-// ユーティリティ
-// ============================================================
-function parseCsv(line){
-  const res=[]; let cur='', inQ=false;
-  for(let i=0;i<line.length;i++){
-    const ch=line[i];
-    if(ch==='"'){if(inQ&&line[i+1]==='"'){cur+='"';i++;}else inQ=!inQ;}
-    else if(ch===','&&!inQ){res.push(cur);cur='';}
-    else cur+=ch;
-  }
-  res.push(cur); return res;
-}
-function ec(v){
-  if(v===null||v===undefined)return ''; v=String(v).replace(/"/g,'""');
-  if(v.includes(',')||v.includes('\n')||v.includes('"'))return `"${v}"`; return v;
-}
-function dlSJIS(csv,fname){
-  const ua=[]; for(let i=0;i<csv.length;i++) ua.push(csv.charCodeAt(i));
-  const sj=Encoding.convert(ua,{to:'SJIS',from:'UNICODE'});
-  const bl=new Blob([new Uint8Array(sj)],{type:'text/csv;charset=Shift_JIS;'});
-  const a=document.createElement('a'); a.href=URL.createObjectURL(bl);
-  a.download=fname; document.body.appendChild(a); a.click(); document.body.removeChild(a);
-}
-function e(s){if(!s)return '';return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');}
-function toast(msg){
-  const el=document.getElementById('toast'); el.textContent=msg;
-  el.classList.add('on'); setTimeout(()=>el.classList.remove('on'),3500);
-}
-
-// ============================================================
-// 固定横スクロールバー
-// ============================================================
-function initFixedScrollbar() {
-  const tscroll = document.querySelector('.tscroll');
-  const fixed = document.getElementById('fixedScrollbar');
-  const inner = document.getElementById('fixedScrollbarInner');
-  if (!tscroll || !fixed || !inner) return;
-
-  // テーブルの幅に合わせてinnerの幅をセット
-  const syncWidth = () => {
-    inner.style.width = tscroll.scrollWidth + 'px';
-  };
-  syncWidth();
-
-  // 固定バーの左位置をテーブルのコンテナに合わせる
-  const syncPos = () => {
-    const rect = tscroll.getBoundingClientRect();
-    fixed.style.left = rect.left + 'px';
-    fixed.style.right = (window.innerWidth - rect.right) + 'px';
-    fixed.style.width = 'auto';
-  };
-  syncPos();
-
-  // テーブルが画面内にあるときだけ固定バーを表示
-  const onScroll = () => {
-    const rect = tscroll.getBoundingClientRect();
-    const visible = rect.top < window.innerHeight && rect.bottom > 60;
-    // テーブルの下端が画面内に収まっていてスクロールバーが見えているなら非表示
-    const barVisible = rect.bottom > window.innerHeight;
-    fixed.style.display = (visible && barVisible) ? 'block' : 'none';
-    syncPos();
-    syncWidth();
-  };
-
-  // スクロール同期（固定バー → テーブル）
-  fixed.addEventListener('scroll', () => {
-    tscroll.scrollLeft = fixed.scrollLeft;
-  });
-  // スクロール同期（テーブル → 固定バー）
-  tscroll.addEventListener('scroll', () => {
-    fixed.scrollLeft = tscroll.scrollLeft;
-  });
-
-  window.addEventListener('scroll', onScroll, { passive: true });
-  window.addEventListener('resize', onScroll, { passive: true });
-  onScroll();
-}
-
-// ============================================================
-// バーコードスキャナー（html5-qrcode）
-// ============================================================
-
-window.addEventListener('DOMContentLoaded',()=>{
-  // ホーム日付
-  const hd=document.getElementById('hmDate');
-  if(hd) hd.textContent=new Date().toLocaleDateString('ja-JP',{year:'numeric',month:'long',day:'numeric',weekday:'short'})+'　今日は何をしますか？';
-
-  // 保存済み設定があれば自動接続
-  const saved=localStorage.getItem(FK);
-  if(saved){
-    try{
-      const cfg=JSON.parse(saved);
-      if(cfg.databaseURL&&cfg.apiKey&&cfg.projectId){
-        document.getElementById('sDbUrl').value=cfg.databaseURL;
-        document.getElementById('sApiKey').value=cfg.apiKey;
-        document.getElementById('sProjId').value=cfg.projectId;
-        hmUpdateStatus('Firebase接続中...');
-        loadFB(()=>initFB(cfg,null));
-        return;
-      }
-    }catch(ex){}
-  }
-  // なければ設定画面を表示
-});
-
-// ============================================================
-// 入荷・商品登録管理
-// ============================================================
-const PK  = 'tb_products_v1';
-const NAK = 'tb_arrivals_v1';
-const AIKK = 'tb_aikey_v1'; // Anthropic APIキー
-
-function nkGetProducts(){ try{return JSON.parse(localStorage.getItem(PK)||'[]');}catch(e){return[];} }
-function nkSaveProducts(list){ try{localStorage.setItem(PK,JSON.stringify(list));}catch(e){} }
-
-// ── 使用済みバーコード管理（一度発番した番号は永久に再利用しない） ──
-function getBcUsed(){ try{return new Set(JSON.parse(localStorage.getItem(BK)||'[]'));}catch(e){return new Set();} }
-function addBcUsed(nums){
-  const s=getBcUsed();
-  nums.forEach(n=>s.add(String(n)));
-  try{localStorage.setItem(BK,JSON.stringify([...s]));}catch(e){}
-}
-function nkGetArrivals(){ try{return JSON.parse(localStorage.getItem(NAK)||'[]');}catch(e){return[];} }
-function nkSaveArrivals(list){ try{localStorage.setItem(NAK,JSON.stringify(list.slice(0,500)));}catch(e){} }
-
-// ── Claude貼り付けインポート ─────────────────────
-
-function nkCopyPrompt(){
-  const txt=document.getElementById('nkPromptBox').textContent;
-  navigator.clipboard.writeText(txt).then(()=>{
-    toast('プロンプトをコピーしました。Claudeに貼り付けてください');
-  }).catch(()=>{
-    // fallback
-    const ta=document.createElement('textarea');
-    ta.value=txt; document.body.appendChild(ta);
-    ta.select(); document.execCommand('copy'); document.body.removeChild(ta);
-    toast('プロンプトをコピーしました');
-  });
-}
-
-function nkImportPaste(){
-  const raw=(document.getElementById('nkPasteArea').value||'').trim();
-  const status=document.getElementById('nkPasteStatus');
-  status.style.display='none';
-
-  if(!raw){ alert('Claudeの出力テキストを貼り付けてください'); return; }
-
-  const lines=raw.split('\n').map(l=>l.trim()).filter(l=>l&&!l.startsWith('//'));
-  const items=[];
-  const errors=[];
-
-  lines.forEach((line,i)=>{
-    // コードブロック記法や空行を無視
-    if(line.startsWith('```')||line.startsWith('#')||line==='-') return;
-
-    // カンマ区切りでパース（全角カンマも対応）
-    const cols=line.split(/[,，]/).map(c=>c.trim());
-    if(cols.length<2){ errors.push(`行${i+1}: 「${line}」（スキップ）`); return; }
-
-    const name=cols[0].replace(/^["「『]|["」』]$/g,'').trim();
-    if(!name){ errors.push(`行${i+1}: 商品名なし（スキップ）`); return; }
-
-    const qty=parseInt(cols[1])||1;
-    const cost=cols[2]?cols[2].replace(/[¥￥,，\s]/g,''):'';
-    const taxRate=(cols[3]||'').replace(/[^0-9]/g,'');
-    const z=(taxRate==='8')?'8':'10';
-
-    items.push({n:name, z, qty, cost, p:'', u:'点', cat:'', catId:'', bc:'', isNew:true});
-  });
-
-  if(!items.length){
-    status.style.display='block';
-    status.style.color='#e74c3c';
-    status.textContent='❌ 読み込める行がありませんでした。Claudeに指定フォーマットで出力させてください。';
-    return;
-  }
-
-  // 既存の空行をクリアして追加
-  nkArrivalRows=nkArrivalRows.filter(r=>r.n.trim());
-  items.forEach(it=>nkArrivalRows.push(it));
-  if(!nkArrivalRows.length) nkAddRow();
-  nkRenderArrival();
-
-  document.getElementById('nkPasteArea').value='';
-  document.getElementById('nkPasteArea').style.borderColor='#c8d4f0';
-
-  status.style.display='block';
-  status.style.color='#1a7a4a';
-  let msg=`✅ ${items.length}件を読み込みました。内容を確認・修正して保存してください。`;
-  if(errors.length) msg+=`　（${errors.length}行スキップ）`;
-  status.textContent=msg;
-
-  toast(`${items.length}件インポートしました`);
-
-  // 入荷情報カードまでスクロール
-  setTimeout(()=>{
-    const el=document.getElementById('nkTbody');
-    if(el) el.closest('.nk-card').scrollIntoView({behavior:'smooth',block:'start'});
-  },200);
-}
-
-
-
-
-function nkNextBarcode(){
-  const prods=nkGetProducts();
-  const used=getBcUsed();
-  let maxNum=10000000;
-  const numPat=/^(\d{8,})$/;
-  prods.forEach(p=>{ const m=p.barcode&&p.barcode.match(numPat); if(m) maxNum=Math.max(maxNum,parseInt(m[1],10)); });
-  used.forEach(v=>{ const m=v.match(numPat); if(m) maxNum=Math.max(maxNum,parseInt(m[1],10)); });
-  let next=maxNum+1;
-  // 万が一の衝突回避（念のため）
-  while(used.has(String(next))) next++;
-  return String(next);
-}
-
-function doNyuuka(){
-  showPage('pgNyuuka');
-  document.getElementById('nkDate').value=new Date().toISOString().slice(0,10);
-  nkArrivalRows=[];
-  nkAddRow();
-  nkShowTab('arrival');
-}
-
-function nkShowTab(name){
-  ['arrival','products','labels','history'].forEach(n=>{
-    const p=document.getElementById('nkpnl-'+n);
-    const t=document.getElementById('nktab-'+n);
-    if(p) p.style.display=(n===name?'block':'none');
-    if(t) t.classList.toggle('on',n===name);
-  });
-  if(name==='products') nkRenderProducts();
-  if(name==='labels')   nkRenderLabelList();
-  if(name==='history')  nkRenderHistory();
-}
-
-let nkArrivalRows=[];
-
-function nkAddRow(){
-  nkArrivalRows.push({n:'',z:'10',qty:1,cost:'',p:'',u:'点',cat:'',catId:'',bc:'',isNew:true});
-  nkRenderArrival();
-}
-
-function nkRenderArrival(){
-  const tbody=document.getElementById('nkTbody'); if(!tbody)return;
-  tbody.innerHTML=nkArrivalRows.map((r,i)=>`<tr>
-    <td style="text-align:center">
-      <button onclick="nkDelRow(${i})" style="background:none;border:1px solid #e74c3c;color:#e74c3c;border-radius:4px;padding:1px 6px;cursor:pointer;font-size:11px">✕</button>
-    </td>
-    <td style="min-width:150px">
-      <input class="nk-ci" value="${e(r.n)}" placeholder="商品名を入力" style="min-width:140px"
-        oninput="nkArrivalRows[${i}].n=this.value" onblur="nkAutoFill(${i})">
-    </td>
-    <td><select class="nk-ci" onchange="nkArrivalRows[${i}].z=this.value">
-      <option value="10"${r.z==='10'?' selected':''}>10%</option>
-      <option value="8"${r.z==='8'?' selected':''}>8%</option>
-    </select></td>
-    <td><input class="nk-ci" type="number" min="0" value="${r.qty}" oninput="nkArrivalRows[${i}].qty=this.value" style="text-align:right"></td>
-    <td><input class="nk-ci" type="number" value="${r.cost}" placeholder="原価" oninput="nkArrivalRows[${i}].cost=this.value" style="text-align:right"></td>
-    <td style="background:#e8faf0">
-      <input class="nk-ci" type="number" value="${r.p}" placeholder="売価"
-        oninput="nkArrivalRows[${i}].p=this.value" style="text-align:right;font-weight:700;color:#1a5c2e">
-    </td>
-    <td><input class="nk-ci" value="${e(r.u)}" placeholder="点" oninput="nkArrivalRows[${i}].u=this.value" style="width:50px"></td>
-    <td><select class="nk-ci" style="color:${r.catId?'#FF6600':'#888'};font-weight:${r.catId?'700':'400'}"
-      onchange="nkArrivalRows[${i}].catId=this.value;nkArrivalRows[${i}].cat=(CATS.find(c=>c.id===this.value)||{}).l||'';this.style.color=this.value?'#FF6600':'#888';this.style.fontWeight=this.value?'700':'400'">
-      ${CATS.map(c=>`<option value="${e(c.id)}"${r.catId===c.id?' selected':''}>${e(c.l)}</option>`).join('')}
-    </select></td>
-    <td><input class="nk-ci" value="${e(r.catId)}" placeholder="ID" style="width:70px;font-size:11px"
-      oninput="nkArrivalRows[${i}].catId=this.value"></td>
-    <td style="text-align:center">
-      ${r.bc
-        ?`<span style="font-family:monospace;font-size:10px;font-weight:700;background:#e8f5e9;color:#1a5c2e;padding:3px 6px;border-radius:4px">${e(r.bc)}</span>`
-        :`<span style="font-size:10px;color:#aab">保存時発行</span>`}
-    </td>
-  </tr>`).join('');
-}
-
-function nkDelRow(i){
-  nkArrivalRows.splice(i,1);
-  if(!nkArrivalRows.length) nkAddRow();
-  else nkRenderArrival();
-}
-
-function nkAutoFill(i){
-  const name=nkArrivalRows[i].n.trim(); if(!name)return;
-  const found=nkGetProducts().find(p=>p.name===name);
-  if(!found)return;
-  const r=nkArrivalRows[i];
-  if(!r.p)     r.p=found.price||'';
-  if(!r.catId) r.catId=found.catId||'';
-  if(!r.cat)   r.cat=found.category||'';
-  if(r.u==='点') r.u=found.unit||'点';
-  r.z=found.taxRate||'10';
-  r.bc=found.barcode||'';
-  r.isNew=false;
-  nkRenderArrival();
-  toast(`「${name}」の情報を補完しました`);
-}
-
-function nkSaveArrival(){
-  const rows=nkArrivalRows.filter(r=>r.n.trim());
-  if(!rows.length){alert('商品を1件以上入力してください');return;}
-  const date=document.getElementById('nkDate').value;
-  const supplier=document.getElementById('nkSupplier').value.trim();
-  const memo=document.getElementById('nkMemo').value.trim();
-
-  const prods=nkGetProducts();
-  const prodMap={};
-  // キー = 商品名|価格（同名・価格違いは別商品として扱う）
-  prods.forEach(p=>{
-    const k=p.name+'|'+(p.price||'');
-    prodMap[k]=p;
-  });
-
-  // ── 重複チェック（同名・同価格のみ重複とみなす）──────────────────────────────
-  const dups=[];
-  rows.forEach(r=>{
-    const name=r.n.trim(); if(!name)return;
-    const pk=name+'|'+(r.p||'');
-    const ex=prodMap[pk];
-    if(!ex) return; // 新規は問題なし
-    const diffs=[];
-    const fmt=v=>v?'¥'+Number(v).toLocaleString():'未設定';
-    if(r.cost && String(r.cost)!==String(ex.costPrice||''))
-      diffs.push(`原価：登録済み${fmt(ex.costPrice)} → 今回${fmt(r.cost)}`);
-    if(r.z && r.z!==(ex.taxRate||'10'))
-      diffs.push(`税率：登録済み${ex.taxRate||'10'}% → 今回${r.z}%`);
-    if(r.u && r.u!=='点' && r.u!==(ex.unit||''))
-      diffs.push(`単位：登録済み「${ex.unit||'点'}」→ 今回「${r.u}」`);
-    dups.push({name, diffs, hasDiff: diffs.length>0});
-  });
-
-  if(dups.length){
-    const changed=dups.filter(d=>d.hasDiff);
-    const same=dups.filter(d=>!d.hasDiff);
-    let msg='【重複商品が見つかりました】\n\n';
-    if(changed.length){
-      msg+='▼ 内容が異なる商品（上書き確認）\n';
-      changed.forEach(d=>{
-        msg+=`・${d.name}\n`;
-        d.diffs.forEach(diff=>{ msg+=`　${diff}\n`; });
-      });
-      msg+='\n';
-    }
-    if(same.length){
-      msg+='▼ 同名・同内容の商品（再登録不要）\n';
-      same.forEach(d=>{ msg+=`・${d.name}\n`; });
-      msg+='\n';
-    }
-    msg+='このまま保存（上書き更新）しますか？\n「キャンセル」で入力画面に戻って修正できます。';
-    if(!confirm(msg)) return;
-  }
-
-  // ── 保存処理 ──────────────────────────────────
-  let newCount=0,updCount=0;
-  const savedItems=[];
-  rows.forEach(r=>{
-    const name=r.n.trim(); if(!name)return;
-    const pk=name+'|'+(r.p||'');
-    if(prodMap[pk]){
-      const p=prodMap[pk];
-      if(r.cost) p.costPrice=r.cost;
-      if(r.catId){p.catId=r.catId;}
-      if(r.cat)  p.category=r.cat;
-      if(r.z)    p.taxRate=r.z;
-      if(r.u)    p.unit=r.u;
-      if(supplier) p.supplier=supplier;
-      r.bc=p.barcode;
-      updCount++;
-    } else {
-      const bc=nkNextBarcode();
-      addBcUsed([bc]); // 発番した番号を即座に使用済み登録（重複防止）
-      const pc=nkGenProductCode(r.catId||'', r.cat||'');
-      const np={
-        id:'p'+Date.now()+'_'+Math.random().toString(36).slice(2,5),
-        name, barcode:bc, productCode:pc,
-        price:r.p||'', costPrice:r.cost||'',
-        taxRate:r.z||'10', unit:r.u||'点',
-        category:r.cat||'', catId:r.catId||'',
-        supplier:supplier||'', createdAt:Date.now()
-      };
-      prods.push(np);
-      prodMap[name+'|'+(r.p||'')]=np;
-      r.bc=bc;
-      newCount++;
-    }
-    savedItems.push({name,barcode:r.bc,qty:isNaN(parseInt(r.qty))?1:parseInt(r.qty),cost:r.cost,price:r.p});
-  });
-
-  nkSaveProducts(prods);
-  const arrivals=nkGetArrivals();
-  arrivals.unshift({id:'a'+Date.now(),date,supplier,memo,items:savedItems,at:Date.now()});
-  nkSaveArrivals(arrivals);
-  nkRenderArrival();
-  toast(`新規${newCount}件・更新${updCount}件`);
-  if(confirm(`保存完了！\n新規：${newCount}件　更新：${updCount}件\n\nバーコードシール印刷画面を開きますか？`)){
-    nkShowTab('labels');
-  }
-}
-
-function nkRenderProducts(){
-  const list=document.getElementById('nkProdList'); if(!list)return;
-  const q=(document.getElementById('nkProdSearch')||{}).value||'';
-  let prods=nkGetProducts();
-  if(q) prods=prods.filter(p=>p.name.includes(q)||(p.barcode||'').includes(q));
-  // 商品コード未設定数をバナーに反映
-  const noPc=prods.filter(p=>!p.productCode).length;
-  const pcBanner=document.getElementById('nkPcBanner');
-  if(pcBanner) pcBanner.style.display=noPc>0?'block':'none';
-  if(pcBanner&&noPc>0) pcBanner.querySelector('span').textContent=`商品コード未設定：${noPc}件`;
-  const cnt=document.getElementById('nkProdCount');
-  if(cnt) cnt.textContent=`（${prods.length}件）`;
-  if(!prods.length){
-    list.innerHTML='<div style="text-align:center;color:#aab;padding:32px">商品がまだ登録されていません。入荷入力から登録してください。</div>';
-    return;
-  }
-  list.innerHTML=prods.map(p=>`
-    <div class="nk-prod-item">
-      <span class="nk-prod-bc" title="バーコード">${e(p.barcode)||'<span style="color:#e74c3c;font-size:10px">BC未設定</span>'}</span>
-      <span style="font-size:10px;color:#2d7a4f;font-weight:700;font-family:monospace;min-width:74px" title="商品コード">${e(p.productCode)||'<span style="color:#aab">―</span>'}</span>
-      <span class="nk-prod-name">${e(p.name)}</span>
-      ${p.category?`<span class="nk-prod-cat">${e(p.category)}</span>`:''}
-      <span class="nk-prod-price">${p.price?'¥'+Number(p.price).toLocaleString():'価格未設定'}</span>
-      <span style="font-size:11px;color:#aab">${p.unit||''}</span>
-      <button onclick="nkDeleteProduct('${p.id}')"
-        style="border:1px solid #e74c3c;color:#e74c3c;background:none;border-radius:4px;padding:2px 8px;font-size:11px;cursor:pointer;margin-left:auto;font-family:inherit">削除</button>
-    </div>
-  `).join('');
-}
-
-function nkDeleteProduct(id){
-  if(!confirm('この商品を削除しますか？')) return;
-  nkSaveProducts(nkGetProducts().filter(p=>p.id!==id));
-  nkRenderProducts();
-}
-
-// ── 既存マスタの重複バーコードを検出・整理 ──
-function nkFixDuplicateBarcodes(){
-  const prods=nkGetProducts();
-  // バーコード別に商品をグループ化
-  const bcGroups={};
-  prods.forEach(p=>{
-    if(!p.barcode) return;
-    if(!bcGroups[p.barcode]) bcGroups[p.barcode]=[];
-    bcGroups[p.barcode].push(p);
-  });
-  const dupBcs=Object.keys(bcGroups).filter(bc=>bcGroups[bc].length>1);
-  if(!dupBcs.length){
-    toast('✅ 重複バーコードはありません');
-    return;
-  }
-
-  // 重複の内容を確認
-  let msg=`重複バーコードが${dupBcs.length}件見つかりました。
-
-`;
-  dupBcs.slice(0,5).forEach(bc=>{
-    const names=bcGroups[bc].map(p=>p.name+(p.price?'(¥'+p.price+')':'')).join('、');
-    msg+=`BC:${bc} → ${names}\n`;
-  });
-  if(dupBcs.length>5) msg+=`…他${dupBcs.length-5}件\n`;
-  msg+='\n重複している商品にそれぞれ新しいバーコードを割り当てます（最初の1件はそのまま）。よろしいですか？';
-  if(!confirm(msg)) return;
-
-  const used=getBcUsed();
-  const numPat=/^(\d{8,})$/;
-  let maxNum=10000000;
-  prods.forEach(p=>{ const m=p.barcode&&p.barcode.match(numPat); if(m) maxNum=Math.max(maxNum,parseInt(m[1],10)); });
-  used.forEach(v=>{ const m=v.match(numPat); if(m) maxNum=Math.max(maxNum,parseInt(m[1],10)); });
-
-  const newBcList=[];
-  let fixed=0;
-  dupBcs.forEach(bc=>{
-    const group=bcGroups[bc];
-    // 最初の1件はそのまま、2件目以降に新バーコードを割り当て
-    group.slice(1).forEach(p=>{
-      do{ maxNum++; }while(used.has(String(maxNum)));
-      const newBc=String(maxNum);
-      p.barcode=newBc;
-      newBcList.push(newBc);
-      fixed++;
-    });
-  });
-
-  addBcUsed(newBcList);
-  nkSaveProducts(prods);
-  nkRenderProducts();
-  toast(`✅ ${fixed}件の重複バーコードを修正しました`);
-  alert(`✅ ${fixed}件を修正しました。
-修正後は「🛒 Airレジ出力」でCSVを再出力してアップロードしてください。`);
-}
-
-// 既存商品に商品コードが未設定のものへ一括付与
-function nkAssignAllProductCodes(){
-  const prods=nkGetProducts();
-  let cnt=0;
-  prods.forEach(p=>{
-    if(p.productCode) return;
-    p.productCode=nkGenProductCode(p.catId||'', p.category||'');
-    cnt++;
-  });
-  if(!cnt){ toast('すべての商品にすでに商品コードが設定されています'); return; }
-  nkSaveProducts(prods);
-  nkRenderProducts();
-  toast(`✅ ${cnt}件に商品コードを付与しました`);
-}
-
-function nkExportAir(){
-  const prods=nkGetProducts();
-  if(!prods.length){alert('登録済み商品がありません');return;}
-
-  const noBc=prods.filter(p=>!p.barcode);
-  if(noBc.length){
-    if(!confirm(`${noBc.length}件にバーコードが未設定です。\n「入荷・商品登録」→「🏷バーコード印刷」タブで発番してから出力することをお勧めします。\nそのまま出力しますか？`)) return;
-  }
-
-  // エアレジ正式形式（AHEADS 27列）で出力
-  let csv = AHEADS.map(ec).join(',') + '\r\n';
-  prods.forEach(p=>{
-    const tax = p.taxRate==='8' ? '軽減税率' : '標準税率';
-    const row = new Array(27).fill('');
-    row[3]  = p.catId||'';
-    row[4]  = p.name||'';
-    row[5]  = p.name||'';
-    row[6]  = p.name||'';
-    row[9]  = '内税';
-    row[10] = tax;
-    row[12] = '通常';
-    row[13] = p.unit||'';
-    row[14] = p.price||'';
-    row[16] = p.costPrice||'';
-    row[17] = p.productCode||'';
-    row[18] = '';
-    row[19] = p.barcode||'';
-    row[20] = '対象';
-    row[21] = '表示';
-    row[22] = '印字する';
-    row[23] = '印字する';
-    csv += row.map(ec).join(',') + '\r\n';
-  });
-
-  const fname = `エアレジ商品登録_${new Date().toISOString().slice(0,10).replace(/-/g,'')}.csv`;
-  dlSJIS(csv, fname);
-  toast(`${prods.length}件を出力（バーコード設定済：${prods.filter(p=>p.barcode).length}件）`);
-}
-
-function nkRenderLabelList(){
-  const el=document.getElementById('nkLabelList'); if(!el)return;
-  const prods=nkGetProducts();
-  if(!prods.length){
-    el.innerHTML='<div style="text-align:center;color:#aab;padding:32px;grid-column:1/-1">商品がありません。入荷入力から登録してください。</div>';
-    return;
-  }
-  el.innerHTML=prods.map((p,i)=>`
-    <div class="nk-label-item">
-      <label class="nk-label-check">
-        <input type="checkbox" id="lchk_${i}" value="${p.id}" checked style="accent-color:#0f2744;width:14px;height:14px;flex-shrink:0">
-        <span style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap;flex:1">${e(p.name)}</span>
-      </label>
-      <div style="font-size:10px;color:#888;font-family:monospace;text-align:center">${e(p.barcode)}</div>
-      ${p.price?`<div style="font-size:12px;font-weight:700;color:#c00;text-align:center">¥${Number(p.price).toLocaleString()}</div>`:''}
-      <div style="display:flex;align-items:center;justify-content:center;gap:6px;font-size:11px;color:#6b7a8d">
-        印刷枚数: <input type="number" min="1" max="99" value="1" id="lqty_${i}"
-          style="width:48px;text-align:center;border:1px solid #dde3ea;border-radius:4px;padding:4px;font-size:13px;font-family:inherit">
-      </div>
-    </div>
-  `).join('');
-}
-
-function nkSelectAllLabels(val){
-  document.querySelectorAll('#nkLabelList input[type=checkbox]').forEach(cb=>cb.checked=val);
-}
-
+// ── QRシール印刷（入荷タブ）──
 function nkPrintLabels(startPos){
   const prods=nkGetProducts();
   const prodMap={};
@@ -5553,194 +4568,12 @@ function nkPrintLabels(startPos){
   });
   if(!items.length){alert('印刷する商品を選択してください');return;}
   const html=buildQrLabelHtml(items, startPos||1);
-  const win=window.open('','_blank','width=900,height=700');
+  const win=window.open('','_blank','width=960,height=760');
   win.document.write(html);
   win.document.close();
 }
 
-
-function nkRenderHistory(){
-  const el=document.getElementById('nkHistList'); if(!el)return;
-  const list=nkGetArrivals();
-  if(!list.length){
-    el.innerHTML='<div style="text-align:center;color:#aab;padding:32px">入荷履歴がありません</div>';
-    return;
-  }
-  el.innerHTML=list.map(a=>`
-    <div class="nk-arr-item">
-      <div class="nk-arr-head">
-        <span class="nk-arr-date">${e(a.date)}</span>
-        ${a.supplier?`<span class="nk-arr-sup">📦 ${e(a.supplier)}</span>`:''}
-        ${a.memo?`<span style="font-size:11px;color:#aab">${e(a.memo)}</span>`:''}
-        <span style="margin-left:auto;font-size:11px;color:#1a5c2e;font-weight:700">${(a.items||[]).length}品目</span>
-      </div>
-      <div class="nk-arr-items">
-        ${(a.items||[]).map(it=>`<span class="nk-arr-tag">${e(it.name)} ×${it.qty||1}</span>`).join('')}
-      </div>
-    </div>
-  `).join('');
-}
 </script>
-<!-- ===== 入荷・商品登録 PAGE ===== -->
-<div class="page" id="pgNyuuka">
-  <div class="nk-topbar">
-    <div class="nk-logo">📦 入荷・商品登録</div>
-    <div style="display:flex;gap:6px;align-items:center">
-      <button class="tbtn" onclick="nkExportAir()" style="background:#FF6600;color:#fff">🛒 Airレジ出力</button>
-      <button class="tbtn tbtn-exit" onclick="showPage('pgSession')">← 戻る</button>
-    </div>
-  </div>
-  <div class="tabs" style="background:#fff;border-bottom:2px solid #dde3ea;display:flex;padding:0 16px">
-    <div class="tab on" id="nktab-arrival" onclick="nkShowTab('arrival')">📦 入荷入力</div>
-    <div class="tab" id="nktab-products" onclick="nkShowTab('products')">📋 商品一覧</div>
-    <div class="tab" id="nktab-labels" onclick="nkShowTab('labels')">🏷 シール印刷</div>
-    <div class="tab" id="nktab-history" onclick="nkShowTab('history')">📁 入荷履歴</div>
-  </div>
-  <div class="nk-body">
-
-    <!-- ── 入荷入力パネル ── -->
-    <div id="nkpnl-arrival">
-
-      <!-- OCR取り込みカード -->
-      <!-- Claude貼り付けインポートカード -->
-      <div class="nk-card" id="nkOcrCard">
-        <h2>🤖 Claudeから読み取る</h2>
-
-        <!-- ステップ1: プロンプトコピー -->
-        <div style="margin-bottom:14px">
-          <div style="font-size:12px;font-weight:700;color:#0f2744;margin-bottom:8px">
-            <span style="background:#0f2744;color:#fff;border-radius:50%;width:18px;height:18px;display:inline-flex;align-items:center;justify-content:center;font-size:10px;margin-right:6px">1</span>
-            別のClaudeを開き、納品書（画像・PDF）を添付してこのプロンプトを送る
-          </div>
-          <div id="nkPromptBox" style="background:#f8faff;border:1.5px solid #c8d4f0;border-radius:8px;padding:12px 14px;font-size:12px;color:#333;line-height:1.7;position:relative;white-space:pre-wrap;font-family:monospace">この納品書から商品情報を読み取り、以下のCSV形式で出力してください。
-ヘッダー行は不要です。1商品1行で出力してください。
-
-形式: 商品名,数量,仕入単価(税抜),税率(10か8)
-
-例:
-UGG Matt Black 37,10,25000,10
-インソール Scandinavian 41,5,3500,10
-
-数量・単価が読み取れない場合は0を入れてください。</div>
-          <button onclick="nkCopyPrompt()" style="margin-top:8px;padding:8px 18px;background:#0f2744;color:#fff;border:none;border-radius:6px;font-size:12px;font-weight:700;cursor:pointer;font-family:inherit">
-            📋 プロンプトをコピー
-          </button>
-        </div>
-
-        <!-- ステップ2: 貼り付け -->
-        <div>
-          <div style="font-size:12px;font-weight:700;color:#0f2744;margin-bottom:8px">
-            <span style="background:#0f2744;color:#fff;border-radius:50%;width:18px;height:18px;display:inline-flex;align-items:center;justify-content:center;font-size:10px;margin-right:6px">2</span>
-            Claudeが出力したCSVテキストをここに貼り付けて「読み込む」を押す
-          </div>
-          <textarea id="nkPasteArea" rows="7"
-            placeholder="例：&#10;UGG Matt Black 37,10,25000,10&#10;UGG Walnut 37,3,20000,10&#10;インソール Scandinavian 41,5,3500,10"
-            style="width:100%;padding:10px;border:2px solid #c8d4f0;border-radius:8px;font-size:12px;font-family:monospace;resize:vertical;box-sizing:border-box;line-height:1.7;background:#fafbfc"
-            oninput="this.style.borderColor=this.value.trim()?'#1a6ea6':'#c8d4f0'"></textarea>
-          <div style="display:flex;gap:8px;margin-top:8px;align-items:center;flex-wrap:wrap">
-            <button onclick="nkImportPaste()"
-              style="flex:1;padding:13px;background:#1a6ea6;color:#fff;border:none;border-radius:8px;font-size:14px;font-weight:700;cursor:pointer;font-family:inherit">
-              📥 商品リストに読み込む
-            </button>
-            <button onclick="document.getElementById('nkPasteArea').value='';document.getElementById('nkPasteArea').style.borderColor='#c8d4f0'"
-              style="padding:13px 16px;background:#f0f2f5;color:#6b7a8d;border:none;border-radius:8px;font-size:13px;cursor:pointer;font-family:inherit;font-weight:700">
-              クリア
-            </button>
-          </div>
-          <div id="nkPasteStatus" style="display:none;margin-top:8px;font-size:12px;font-weight:700"></div>
-        </div>
-      </div>
-
-      <div class="nk-card">
-        <h2>📅 入荷情報</h2>
-        <div class="nk-grid">
-          <div><div class="nk-lbl">入荷日</div><input class="nk-inp" type="date" id="nkDate"></div>
-          <div><div class="nk-lbl">仕入先</div><input class="nk-inp" id="nkSupplier" placeholder="例：○○商事"></div>
-          <div><div class="nk-lbl">備考（納品書番号など）</div><input class="nk-inp" id="nkMemo" placeholder="No.12345"></div>
-        </div>
-      </div>
-      <div class="nk-card">
-        <h2>📦 入荷商品リスト <span style="font-size:11px;font-weight:400;color:#6b7a8d">※既存商品名を入力すると情報が自動補完されます</span></h2>
-        <div style="overflow-x:auto">
-          <table class="nk-tbl">
-            <thead><tr>
-              <th style="width:28px"></th>
-              <th style="min-width:150px;text-align:left;padding-left:8px">商品名</th>
-              <th style="width:66px">税率</th>
-              <th style="width:62px">数量</th>
-              <th style="width:86px">仕入単価</th>
-              <th style="width:96px;background:#1a5c2e">税込売価</th>
-              <th style="width:62px">単位</th>
-              <th class="air" style="min-width:120px">Airカテゴリー</th>
-              <th class="air" style="width:76px">カテゴリーID</th>
-              <th style="width:96px">バーコード</th>
-            </tr></thead>
-            <tbody id="nkTbody"></tbody>
-          </table>
-        </div>
-        <button class="nk-add-btn" onclick="nkAddRow()">＋ 商品を追加</button>
-        <button class="nk-save-btn" onclick="nkSaveArrival()">💾 入荷を保存してバーコードを発行</button>
-      </div>
-    </div>
-
-    <!-- ── 商品一覧パネル ── -->
-    <div id="nkpnl-products" style="display:none">
-      <div class="nk-card">
-        <div style="display:flex;align-items:center;gap:8px;margin-bottom:12px;flex-wrap:wrap">
-          <h2 style="margin:0;border:none;flex:1">📋 登録済み商品一覧 <span id="nkProdCount" style="font-size:11px;color:#6b7a8d;font-weight:400"></span></h2>
-          <input id="nkProdSearch" class="nk-inp" placeholder="🔍 商品名・コードで絞り込み" style="width:180px;margin:0" oninput="nkRenderProducts()">
-          <button onclick="nkFixDuplicateBarcodes()" style="background:#e74c3c;color:#fff;border:none;border-radius:6px;padding:8px 12px;font-size:11px;font-weight:700;cursor:pointer;white-space:nowrap">🔧 重複BC修正</button>
-          <button onclick="nkExportAir()" style="background:#FF6600;color:#fff;border:none;border-radius:6px;padding:8px 14px;font-size:12px;font-weight:700;cursor:pointer;white-space:nowrap">🛒 Airレジ出力</button>
-        </div>
-        <!-- 商品コード体系の説明 -->
-        <div style="background:#f0f8f4;border:1.5px solid #b0d8b0;border-radius:8px;padding:10px 14px;margin-bottom:10px;font-size:12px;color:#1a4a2e">
-          <b>📌 商品コードの見方</b>｜カテゴリー略称（3文字）＋連番5桁で自動発番されます<br>
-          <span style="font-family:monospace;font-size:11px;color:#2d7a4f">
-            HCH=はちみつ　ZAK=雑貨　EMS=エムズオリジナル　MIT=ミツロウ　KUT=靴　KOJ=個人作家<br>
-            FUK=服・靴下　SHO=食品　DRY=ドライフラワー・植物　ITK=委託　SOR=送料　KIK=企画展
-          </span>
-        </div>
-        <!-- 商品コード未設定バナー -->
-        <div id="nkPcBanner" style="display:none;background:#fff8e7;border:1.5px solid #f39c12;border-radius:8px;padding:10px 14px;margin-bottom:10px;display:flex;align-items:center;justify-content:space-between;gap:10px">
-          <span style="font-size:12px;color:#7b4500;font-weight:700"></span>
-          <button onclick="nkAssignAllProductCodes()"
-            style="background:#f39c12;color:#fff;border:none;border-radius:6px;padding:6px 14px;font-size:12px;font-weight:700;cursor:pointer;white-space:nowrap;font-family:inherit">
-            🔢 一括で商品コードを付与する
-          </button>
-        </div>
-        <div id="nkProdList"></div>
-      </div>
-    </div>
-
-    <!-- ── シール印刷パネル ── -->
-    <div id="nkpnl-labels" style="display:none">
-      <div class="nk-card">
-        <h2>🏷 バーコードシール印刷</h2>
-        <div style="background:#f0f6ff;border:1px solid #c8d4f0;border-radius:7px;padding:10px 14px;margin-bottom:14px;font-size:12px;color:#1a3a6a">
-          <b>エーワン 31397</b> 専用レイアウト ／ A4 ・ <b>20mm × 8mm</b> ・ <b>8列 × 25行 = 200面/シート</b><br>
-          各ラベル：<b>左側＝商品名・価格、右側＝QRコード</b>（SocketMobile D750対応）<br>
-          ※印刷ダイアログで「余白なし」「実際のサイズ（倍率100%）」に設定してください。
-        </div>
-        <div style="display:flex;gap:8px;margin-bottom:12px;flex-wrap:wrap;align-items:center">
-          <button onclick="nkSelectAllLabels(true)" style="font-size:11px;padding:6px 12px;border:1px solid #dde3ea;border-radius:5px;background:#fff;cursor:pointer;font-family:inherit">全選択</button>
-          <button onclick="nkSelectAllLabels(false)" style="font-size:11px;padding:6px 12px;border:1px solid #dde3ea;border-radius:5px;background:#fff;cursor:pointer;font-family:inherit">全解除</button>
-          <button onclick="openLabelPosPicker('nk')" style="font-size:13px;font-weight:700;padding:8px 20px;border:none;border-radius:6px;background:#1a4a2e;color:#fff;cursor:pointer;font-family:inherit">📍 開始位置を選んで印刷</button>
-        </div>
-        <div id="nkLabelList" class="nk-label-grid"></div>
-      </div>
-    </div>
-
-    <!-- ── 入荷履歴パネル ── -->
-    <div id="nkpnl-history" style="display:none">
-      <div class="nk-card">
-        <h2>📁 入荷履歴</h2>
-        <div id="nkHistList" class="nk-arr-list"></div>
-      </div>
-    </div>
-
-  </div>
-</div>
-
 
       <!-- ★ ラベル開始位置ピッカーモーダル ★ -->
       <div id="labelPosModal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.7);z-index:9200;align-items:flex-start;justify-content:center;overflow-y:auto;padding:16px 8px">
@@ -5784,5 +4617,4 @@ UGG Matt Black 37,10,25000,10
         </div>
       </div>
 
-</body>
-</html>
+</body></html>
