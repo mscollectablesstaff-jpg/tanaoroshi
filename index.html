@@ -1186,7 +1186,7 @@ svg.trend-chart text{font-family:inherit}
 </div>
 
 <!-- ===== HOME PAGE ===== -->
-<div class="page" id="pgHome">
+<div class="page" id="pgHome" style="display:none!important">
   <div class="hm-top">
     <div style="font-size:36px">📦</div>
     <h1>MS在庫管理システム</h1>
@@ -1317,8 +1317,6 @@ svg.trend-chart text{font-family:inherit}
     <div style="display:flex;gap:8px;margin-top:8px">
       <button class="btn btn-gray" onclick="showPage('pgSetup')"
         style="flex:1;margin-top:0;font-size:11px;padding:7px">⚙ Firebase設定</button>
-      <button class="btn btn-gray" onclick="showPage('pgHome')"
-        style="flex:1;margin-top:0;font-size:11px;padding:7px">🏠 ホーム</button>
     </div>
 
     <!-- アーカイブ履歴 -->
@@ -2034,7 +2032,7 @@ function autoInit(){
             offline=false;
             document.getElementById('modeLabel').textContent='🔴 リアルタイム同期モード';
             syncFromFirebase(()=>{
-              showPage('pgHome');
+              showPage('pgSession');
               renderRecent();
               hmUpdateStatus('🟢 Firebase接続済み');
             });
@@ -2052,7 +2050,7 @@ function autoInit(){
 }
 
 function showPage(id){
-  ['pgHome','pgSetup','pgSession','pgApp','pgMstock'].forEach(p=>{
+  ['pgSetup','pgSession','pgApp','pgMstock'].forEach(p=>{
     const el=document.getElementById(p);
     if(el) el.classList.remove('show');
   });
@@ -2155,7 +2153,7 @@ function doSave(){
 function doOffline(){
   offline=true; db=null;
   document.getElementById('modeLabel').textContent='📴 オフラインモード';
-  showPage('pgHome');
+  showPage('pgSession');
   renderRecent();
 }
 
@@ -2273,7 +2271,7 @@ function initFB(cfg,btn){
     document.getElementById('modeLabel').textContent='🔴 リアルタイム同期モード';
     // Firebaseからアーカイブ・月次データを同期してからホーム画面へ
     syncFromFirebase(()=>{
-      showPage('pgHome');
+      showPage('pgSession');
       renderRecent();
       hmUpdateStatus('🟢 Firebase接続済み');
     });
@@ -4572,36 +4570,39 @@ function bcpRender(){
   const filterDiv=document.getElementById('bcpPageFilter');
   if(!filterDiv) return;
 
-  // ページ一覧を収集（セッションページ + マスタのカテゴリー）
+  // ページ一覧収集
   const pageSet=new Map(); // key → label
 
-  // ① セッションページ（実際に入力されているページ）
+  // ① セッションのページ名
   order.forEach(k=>{
     const pg=pages[k]||{};
     const label=(pg.tanto||'').trim();
     if(label) pageSet.set('page:'+label, label);
   });
 
-  // ② マスタ商品のカテゴリー（ページと重複しないもの）
+  // ② マスタ商品のカテゴリー（ページ名と重複しないもの）
+  const pageLabels=new Set(pageSet.values());
   nkGetProducts().forEach(p=>{
     const cat=(p.category||'').trim();
-    if(cat && !Array.from(pageSet.values()).includes(cat)){
-      pageSet.set('cat:'+cat, cat);
-    }
+    if(cat && !pageLabels.has(cat)) pageSet.set('cat:'+cat, cat);
   });
 
-  // 既存チェック状態を保存
+  // 既存チェック状態保存
   const prevChecked=new Set();
   filterDiv.querySelectorAll('input[type=checkbox]:checked').forEach(cb=>prevChecked.add(cb.value));
+  const isFirst=filterDiv.innerHTML==='';
 
-  // チェックボックス描画
   if(pageSet.size===0){
-    filterDiv.innerHTML='<span style="font-size:12px;color:#aaa">（ページ情報がありません）</span>';
+    filterDiv.innerHTML='<span style="font-size:12px;color:#aaa">（絞り込み項目なし）</span>';
   } else {
     filterDiv.innerHTML=[...pageSet.entries()].map(([key,label])=>{
-      const checked=prevChecked.size===0||prevChecked.has(key) ? 'checked' : '';
-      return `<label style="display:inline-flex;align-items:center;gap:5px;background:${checked?'#0f2744':'#f0f4fa'};color:${checked?'#fff':'#333'};border:1.5px solid ${checked?'#0f2744':'#dde3ea'};border-radius:20px;padding:5px 12px;font-size:12px;font-weight:700;cursor:pointer;user-select:none;transition:.15s" onclick="bcpTogglePageChip(this)">
-        <input type="checkbox" value="${key}" ${checked} style="display:none">${label}
+      // 初回は全チェック、以降は前回状態を維持
+      const chk=isFirst || prevChecked.size===0 || prevChecked.has(key);
+      const bg=chk?'#0f2744':'#f0f4fa';
+      const fg=chk?'#fff':'#333';
+      const bd=chk?'#0f2744':'#dde3ea';
+      return `<label style="display:inline-flex;align-items:center;gap:5px;background:${bg};color:${fg};border:1.5px solid ${bd};border-radius:20px;padding:5px 12px;font-size:12px;font-weight:700;cursor:pointer;user-select:none;transition:.15s" onclick="bcpTogglePageChip(this)">
+        <input type="checkbox" value="${key}" ${chk?'checked':''} style="display:none">${e(label)}
       </label>`;
     }).join('');
   }
@@ -4628,7 +4629,6 @@ function bcpFilter(){
   if(filterDiv){
     filterDiv.querySelectorAll('input[type=checkbox]:checked').forEach(cb=>checkedKeys.add(cb.value));
   }
-  const filterActive=checkedKeys.size>0;
 
   // 商品名→ページ名マップ（セッション行から）
   const nameToPage={};
@@ -4643,13 +4643,10 @@ function bcpFilter(){
 
   _bcpFiltered=bcpGetAllSources().filter(p=>{
     if(kw&&!(p.name||'').toLowerCase().includes(kw)) return false;
-    if(!filterActive) return true;
-
-    // ページ名マップで照合（マスタ商品でも棚卸行に入力があれば一致）
+    // チェックなし = 全件表示
+    if(checkedKeys.size===0) return true;
     const pLabel=nameToPage[p.name]||p._pageLabel||'';
     const pCat=(p.category||'').trim();
-
-    // チェック中のキーに合致するか
     for(const key of checkedKeys){
       if(key.startsWith('page:') && pLabel===key.slice(5)) return true;
       if(key.startsWith('cat:') && pCat===key.slice(4)) return true;
