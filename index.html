@@ -4686,15 +4686,15 @@ function bcpRenderSections(){
     const bcCnt = pg.items.filter(it=>it.barcode).length;
     const allCnt= pg.items.length;
     const badge = bcCnt < allCnt
-      ? '<span style="font-size:10px;background:#fff3e0;color:#c06000;border-radius:4px;padding:2px 6px;font-weight:700;display:block;text-align:center;line-height:1.5">発番済<br>'+bcCnt+'/'+allCnt+'</span>'
-      : '<span style="font-size:10px;background:#e8f5e9;color:#1a7a4a;border-radius:4px;padding:2px 6px;font-weight:700;display:block;text-align:center;line-height:1.5">✓ 全済<br>'+allCnt+'件</span>';
-    return '<label style="display:flex;flex-direction:column;align-items:center;gap:5px;padding:10px 6px;'
+      ? '<span style="font-size:9px;background:#fff3e0;color:#c06000;border-radius:3px;padding:1px 4px;font-weight:700;white-space:nowrap">'+bcCnt+'/'+allCnt+'</span>'
+      : '<span style="font-size:9px;background:#e8f5e9;color:#1a7a4a;border-radius:3px;padding:1px 4px;font-weight:700;white-space:nowrap">✓ '+allCnt+'件</span>';
+    return '<label style="display:flex;flex-direction:column;align-items:center;gap:3px;padding:6px 4px;'
       +'cursor:pointer;background:'+(isOn?'#eef4ff':'#fff')+';border:2px solid '+(isOn?'#1a6ea6':'#dde3ea')+';'
-      +'border-radius:8px;text-align:center;min-width:90px;flex:1;transition:.1s;box-shadow:'+(isOn?'0 0 0 3px rgba(26,110,166,.15)':'none')+'">'
+      +'border-radius:6px;text-align:center;flex:0 0 auto;transition:.1s;box-shadow:'+(isOn?'0 0 0 3px rgba(26,110,166,.15)':'none')+'">'
       +'<input type="checkbox" '+(isOn?'checked':'')
-      +' style="width:17px;height:17px;accent-color:#1a6ea6;cursor:pointer"'
+      +' style="width:14px;height:14px;accent-color:#1a6ea6;cursor:pointer;flex-shrink:0"'
       +' onchange="bcpTogglePage(\''+pg.pageKey.replace(/\\/g,'\\\\').replace(/'/g,"\\'")+'\',this.checked)">'
-      +'<span style="font-size:12px;font-weight:700;color:#0f2744;line-height:1.3;word-break:break-all">'+e(pg.pageLabel)+'</span>'
+      +'<span style="font-size:11px;font-weight:700;color:#0f2744;line-height:1.2;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:100%">'+e(pg.pageLabel)+'</span>'
       +badge+'</label>';
   }).join('');
 
@@ -4755,7 +4755,7 @@ function bcpRenderSections(){
     '<div style="border:1.5px solid #e0e6ed;border-radius:8px;overflow:hidden;margin-bottom:0">'
     +'<div style="background:#0f2744;padding:8px 14px">'
     +'<span style="font-size:13px;font-weight:700;color:#fff">① 印刷するカテゴリーを選んでください</span>'
-    +'</div><div style="background:#f8faff;padding:10px 12px;display:flex;flex-wrap:wrap;gap:8px">'+step1Rows+'</div></div>'
+    +'</div><div style="background:#f8faff;padding:6px 8px;display:flex;flex-wrap:wrap;gap:5px">'+step1Rows+'</div></div>'
     + step2html;
 
   bcpUpdateCount();
