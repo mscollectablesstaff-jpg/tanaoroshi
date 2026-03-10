@@ -4727,22 +4727,22 @@ function bcpRenderSections(){
           +'</div>';
       }).join('');
       return '<div style="margin-bottom:2px">'
-        +'<div style="background:#dde6f2;padding:5px 14px;display:flex;align-items:center;gap:8px;border-bottom:1px solid #c5d4e8">'
+        +'<div style="background:#dde6f2;padding:5px 14px;display:flex;align-items:center;gap:6px;border-bottom:1px solid #c5d4e8">'
+        +'<button onclick="bcpSelectByKey(\''+pg.pageKey.replace(/'/g,"\\'")+'\',true)" '
+        +'style="padding:2px 9px;font-size:10px;background:#fff;border:1px solid #c5d4e8;border-radius:4px;cursor:pointer;font-family:inherit;flex-shrink:0">全選択</button>'
+        +'<button onclick="bcpSelectByKey(\''+pg.pageKey.replace(/'/g,"\\'")+'\',false)" '
+        +'style="padding:2px 9px;font-size:10px;background:#fff;border:1px solid #c5d4e8;border-radius:4px;cursor:pointer;font-family:inherit;flex-shrink:0">全解除</button>'
         +'<span style="font-size:11px;font-weight:700;color:#1a4a7a;flex:1">📂 '+e(pg.pageLabel)
         +'　<span style="font-weight:400;color:#6b7a8d">'+pg.items.length+'件</span></span>'
-        +'<button onclick="bcpSelectByKey(\''+pg.pageKey.replace(/'/g,"\\'")+'\',true)" '
-        +'style="padding:2px 9px;font-size:10px;background:#fff;border:1px solid #c5d4e8;border-radius:4px;cursor:pointer;font-family:inherit">全選択</button>'
-        +'<button onclick="bcpSelectByKey(\''+pg.pageKey.replace(/'/g,"\\'")+'\',false)" '
-        +'style="padding:2px 9px;font-size:10px;background:#fff;border:1px solid #c5d4e8;border-radius:4px;cursor:pointer;font-family:inherit">全解除</button>'
         +'</div>'
         +'<div>'+rows+'</div></div>';
     }).join('');
 
     step2html = '<div style="margin-top:12px;border:1.5px solid #1a6ea6;border-radius:8px;overflow:hidden">'
       +'<div style="background:#1a6ea6;padding:8px 14px;display:flex;align-items:center;gap:8px">'
+      +'<button onclick="bcpSelectAllInView(true)" style="padding:4px 12px;font-size:11px;background:rgba(255,255,255,.2);color:#fff;border:1px solid rgba(255,255,255,.4);border-radius:4px;cursor:pointer;font-family:inherit;flex-shrink:0">全選択</button>'
+      +'<button onclick="bcpSelectAllInView(false)" style="padding:4px 12px;font-size:11px;background:rgba(255,255,255,.2);color:#fff;border:1px solid rgba(255,255,255,.4);border-radius:4px;cursor:pointer;font-family:inherit;flex-shrink:0">全解除</button>'
       +'<span style="font-size:13px;font-weight:700;color:#fff;flex:1">② 印刷する商品を選んでください</span>'
-      +'<button onclick="bcpSelectAllInView(true)" style="padding:4px 12px;font-size:11px;background:rgba(255,255,255,.2);color:#fff;border:1px solid rgba(255,255,255,.4);border-radius:4px;cursor:pointer;font-family:inherit">全選択</button>'
-      +'<button onclick="bcpSelectAllInView(false)" style="padding:4px 12px;font-size:11px;background:rgba(255,255,255,.2);color:#fff;border:1px solid rgba(255,255,255,.4);border-radius:4px;cursor:pointer;font-family:inherit">全解除</button>'
       +'</div>'
       +'<div style="background:#fff">'+productRows+'</div></div>';
   } else {
@@ -4989,6 +4989,7 @@ body{font-family:'Hiragino Kaku Gothic Pro','Meiryo',sans-serif;background:#dde3
 .tbtn{padding:7px 16px;border:none;border-radius:6px;font-size:12px;font-weight:700;cursor:pointer;font-family:inherit}
 .tbtn-print{background:#1a7a4a;color:#fff}
 .tbtn-close{background:#444;color:#fff}
+.tbtn-reset{background:#664;color:#fff}
 .adj{display:flex;align-items:center;gap:5px;background:rgba(255,255,255,.1);padding:4px 8px;border-radius:5px}
 .adj label{font-size:10px;color:#a8c4e0;white-space:nowrap}
 .adj input[type=range]{width:70px;accent-color:#4caf50}
@@ -5066,6 +5067,11 @@ body{font-family:'Hiragino Kaku Gothic Pro','Meiryo',sans-serif;background:#dde3
     <div class="toolbar-sub">${items.length}件 ／ 開始: ${offset+1}番　A-one 31397</div>
   </div>
   <div class="adj">
+    <label>倍率</label>
+    <input type="range" id="adjS" min="0.85" max="1.15" step="0.005" value="1" oninput="applyAdj()">
+    <span id="adjSv">100%</span>
+  </div>
+  <div class="adj">
     <label>左右</label>
     <input type="range" id="adjX" min="-5" max="5" step="0.05" value="0" oninput="applyAdj()">
     <span id="adjXv">±0mm</span>
@@ -5075,11 +5081,12 @@ body{font-family:'Hiragino Kaku Gothic Pro','Meiryo',sans-serif;background:#dde3
     <input type="range" id="adjY" min="-5" max="5" step="0.05" value="0" oninput="applyAdj()">
     <span id="adjYv">±0mm</span>
   </div>
+  <button class="tbtn tbtn-reset" onclick="resetAdj()">↺ リセット</button>
   <button class="tbtn tbtn-print" onclick="window.print()">🖨️ 印刷</button>
   <button class="tbtn tbtn-close" onclick="window.close()">✕ 閉じる</button>
   <div class="hint">
     ⚠️ 印刷設定：<strong>余白なし・倍率100%・用紙A4縦</strong><br>
-    ズレる場合は左右/上下スライダーで微調整
+    調整値は自動保存されます
   </div>
 </div>
 
@@ -5097,6 +5104,7 @@ body{font-family:'Hiragino Kaku Gothic Pro','Meiryo',sans-serif;background:#dde3
 <script src="${jsBarcodeUrl}"><\/script>
 <script>
 window.addEventListener('load', function(){
+  loadAdj();
   // px/mm 換算（96dpi基準）
   var PX_PER_MM = 96 / 25.4; // ≒3.78
 
@@ -5132,15 +5140,57 @@ window.addEventListener('load', function(){
   });
 });
 
-var _adjX=0, _adjY=0;
+var SAVE_KEY = 'tb_bc_adj_v1';
+var _adjX=0, _adjY=0, _adjS=1;
+
+function loadAdj(){
+  try{
+    var saved = JSON.parse(localStorage.getItem(SAVE_KEY)||'{}');
+    _adjX = saved.x||0;
+    _adjY = saved.y||0;
+    _adjS = saved.s||1;
+  }catch(e){ _adjX=0; _adjY=0; _adjS=1; }
+  document.getElementById('adjX').value = _adjX;
+  document.getElementById('adjY').value = _adjY;
+  document.getElementById('adjS').value = _adjS;
+  _syncDisplay();
+  _applyStyle();
+}
+
+function saveAdj(){
+  try{ localStorage.setItem(SAVE_KEY, JSON.stringify({x:_adjX, y:_adjY, s:_adjS})); }catch(e){}
+}
+
 function applyAdj(){
   _adjX = parseFloat(document.getElementById('adjX').value)||0;
   _adjY = parseFloat(document.getElementById('adjY').value)||0;
+  _adjS = parseFloat(document.getElementById('adjS').value)||1;
+  _syncDisplay();
+  _applyStyle();
+  saveAdj();
+}
+
+function resetAdj(){
+  _adjX=0; _adjY=0; _adjS=1;
+  document.getElementById('adjX').value=0;
+  document.getElementById('adjY').value=0;
+  document.getElementById('adjS').value=1;
+  _syncDisplay();
+  _applyStyle();
+  saveAdj();
+}
+
+function _syncDisplay(){
   document.getElementById('adjXv').textContent = (_adjX>=0?'+':'')+_adjX.toFixed(2)+'mm';
   document.getElementById('adjYv').textContent = (_adjY>=0?'+':'')+_adjY.toFixed(2)+'mm';
+  document.getElementById('adjSv').textContent = Math.round(_adjS*100)+'%';
+}
+
+function _applyStyle(){
   document.querySelectorAll('.sheet').forEach(function(sh){
     sh.style.marginLeft = _adjX+'mm';
     sh.style.marginTop  = _adjY+'mm';
+    sh.style.zoom       = _adjS;
   });
 }
 <\/script>
