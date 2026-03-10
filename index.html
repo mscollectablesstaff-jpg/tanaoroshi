@@ -3828,7 +3828,11 @@ function fy(n){return '¥'+(n?fm(n):'0');}
 // ============================================================
 // 描画
 // ============================================================
-function renderAll(){renderPTabs();renderTable();renderQbar();}
+function renderAll(){
+  renderPTabs();renderTable();renderQbar();
+  const bcPanel=document.getElementById("pnl-bcprint");
+  if(bcPanel&&bcPanel.classList.contains("on")) bcpRenderSections();
+}
 
 function addRow(){
   if(!curKey||!pages[curKey])return;
@@ -4409,53 +4413,97 @@ let _bcpStartPos = 1;
 
 // ─── データ取得 ───────────────────────────────────────────
 
-// 全商品をページ別にまとめて返す
-// 戻り値: [{pageKey, pageLabel, items:[{id,name,price,barcode,source,_sessKey,_row}]}]
+// 全商品をカテゴリー（ページ名）別にまとめて返す
+// セッションページ→マスタのカテゴリー名でグループ化
 function bcpGetPagedData(){
   const master = nkGetProducts();
   const masterByName = {};
   master.forEach(p => { if(p.name) masterByName[p.name] = p; });
 
-  const usedNames = new Set();
   const result = [];
+  const usedProductIds = new Set(); // 出力済みのマスタ商品IDを追跡
 
-  // セッションページごとに商品を収集
-  order.forEach(k => {
-    const pg = pages[k] || {};
-    const label = (pg.tanto || k).trim();
-    const items = [];
-    (pg.rows || []).forEach(r => {
-      const name = (r.n || '').trim();
-      if(!name) return;
-      usedNames.add(name);
-      const mp = masterByName[name];
-      items.push({
-        id: mp ? mp.id : 'sess_'+name,
-        name,
-        price: mp ? (mp.price || r.p || '') : (r.p || ''),
-        barcode: mp ? ((mp.barcode||'').trim() || (r.bc||'').trim()) : (r.bc||'').trim(),
-        source: 'session',
-        _masterRef: mp || null,
-        _sessKey: k,
-        _row: r
+  // ① セッションページがある場合：ページ名でグループ化
+  if(order.length > 0){
+    order.forEach(k => {
+      const pg = pages[k] || {};
+      const pageLabel = (pg.tanto || k).trim() || ('ページ'+(order.indexOf(k)+1));
+      const pageCatId = (pg.catId || '').trim();
+      const items = [];
+
+      // セッション行（棚卸入力済み商品）
+      (pg.rows || []).forEach(r => {
+        const name = (r.n || '').trim();
+        if(!name) return;
+        const mp = masterByName[name];
+        if(mp) usedProductIds.add(mp.id);
+        items.push({
+          id: mp ? mp.id : 'sess_'+name,
+          name,
+          price: mp ? (mp.price || r.p || '') : (r.p || ''),
+          barcode: mp ? ((mp.barcode||'').trim() || (r.bc||'').trim()) : (r.bc||'').trim(),
+          source: 'session',
+          _masterRef: mp || null,
+          _sessKey: k,
+          _row: r
+        });
       });
-    });
-    if(items.length) result.push({ pageKey: k, pageLabel: label, items });
-  });
 
-  // マスタのみの商品（棚卸未入力）
-  const masterOnly = master.filter(p => p.name && !usedNames.has(p.name));
-  if(masterOnly.length){
-    result.push({
-      pageKey: '__master__',
-      pageLabel: '商品マスタ（棚卸未入力）',
-      items: masterOnly.map(p => ({
+      // ページのカテゴリーID/名と一致するマスタ商品で未追加のものも含める
+      if(pageCatId){
+        master.forEach(p => {
+          if(usedProductIds.has(p.id)) return;
+          if((p.catId||'') === pageCatId){
+            usedProductIds.add(p.id);
+            items.push({
+              id: p.id, name: p.name,
+              price: p.price || '',
+              barcode: (p.barcode || '').trim(),
+              source: 'master', _masterRef: p, _sessKey: null, _row: null
+            });
+          }
+        });
+      } else {
+        // catId未設定でも、ページ名と同じカテゴリー名（category/tanto一致）のマスタを追加
+        master.forEach(p => {
+          if(usedProductIds.has(p.id)) return;
+          const pCat = (p.category || '').trim();
+          if(pCat && pCat === pageLabel){
+            usedProductIds.add(p.id);
+            items.push({
+              id: p.id, name: p.name,
+              price: p.price || '',
+              barcode: (p.barcode || '').trim(),
+              source: 'master', _masterRef: p, _sessKey: null, _row: null
+            });
+          }
+        });
+      }
+
+      if(items.length) result.push({ pageKey: k, pageLabel, items });
+    });
+  }
+
+  // ② 残りのマスタ商品（どのセッションページにも対応しなかったもの）
+  // カテゴリー名でグループ化
+  const remaining = master.filter(p => p.name && !usedProductIds.has(p.id));
+  if(remaining.length){
+    // カテゴリー別にグループ分け
+    const catGroups = new Map();
+    remaining.forEach(p => {
+      const cat = (p.category || p.catId || 'その他').trim() || 'その他';
+      if(!catGroups.has(cat)) catGroups.set(cat, []);
+      catGroups.get(cat).push({
         id: p.id, name: p.name, price: p.price || '',
         barcode: (p.barcode || '').trim(),
         source: 'master', _masterRef: p, _sessKey: null, _row: null
-      }))
+      });
+    });
+    catGroups.forEach((items, cat) => {
+      result.push({ pageKey: '__cat__'+cat, pageLabel: cat, items });
     });
   }
+
   return result;
 }
 
@@ -4543,13 +4591,24 @@ function bcpRender(){
 
 function bcpRenderSections(){
   const container = document.getElementById('bcpPageSections');
-  if(!container) return;
+  if(!container){ console.error('bcpPageSections not found'); return; }
 
-  const data = bcpGetPagedData();
-  const total = data.reduce((s, pg) => s + pg.items.length, 0);
+  let data, total;
+  try{
+    data = bcpGetPagedData();
+    total = data.reduce((s, pg) => s + pg.items.length, 0);
+    console.log('[BCP] sections:', data.length, 'total items:', total,
+      'order:', order.length, 'master:', nkGetProducts().length);
+  }catch(err){
+    container.innerHTML = '<div style="color:red;padding:16px">⚠️ エラー: '+err.message+'</div>';
+    console.error('[BCP] bcpGetPagedData error:', err);
+    return;
+  }
 
   if(!total){
-    container.innerHTML = '<div style="text-align:center;color:#aab;padding:32px;font-size:13px">商品がありません。<br>棚卸入力か商品マスタに商品を登録してください。</div>';
+    container.innerHTML = '<div style="text-align:center;color:#aab;padding:32px;font-size:13px">'
+      +'商品がありません。<br>棚卸入力か商品マスタに商品を登録してください。<br>'
+      +'<small style="color:#c99">(order:'+order.length+' master:'+nkGetProducts().length+')</small></div>';
     bcpUpdateCount();
     return;
   }
