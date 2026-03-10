@@ -950,12 +950,12 @@ tbody tr:hover td.sticky-name{background:#e8f0f8}
   @page{size:A4 landscape;margin:0}
   body *{visibility:hidden}
   #printArea,#printArea *{visibility:visible}
-  #printArea{position:fixed;inset:0;background:#fff;z-index:99999;overflow:auto}
+  #printArea{position:fixed;inset:0;background:#fff;z-index:99999;overflow:hidden}
   .no-print{display:none!important}
 }
 
 /* ===== 印刷プレビュー ===== */
-#printArea{display:none;position:fixed;inset:0;background:#fff;z-index:9500;overflow-y:auto;font-family:'Hiragino Kaku Gothic ProN','Yu Gothic','Meiryo',sans-serif;color:#000}
+#printArea{display:none;position:fixed;inset:0;background:#fff;z-index:9500;overflow-y:auto;scrollbar-width:thin;font-family:'Hiragino Kaku Gothic ProN','Yu Gothic','Meiryo',sans-serif;color:#000}
 .print-toolbar{background:#0f2744;color:#fff;padding:10px 20px;display:flex;align-items:center;gap:10px;position:sticky;top:0;z-index:10}
 .print-toolbar button{border:none;border-radius:6px;padding:8px 18px;font-size:13px;font-weight:700;cursor:pointer;font-family:inherit}
 .print-doc{width:297mm;min-height:210mm;margin:12px auto;background:#fff;padding:10mm 12mm 8mm;box-sizing:border-box;box-shadow:0 2px 12px rgba(0,0,0,.15)}
@@ -1064,6 +1064,8 @@ tbody tr:hover td.sticky-name{background:#e8f0f8}
 .ps-foot{display:flex;justify-content:space-between;margin-top:4mm;padding-top:2mm;border-top:1px solid #bbb;font-size:7pt;color:#888}
 @media print{
   .print-toolbar{display:none!important}
+  #printArea{overflow:hidden!important}
+  #printArea::-webkit-scrollbar{display:none!important}
   .print-sheet{margin:0;box-shadow:none;page-break-after:always}
   .ps-dtbl{font-size:7.5pt}
 }
@@ -5048,7 +5050,7 @@ body{font-family:'Hiragino Kaku Gothic Pro','Meiryo',sans-serif;background:#dde3
 }
 
 @media print{
-  html,body{background:#fff!important}
+  html,body{background:#fff!important;overflow:hidden!important}
   .toolbar,.main>.list-card{display:none!important}
   .main{padding:0!important;display:block!important}
   .sheets-wrap{display:block!important}
