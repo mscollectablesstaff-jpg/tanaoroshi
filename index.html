@@ -1879,6 +1879,33 @@ function mkRows(){
 // ============================================================
 // 画面切替
 // ============================================================
+
+// ============================================================
+// CSVデータ復元（商品マスタ初期データ）
+// ============================================================
+const _CSV_PRODUCTS = [{"id": "csv_0_1773125269067", "name": "マヌカ大瓶", "barcode": "", "productCode": "", "price": "7400", "costPrice": "", "taxRate": "8", "unit": "点", "category": "はちみつ", "catId": "0002", "supplier": "", "createdAt": 1773125269067}, {"id": "csv_1_1773125269067", "name": "マヌカ小瓶", "barcode": "", "productCode": "", "price": "4200", "costPrice": "", "taxRate": "8", "unit": "点", "category": "はちみつ", "catId": "0002", "supplier": "", "createdAt": 1773125269067}, {"id": "csv_2_1773125269067", "name": "ワイルドフラワーズ大瓶", "barcode": "", "productCode": "", "price": "3200", "costPrice": "", "taxRate": "8", "unit": "点", "category": "はちみつ", "catId": "0002", "supplier": "", "createdAt": 1773125269067}, {"id": "csv_3_1773125269067", "name": "ワイルドフラワーズ小瓶", "barcode": "", "productCode": "", "price": "1800", "costPrice": "", "taxRate": "8", "unit": "点", "category": "はちみつ", "catId": "0002", "supplier": "", "createdAt": 1773125269067}, {"id": "csv_4_1773125269067", "name": "マヌカキャンディー", "barcode": "", "productCode": "", "price": "1080", "costPrice": "", "taxRate": "8", "unit": "点", "category": "はちみつ", "catId": "0002", "supplier": "", "createdAt": 1773125269067}, {"id": "csv_5_1773125269067", "name": "マヌカせっけん", "barcode": "", "productCode": "", "price": "1760", "costPrice": "", "taxRate": "10", "unit": "点", "category": "はちみつ", "catId": "0002", "supplier": "", "createdAt": 1773125269067}, {"id": "csv_6_1773125269067", "name": "シア脂の全身保湿クリーム", "barcode": "10000001", "productCode": "", "price": "1485", "costPrice": "", "taxRate": "10", "unit": "点", "category": "松山油脂", "catId": "0016", "supplier": "", "createdAt": 1773125269067}, {"id": "csv_7_1773125269067", "name": "シア脂のハンドクリーム", "barcode": "10000002", "productCode": "", "price": "880", "costPrice": "", "taxRate": "10", "unit": "点", "category": "松山油脂", "catId": "0016", "supplier": "", "createdAt": 1773125269067}, {"id": "csv_8_1773125269067", "name": "米ぬかボディローション", "barcode": "10000003", "productCode": "", "price": "1727", "costPrice": "", "taxRate": "10", "unit": "点", "category": "松山油脂", "catId": "0016", "supplier": "", "createdAt": 1773125269067}, {"id": "csv_9_1773125269067", "name": "はっかのせっけん歯みがき", "barcode": "10000004", "productCode": "", "price": "748", "costPrice": "", "taxRate": "10", "unit": "点", "category": "松山油脂", "catId": "0016", "supplier": "", "createdAt": 1773125269067}, {"id": "csv_10_1773125269067", "name": "ゆずのせっけん歯みがき", "barcode": "10000005", "productCode": "", "price": "748", "costPrice": "", "taxRate": "10", "unit": "点", "category": "松山油脂", "catId": "0016", "supplier": "", "createdAt": 1773125269067}, {"id": "csv_11_1773125269067", "name": "ローズマリーのアミノ酸せっけんシャンプー", "barcode": "10000006", "productCode": "", "price": "1287", "costPrice": "", "taxRate": "10", "unit": "点", "category": "松山油脂", "catId": "0016", "supplier": "", "createdAt": 1773125269067}, {"id": "csv_12_1773125269067", "name": "ローズマリーのアミノ酸ボリュームリンス", "barcode": "10000007", "productCode": "", "price": "1287", "costPrice": "", "taxRate": "10", "unit": "点", "category": "松山油脂", "catId": "0016", "supplier": "", "createdAt": 1773125269067}, {"id": "csv_13_1773125269067", "name": "ローズマリーのアミノ酸補修トリートメント", "barcode": "10000008", "productCode": "", "price": "1364", "costPrice": "", "taxRate": "10", "unit": "点", "category": "松山油脂", "catId": "0016", "supplier": "", "createdAt": 1773125269067}, {"id": "csv_14_1773125269067", "name": "ユーカリの釜焚きせっけんハンドソープ", "barcode": "10000009", "productCode": "", "price": "627", "costPrice": "", "taxRate": "10", "unit": "点", "category": "松山油脂", "catId": "0016", "supplier": "", "createdAt": 1773125269067}, {"id": "csv_15_1773125269067", "name": "ユーカリの釜焚きせっけんハンドソープ　詰替用", "barcode": "10000010", "productCode": "", "price": "451", "costPrice": "", "taxRate": "10", "unit": "点", "category": "松山油脂", "catId": "0016", "supplier": "", "createdAt": 1773125269067}, {"id": "csv_16_1773125269067", "name": "釜焚きせっけんラベンダーボディソープ", "barcode": "10000011", "productCode": "", "price": "990", "costPrice": "", "taxRate": "10", "unit": "点", "category": "松山油脂", "catId": "0016", "supplier": "", "createdAt": 1773125269067}, {"id": "csv_17_1773125269067", "name": "釜焚きせっけんラベンダーソープ詰替用", "barcode": "10000012", "productCode": "", "price": "814", "costPrice": "", "taxRate": "10", "unit": "点", "category": "松山油脂", "catId": "0016", "supplier": "", "createdAt": 1773125269067}, {"id": "csv_18_1773125269067", "name": "アミノ酸浸透水", "barcode": "10000013", "productCode": "", "price": "1320", "costPrice": "", "taxRate": "10", "unit": "点", "category": "松山油脂", "catId": "0016", "supplier": "", "createdAt": 1773125269067}, {"id": "csv_19_1773125269067", "name": "さざんかとホホバのヘアオイル", "barcode": "10000014", "productCode": "", "price": "1595", "costPrice": "", "taxRate": "10", "unit": "点", "category": "松山油脂", "catId": "0016", "supplier": "", "createdAt": 1773125269067}, {"id": "csv_20_1773125269067", "name": "シア脂のリップクリーム", "barcode": "10000015", "productCode": "", "price": "880", "costPrice": "", "taxRate": "10", "unit": "点", "category": "松山油脂", "catId": "0016", "supplier": "", "createdAt": 1773125269067}, {"id": "csv_21_1773125269067", "name": "ゆずの手荒れ防止ジェル", "barcode": "10000016", "productCode": "", "price": "1551", "costPrice": "", "taxRate": "10", "unit": "点", "category": "松山油脂", "catId": "0016", "supplier": "", "createdAt": 1773125269067}, {"id": "csv_22_1773125269067", "name": "そまり　ハンド用液体石けんローズマリーの香り", "barcode": "10000018", "productCode": "", "price": "1320", "costPrice": "", "taxRate": "10", "unit": "点", "category": "木村石鹸", "catId": "0017", "supplier": "", "createdAt": 1773125269067}, {"id": "csv_23_1773125269067", "name": "そまり　台所用石けん", "barcode": "10000019", "productCode": "", "price": "1320", "costPrice": "", "taxRate": "10", "unit": "点", "category": "木村石鹸", "catId": "0017", "supplier": "", "createdAt": 1773125269067}, {"id": "csv_24_1773125269067", "name": "そこかし粉", "barcode": "10000020", "productCode": "", "price": "902", "costPrice": "", "taxRate": "10", "unit": "点", "category": "木村石鹸", "catId": "0017", "supplier": "", "createdAt": 1773125269067}, {"id": "csv_25_1773125269067", "name": "そまり　台所用石けん　詰替用　1Ｌ", "barcode": "10000021", "productCode": "", "price": "2200", "costPrice": "", "taxRate": "10", "unit": "点", "category": "木村石鹸", "catId": "0017", "supplier": "", "createdAt": 1773125269067}, {"id": "csv_26_1773125269067", "name": "そまり　液体ハンドソープ　詰替用　1Ｌ", "barcode": "10000022", "productCode": "", "price": "3960", "costPrice": "", "taxRate": "10", "unit": "点", "category": "木村石鹸", "catId": "0017", "supplier": "", "createdAt": 1773125269067}, {"id": "csv_27_1773125269067", "name": "きえーる　室内用　300ml", "barcode": "10000023", "productCode": "", "price": "1210", "costPrice": "", "taxRate": "10", "unit": "点", "category": "木村石鹸", "catId": "0017", "supplier": "", "createdAt": 1773125269067}, {"id": "csv_28_1773125269067", "name": "きえーる　洗濯用　600ml", "barcode": "10000024", "productCode": "", "price": "1650", "costPrice": "", "taxRate": "10", "unit": "点", "category": "木村石鹸", "catId": "0017", "supplier": "", "createdAt": 1773125269067}, {"id": "csv_29_1773125269067", "name": "きえーる　詰替用　1Ｌ", "barcode": "10000025", "productCode": "", "price": "2640", "costPrice": "", "taxRate": "10", "unit": "点", "category": "木村石鹸", "catId": "0017", "supplier": "", "createdAt": 1773125269067}, {"id": "csv_30_1773125269067", "name": "きえーる　室内用ゼリータイプ　詰替480g", "barcode": "10000026", "productCode": "", "price": "1595", "costPrice": "", "taxRate": "10", "unit": "点", "category": "木村石鹸", "catId": "0017", "supplier": "", "createdAt": 1773125269067}, {"id": "csv_31_1773125269067", "name": "きえーる　室内用ゼリータイプ140g", "barcode": "10000027", "productCode": "", "price": "858", "costPrice": "", "taxRate": "10", "unit": "点", "category": "木村石鹸", "catId": "0017", "supplier": "", "createdAt": 1773125269067}, {"id": "csv_32_1773125269067", "name": "yahae", "barcode": "10000028", "productCode": "", "price": "1980", "costPrice": "", "taxRate": "10", "unit": "点", "category": "靴下", "catId": "0021", "supplier": "", "createdAt": 1773125269067}, {"id": "csv_33_1773125269067", "name": "Yahae", "barcode": "10000029", "productCode": "", "price": "2200", "costPrice": "", "taxRate": "10", "unit": "点", "category": "靴下", "catId": "0021", "supplier": "", "createdAt": 1773125269067}, {"id": "csv_34_1773125269067", "name": "yahae", "barcode": "10000028", "productCode": "", "price": "3300", "costPrice": "", "taxRate": "10", "unit": "点", "category": "靴下", "catId": "0021", "supplier": "", "createdAt": 1773125269067}, {"id": "csv_35_1773125269067", "name": "yahae", "barcode": "10000028", "productCode": "", "price": "4400", "costPrice": "", "taxRate": "10", "unit": "点", "category": "靴下", "catId": "0021", "supplier": "", "createdAt": 1773125269067}, {"id": "csv_36_1773125269067", "name": "Hoffmann", "barcode": "10000030", "productCode": "", "price": "2200", "costPrice": "", "taxRate": "10", "unit": "点", "category": "靴下", "catId": "0021", "supplier": "", "createdAt": 1773125269067}, {"id": "csv_37_1773125269067", "name": "Hoffmann", "barcode": "10000030", "productCode": "", "price": "1540", "costPrice": "", "taxRate": "10", "unit": "点", "category": "靴下", "catId": "0021", "supplier": "", "createdAt": 1773125269067}, {"id": "csv_38_1773125269067", "name": "ここちうるわし", "barcode": "10000031", "productCode": "", "price": "3410", "costPrice": "", "taxRate": "10", "unit": "点", "category": "靴下", "catId": "0021", "supplier": "", "createdAt": 1773125269067}, {"id": "csv_39_1773125269067", "name": "ここちうるわし", "barcode": "10000031", "productCode": "", "price": "2860", "costPrice": "", "taxRate": "10", "unit": "点", "category": "靴下", "catId": "0021", "supplier": "", "createdAt": 1773125269067}, {"id": "csv_40_1773125269067", "name": "オーガニックガーデン", "barcode": "10000032", "productCode": "", "price": "2860", "costPrice": "", "taxRate": "10", "unit": "点", "category": "靴下", "catId": "0021", "supplier": "", "createdAt": 1773125269067}, {"id": "csv_41_1773125269067", "name": "オーガニックガーデン", "barcode": "10000032", "productCode": "", "price": "2090", "costPrice": "", "taxRate": "10", "unit": "点", "category": "靴下", "catId": "0021", "supplier": "", "createdAt": 1773125269067}, {"id": "csv_42_1773125269067", "name": "オーガニックガーデン", "barcode": "10000032", "productCode": "", "price": "2420", "costPrice": "", "taxRate": "10", "unit": "点", "category": "靴下", "catId": "0021", "supplier": "", "createdAt": 1773125269067}, {"id": "csv_43_1773125269067", "name": "創喜", "barcode": "10000033", "productCode": "", "price": "1870", "costPrice": "", "taxRate": "10", "unit": "点", "category": "靴下", "catId": "0021", "supplier": "", "createdAt": 1773125269067}, {"id": "csv_44_1773125269067", "name": "創喜", "barcode": "10000033", "productCode": "", "price": "2420", "costPrice": "", "taxRate": "10", "unit": "点", "category": "靴下", "catId": "0021", "supplier": "", "createdAt": 1773125269067}, {"id": "csv_45_1773125269067", "name": "創喜", "barcode": "10000033", "productCode": "", "price": "1430", "costPrice": "", "taxRate": "10", "unit": "点", "category": "靴下", "catId": "0021", "supplier": "", "createdAt": 1773125269067}, {"id": "csv_46_1773125269067", "name": "創喜", "barcode": "10000033", "productCode": "", "price": "1100", "costPrice": "", "taxRate": "10", "unit": "点", "category": "靴下", "catId": "0021", "supplier": "", "createdAt": 1773125269067}, {"id": "csv_47_1773125269067", "name": "創喜", "barcode": "10000033", "productCode": "", "price": "2970", "costPrice": "", "taxRate": "10", "unit": "点", "category": "靴下", "catId": "0021", "supplier": "", "createdAt": 1773125269067}, {"id": "csv_48_1773125269067", "name": "創喜", "barcode": "10000033", "productCode": "", "price": "2200", "costPrice": "", "taxRate": "10", "unit": "点", "category": "靴下", "catId": "0021", "supplier": "", "createdAt": 1773125269067}, {"id": "csv_49_1773125269067", "name": "オリジナルソックス", "barcode": "10000034", "productCode": "", "price": "2420", "costPrice": "", "taxRate": "10", "unit": "点", "category": "靴下", "catId": "0021", "supplier": "", "createdAt": 1773125269067}, {"id": "csv_50_1773125269067", "name": "オーガニックガーデン　タイツ", "barcode": "10000035", "productCode": "", "price": "6050", "costPrice": "", "taxRate": "10", "unit": "点", "category": "靴下", "catId": "0021", "supplier": "", "createdAt": 1773125269067}, {"id": "csv_51_1773125269067", "name": "Hoffmann タイツ", "barcode": "10000036", "productCode": "", "price": "4840", "costPrice": "", "taxRate": "10", "unit": "点", "category": "靴下", "catId": "0021", "supplier": "", "createdAt": 1773125269067}, {"id": "csv_52_1773125269067", "name": "Yahae  タイツ", "barcode": "10000037", "productCode": "", "price": "6160", "costPrice": "", "taxRate": "10", "unit": "点", "category": "靴下", "catId": "0021", "supplier": "", "createdAt": 1773125269067}, {"id": "csv_53_1773125269067", "name": "創喜　レギンス", "barcode": "10000038", "productCode": "", "price": "5280", "costPrice": "", "taxRate": "10", "unit": "点", "category": "靴下", "catId": "0021", "supplier": "", "createdAt": 1773125269067}, {"id": "csv_54_1773125269067", "name": "シエルスラン　ウォーマー", "barcode": "10000039", "productCode": "", "price": "1870", "costPrice": "", "taxRate": "10", "unit": "点", "category": "靴下", "catId": "0021", "supplier": "", "createdAt": 1773125269067}, {"id": "csv_55_1773125269067", "name": "シエルスラン　ウォーマー", "barcode": "10000039", "productCode": "", "price": "1980", "costPrice": "", "taxRate": "10", "unit": "点", "category": "靴下", "catId": "0021", "supplier": "", "createdAt": 1773125269067}, {"id": "csv_56_1773125269067", "name": "シエルスラン　ウォーマー", "barcode": "10000039", "productCode": "", "price": "2035", "costPrice": "", "taxRate": "10", "unit": "点", "category": "靴下", "catId": "0021", "supplier": "", "createdAt": 1773125269067}, {"id": "csv_57_1773125269067", "name": "awaia ネックウォーマー", "barcode": "10000040", "productCode": "", "price": "3300", "costPrice": "", "taxRate": "10", "unit": "点", "category": "靴下", "catId": "0021", "supplier": "", "createdAt": 1773125269067}, {"id": "csv_58_1773125269067", "name": "awaia アンクルウォーマー", "barcode": "10000041", "productCode": "", "price": "5280", "costPrice": "", "taxRate": "10", "unit": "点", "category": "靴下", "catId": "0021", "supplier": "", "createdAt": 1773125269067}, {"id": "csv_59_1773125269067", "name": "awaia  コットンシルクレギンス", "barcode": "10000042", "productCode": "", "price": "9790", "costPrice": "", "taxRate": "10", "unit": "点", "category": "靴下", "catId": "0021", "supplier": "", "createdAt": 1773125269067}, {"id": "csv_60_1773125269067", "name": "7インチピラー", "barcode": "", "productCode": "", "price": "6600", "costPrice": "", "taxRate": "10", "unit": "点", "category": "キャンドル・店内", "catId": "0023", "supplier": "", "createdAt": 1773125269067}, {"id": "csv_61_1773125269067", "name": "5インチピラー", "barcode": "", "productCode": "", "price": "4840", "costPrice": "", "taxRate": "10", "unit": "点", "category": "キャンドル・店内", "catId": "0023", "supplier": "", "createdAt": 1773125269067}, {"id": "csv_62_1773125269067", "name": "3インチピラー", "barcode": "", "productCode": "", "price": "3630", "costPrice": "", "taxRate": "10", "unit": "点", "category": "キャンドル・店内", "catId": "0023", "supplier": "", "createdAt": 1773125269067}, {"id": "csv_63_1773125269067", "name": "6インチチューブ", "barcode": "", "productCode": "", "price": "1650", "costPrice": "", "taxRate": "10", "unit": "点", "category": "キャンドル・店内", "catId": "0023", "supplier": "", "createdAt": 1773125269067}, {"id": "csv_64_1773125269067", "name": "テーパー2本組", "barcode": "", "productCode": "", "price": "2640", "costPrice": "", "taxRate": "10", "unit": "点", "category": "キャンドル・店内", "catId": "0023", "supplier": "", "createdAt": 1773125269067}, {"id": "csv_65_1773125269067", "name": "ピラミッド", "barcode": "", "productCode": "", "price": "2200", "costPrice": "", "taxRate": "10", "unit": "点", "category": "キャンドル・店内", "catId": "0023", "supplier": "", "createdAt": 1773125269067}, {"id": "csv_66_1773125269067", "name": "tライト", "barcode": "", "productCode": "", "price": "330", "costPrice": "", "taxRate": "10", "unit": "点", "category": "キャンドル・店内", "catId": "0023", "supplier": "", "createdAt": 1773125269067}, {"id": "csv_67_1773125269067", "name": "店内テスト商品", "barcode": "10000044", "productCode": "", "price": "1100", "costPrice": "", "taxRate": "10", "unit": "点", "category": "キャンドル・店内", "catId": "0023", "supplier": "", "createdAt": 1773125269067}, {"id": "csv_68_1773125269067", "name": "アイリス", "barcode": "", "productCode": "", "price": "28600", "costPrice": "", "taxRate": "10", "unit": "点", "category": "NAOT", "catId": "0022", "supplier": "", "createdAt": 1773125269067}, {"id": "csv_69_1773125269067", "name": "オルガ", "barcode": "", "productCode": "", "price": "31900", "costPrice": "", "taxRate": "10", "unit": "点", "category": "NAOT", "catId": "0022", "supplier": "", "createdAt": 1773125269067}, {"id": "csv_70_1773125269067", "name": "ダニエラ", "barcode": "", "productCode": "", "price": "31900", "costPrice": "", "taxRate": "10", "unit": "点", "category": "NAOT", "catId": "0022", "supplier": "", "createdAt": 1773125269067}, {"id": "csv_71_1773125269067", "name": "デナリ", "barcode": "", "productCode": "", "price": "34100", "costPrice": "", "taxRate": "10", "unit": "点", "category": "NAOT", "catId": "0022", "supplier": "", "createdAt": 1773125269067}, {"id": "csv_72_1773125269067", "name": "セシリア", "barcode": "", "productCode": "", "price": "27500", "costPrice": "", "taxRate": "10", "unit": "点", "category": "NAOT", "catId": "0022", "supplier": "", "createdAt": 1773125269067}, {"id": "csv_73_1773125269067", "name": "インソール", "barcode": "", "productCode": "", "price": "6050", "costPrice": "", "taxRate": "10", "unit": "点", "category": "NAOT", "catId": "0022", "supplier": "", "createdAt": 1773125269067}, {"id": "csv_74_1773125269067", "name": "HUIS", "barcode": "", "productCode": "", "price": "25080", "costPrice": "", "taxRate": "10", "unit": "点", "category": "個人作家系", "catId": "0025", "supplier": "", "createdAt": 1773125269067}, {"id": "csv_75_1773125269067", "name": "HUIS", "barcode": "", "productCode": "", "price": "26180", "costPrice": "", "taxRate": "10", "unit": "点", "category": "個人作家系", "catId": "0025", "supplier": "", "createdAt": 1773125269067}, {"id": "csv_76_1773125269067", "name": "HUIS", "barcode": "", "productCode": "", "price": "21780", "costPrice": "", "taxRate": "10", "unit": "点", "category": "個人作家系", "catId": "0025", "supplier": "", "createdAt": 1773125269067}, {"id": "csv_77_1773125269067", "name": "HUIS", "barcode": "", "productCode": "", "price": "31680", "costPrice": "", "taxRate": "10", "unit": "点", "category": "個人作家系", "catId": "0025", "supplier": "", "createdAt": 1773125269067}, {"id": "csv_78_1773125269067", "name": "HUIS", "barcode": "", "productCode": "", "price": "23980", "costPrice": "", "taxRate": "10", "unit": "点", "category": "個人作家系", "catId": "0025", "supplier": "", "createdAt": 1773125269067}, {"id": "csv_79_1773125269067", "name": "HUIS", "barcode": "", "productCode": "", "price": "27280", "costPrice": "", "taxRate": "10", "unit": "点", "category": "個人作家系", "catId": "0025", "supplier": "", "createdAt": 1773125269067}, {"id": "csv_80_1773125269067", "name": "スリッポン", "barcode": "", "productCode": "", "price": "33000", "costPrice": "", "taxRate": "10", "unit": "点", "category": "", "catId": "", "supplier": "", "createdAt": 1773125269067}, {"id": "csv_81_1773125269067", "name": "サラジジ", "barcode": "", "productCode": "", "price": "24200", "costPrice": "", "taxRate": "10", "unit": "点", "category": "個人作家系", "catId": "0025", "supplier": "", "createdAt": 1773125269067}, {"id": "csv_82_1773125269067", "name": "サラジジ", "barcode": "", "productCode": "", "price": "19800", "costPrice": "", "taxRate": "10", "unit": "点", "category": "個人作家系", "catId": "0025", "supplier": "", "createdAt": 1773125269067}, {"id": "csv_83_1773125269067", "name": "サラジジ", "barcode": "", "productCode": "", "price": "16500", "costPrice": "", "taxRate": "10", "unit": "点", "category": "個人作家系", "catId": "0025", "supplier": "", "createdAt": 1773125269067}, {"id": "csv_84_1773125269067", "name": "サラジジ", "barcode": "", "productCode": "", "price": "15400", "costPrice": "", "taxRate": "10", "unit": "点", "category": "個人作家系", "catId": "0025", "supplier": "", "createdAt": 1773125269067}, {"id": "csv_85_1773125269067", "name": "サラジジ", "barcode": "", "productCode": "", "price": "23100", "costPrice": "", "taxRate": "10", "unit": "点", "category": "個人作家系", "catId": "0025", "supplier": "", "createdAt": 1773125269067}, {"id": "csv_86_1773125269067", "name": "サラジジ", "barcode": "", "productCode": "", "price": "22000", "costPrice": "", "taxRate": "10", "unit": "点", "category": "個人作家系", "catId": "0025", "supplier": "", "createdAt": 1773125269067}, {"id": "csv_87_1773125269067", "name": "サラジジ", "barcode": "", "productCode": "", "price": "6050", "costPrice": "", "taxRate": "10", "unit": "点", "category": "個人作家系", "catId": "0025", "supplier": "", "createdAt": 1773125269067}, {"id": "csv_88_1773125269067", "name": "KOMO", "barcode": "", "productCode": "", "price": "15950", "costPrice": "", "taxRate": "10", "unit": "点", "category": "キャンドル・店内", "catId": "0023", "supplier": "", "createdAt": 1773125269067}, {"id": "csv_89_1773125269067", "name": "KOMO", "barcode": "", "productCode": "", "price": "9570", "costPrice": "", "taxRate": "10", "unit": "点", "category": "キャンドル・店内", "catId": "0023", "supplier": "", "createdAt": 1773125269067}, {"id": "csv_90_1773125269067", "name": "KOMO", "barcode": "", "productCode": "", "price": "11880", "costPrice": "", "taxRate": "10", "unit": "点", "category": "キャンドル・店内", "catId": "0023", "supplier": "", "createdAt": 1773125269067}];
+
+function restoreCsvProducts(){
+  // 既存マスタに新しい商品だけを追加（既存データは消さない）
+  try{
+    const existing = JSON.parse(localStorage.getItem('tb_products_v1')||'[]');
+    const existingNames = new Set(existing.map(p=>p.name+'|'+p.price));
+    let added = 0;
+    _CSV_PRODUCTS.forEach(p=>{
+      const key = p.name+'|'+p.price;
+      if(!existingNames.has(key)){
+        existing.push(p);
+        existingNames.add(key);
+        added++;
+      }
+    });
+    if(added>0){
+      localStorage.setItem('tb_products_v1', JSON.stringify(existing));
+      console.log('商品マスタ復元: '+added+'件追加');
+    }
+  }catch(e){console.error('商品マスタ復元エラー:',e);}
+}
+
 // ============================================================
 // 自動起動（保存済みFirebase設定があれば自動接続）
 // ============================================================
@@ -3680,14 +3707,15 @@ function calc(r){
   const k=parseFloat(r.k)||0, rate=r.z==='8'?.08:.10;
   const p=parseFloat(r.p)||0, zt=p>0?p/(1+rate):0;
   const sr=parseFloat(r.sr)||0;
-  // 仕入単価：手入力があればそれを優先、なければ税抜単価×仕入率%で自動計算
   const stManual=parseFloat(r.st);
   const st = (!isNaN(stManual)&&r.st!==''&&r.st!=='0') ? stManual
             : (zt>0&&sr>0) ? Math.round(zt*sr/100) : 0;
   const ok=r.p!==''&&r.k!=='';
   const j=(!ok||r.z==='8')?0:zt*k, h=(!ok||r.z!=='8')?0:zt*k;
-  const zk=(st>0&&k>0)?st*k:0;
-  return {k,p,zt,st,sr,j,h,zk,ok};
+  // 在庫価格：仕入単価があればそれ×個数、なければ税抜売価×個数（売価ベース）
+  const zk = (st>0&&k>0) ? st*k : (zt>0&&k>0) ? Math.round(zt*k) : 0;
+  const zkBySt = st>0; // true=仕入ベース / false=売価ベース
+  return {k,p,zt,st,sr,j,h,zk,zkBySt,ok};
 }
 function pageSub(rows){
   let p10=0,p8=0,z=0;
@@ -3896,12 +3924,13 @@ function renderTable(){
       <td class="sp-hide"><div class="ac-wrap"><input class="ci" value="${e(r.ss)}" ${d} data-ac="ss" onchange="upd('${curKey}',${ri},'ss',this.value);acAdd('ss',this.value)" onfocus="showAcList(this,'ss',${ri},'${curKey}')" oninput="showAcList(this,'ss',${ri},'${curKey}')" placeholder="仕入先"></div></td>
       <td class="sp-hide"><div class="ac-wrap"><input class="ci r" type="text" inputmode="decimal" value="${r.sr}" ${d} data-ac="sr" onchange="upd('${curKey}',${ri},'sr',this.value);acAdd('sr',this.value)" onfocus="showAcList(this,'sr',${ri},'${curKey}')" oninput="showAcList(this,'sr',${ri},'${curKey}')" placeholder="%"></div></td>
       <td class="sp-hide"><div class="ac-wrap"><input class="ci r" type="text" inputmode="decimal" value="${r.st}" ${d} data-ac="st" onchange="upd('${curKey}',${ri},'st',this.value);acAdd('st',this.value)" onfocus="showAcList(this,'st',${ri},'${curKey}')" oninput="showAcList(this,'st',${ri},'${curKey}')" placeholder="${c.st&&!r.st?c.st:''}" title="${c.st&&!r.st?'自動計算: ¥'+fm(c.st):'手入力'}"></div></td>
-      <td style="${bz}"><span class="cc g">${c.zk?fy(c.zk):''}</span>${c.st&&!r.st&&c.zk?`<br><span style="font-size:9px;color:#888">自動計算</span>`:''}</td>
+      <td style="${bz}"><span class="cc g" style="${!c.zkBySt&&c.zk?'color:#aaa;':'color:#1a7a4a;'}">${c.zk?fy(c.zk):''}</span>${c.zk&&!c.zkBySt?'<br><span style="font-size:9px;color:#aaa">売価ベース</span>':(c.st&&!r.st&&c.zk?'<br><span style="font-size:9px;color:#888">自動計算</span>':'')}</td>
       <td style="white-space:nowrap" class="sp-hide"><div class="ac-wrap"><input class="ci" value="${e(r.b)}" ${d} data-ac="b" onchange="upd('${curKey}',${ri},'b',this.value);acAdd('b',this.value)" onfocus="showAcList(this,'b',${ri},'${curKey}')" oninput="showAcList(this,'b',${ri},'${curKey}')" placeholder="備考"></div></td>
     </tr>`;
   });
   tbody.innerHTML=h;
   const sub=pageSub(rows);
+  const hasSt=rows.some(r=>r.st||r.sr);
   document.getElementById('tfoot').innerHTML=`<tr>
     <td class="sticky-col sticky-drag" style="background:#0f2744"></td>
     <td class="sticky-col sticky-no" style="background:#0f2744"></td>
@@ -3909,8 +3938,8 @@ function renderTable(){
     <td class="sticky-col sticky-name" colspan="6" style="background:#0f2744;color:#fff;font-weight:700;text-align:right">頁　小計</td>
     <td class="tfn sp-hide">${sub.p10?fm(sub.p10):''}</td>
     <td class="tfn sp-hide" style="color:#ffd97d">${sub.p8?fm(sub.p8):''}</td>
-    <td colspan="3" class="tfl sp-hide">在庫合計</td>
-    <td class="tfn" style="color:#7fffb0">${sub.z?fm(sub.z):''}</td>
+    <td colspan="3" class="tfl sp-hide">在庫合計${hasSt?'':'<span style="font-size:9px;font-weight:400;opacity:.7;margin-left:4px">売価ベース</span>'}</td>
+    <td class="tfn" style="color:${hasSt?'#7fffb0':'#aaa'}">${sub.z?fm(sub.z):'0'}</td>
     <td colspan="3" class="sp-hide"></td>
   </tr>`;
   document.getElementById('roNote').innerHTML='';
@@ -4173,10 +4202,18 @@ function moveRow(fromRi, toRi) {
 
 function renderQbar(){
   if(!curKey||!pages[curKey])return;
-  const sub=pageSub(pages[curKey].rows||[]), all=allTot();
+  const rows=pages[curKey].rows||[];
+  const sub=pageSub(rows), all=allTot();
+  const hasSt=rows.some(r=>r.st||r.sr);
   document.getElementById('q10').textContent=fy(sub.p10);
   document.getElementById('q8').textContent=fy(sub.p8);
-  document.getElementById('qz').textContent=fy(sub.z);
+  const qzEl=document.getElementById('qz');
+  qzEl.textContent=fy(sub.z)||'¥0';
+  qzEl.style.color=hasSt?'#7fffb0':'#aaa';
+  qzEl.title=hasSt?'仕入単価ベース':'売価ベース（仕入単価未入力）';
+  // 在庫価格合計ラベルに注記
+  const qzLabel=qzEl.previousElementSibling;
+  if(qzLabel) qzLabel.textContent='在庫価格合計'+(hasSt?'':' ※売価');
   document.getElementById('qg').textContent=fy(all.t10+all.t8);
 }
 
@@ -4401,15 +4438,14 @@ function bcpGetAllSources(){
     result.push({...p, _pageLabel: nameToPage[p.name]||''});
   });
 
-  // セッション入力行（マスタにない ＆ バーコードあり）
+  // セッション入力行（マスタにない商品をバーコードあり・なし問わず表示）
   order.forEach(k=>{
     (pages[k]?.rows||[]).forEach(r=>{
       const name=(r.n||'').trim();
-      const bc=(r.bc||'').trim();
-      if(!name||!bc||seenNames.has(name)) return;
+      if(!name||seenNames.has(name)) return;
       seenNames.add(name);
       result.push({
-        id:'sess_'+name, name, barcode:bc,
+        id:'sess_'+name, name, barcode:(r.bc||'').trim(),
         price:r.p||'', category:r.cat||'',
         taxRate:r.z||'10', _source:'session',
         _pageLabel: nameToPage[name]||''
@@ -4458,16 +4494,23 @@ function bcpRenderList(){
     const borderColor=isSession?'#f0c040':'#dde3ea';
     const bgColor=isSession?'#fffde7':'#fff';
     const badge=isSession?`<span style="font-size:9px;background:#fffde7;color:#856404;border:1px solid #f0c040;padding:1px 5px;border-radius:8px">入力中</span>`:'';
+    const masterBadge=!isSession?`<span style="font-size:9px;background:#e8f5e9;color:#1a5c2e;border:1px solid #a5d6a7;padding:1px 5px;border-radius:8px">マスタ</span>`:'';
     const cat=p._pageLabel?`<span style="font-size:10px;color:#1a5c2e;background:#e8f5e9;padding:1px 6px;border-radius:10px">${e(p._pageLabel)}</span>`:'';
     const price=p.price?`<span style="font-size:11px;color:#1a5c2e">¥${Number(p.price).toLocaleString()}</span>`:'';
-    return `<label style="display:flex;align-items:flex-start;gap:8px;background:${hasBc?bgColor:'#fafafa'};border:1.5px solid ${hasBc?borderColor:'#e8e8e8'};border-radius:8px;padding:8px 10px;cursor:${hasBc?'pointer':'default'};opacity:${hasBc?1:0.5}" id="bcpitem_${i}">
+    const bcDisplay=hasBc
+      ? `<span style="font-size:10px;color:#888;font-family:monospace">${e(p.barcode)}</span>`
+      : `<button onclick="event.preventDefault();bcpAssignOne('${e(p.id||p.name)}',${i})"
+           style="font-size:10px;background:#fff3cd;color:#856404;border:1px solid #ffc107;border-radius:4px;padding:2px 7px;cursor:pointer;font-family:inherit">
+           🔢 バーコード発番
+         </button>`;
+    return `<label style="display:flex;align-items:flex-start;gap:8px;background:${bgColor};border:1.5px solid ${hasBc?borderColor:'#ffc107'};border-radius:8px;padding:8px 10px;cursor:pointer" id="bcpitem_${i}">
       <input type="checkbox" id="bcpchk_${i}" ${!hasBc?'disabled':''}
         style="margin-top:3px;flex-shrink:0;width:15px;height:15px;cursor:${hasBc?'pointer':'not-allowed'}"
         onchange="bcpUpdateStyle(${i})">
       <div style="flex:1;min-width:0">
         <div style="font-size:12px;font-weight:700;color:#0f2744;overflow:hidden;white-space:nowrap;text-overflow:ellipsis" title="${e(p.name)}">${e(p.name)}</div>
-        <div style="display:flex;gap:6px;align-items:center;flex-wrap:wrap;margin-top:3px">${badge}${cat}${price}</div>
-        <div style="font-size:10px;color:${hasBc?'#888':'#e74c3c'};font-family:monospace;margin-top:2px">${hasBc?e(p.barcode):'バーコードなし（発番ボタンで割り当て）'}</div>
+        <div style="display:flex;gap:6px;align-items:center;flex-wrap:wrap;margin-top:3px">${badge}${masterBadge}${cat}${price}</div>
+        <div style="margin-top:4px">${bcDisplay}</div>
       </div>
       <div>
         <input type="number" min="1" max="99" value="1" id="bcpqty_${i}"
@@ -4492,6 +4535,39 @@ function bcpUpdateStyle(i){
     item.style.borderColor=isSession?'#f0c040':'#dde3ea';
     item.style.background=isSession?'#fffde7':'#fff';
   }
+}
+
+// 個別バーコード発番
+function bcpAssignOne(idOrName, listIdx){
+  const p=_bcpFiltered[listIdx]; if(!p) return;
+  // 使用済み番号の最大値を取得して+1
+  const used=JSON.parse(localStorage.getItem('tb_bc_used_v1')||'[]').map(Number);
+  const prods=nkGetProducts();
+  const allBcs=[...used,...prods.map(x=>Number(x.barcode||0)).filter(Boolean)];
+  // セッション行のバーコードも収集
+  order.forEach(k=>{(pages[k]?.rows||[]).forEach(r=>{if(r.bc)allBcs.push(Number(r.bc));});});
+  const maxBc=allBcs.length?Math.max(...allBcs):10000000;
+  const newBc=String(maxBc+1).padStart(8,'0');
+
+  if(p._source==='session'){
+    // セッション行に反映
+    order.forEach(k=>{
+      const rows=pages[k]?.rows||[];
+      rows.forEach((r,ri)=>{
+        if((r.n||'').trim()===p.name) upd(k,ri,'bc',newBc);
+      });
+    });
+  } else {
+    // 商品マスタに反映
+    const ps=nkGetProducts();
+    const idx=ps.findIndex(x=>x.id===p.id||x.name===p.name);
+    if(idx>=0){ ps[idx].barcode=newBc; localStorage.setItem(PK,JSON.stringify(ps)); }
+  }
+  // 使用済みに追加
+  used.push(Number(newBc));
+  localStorage.setItem('tb_bc_used_v1',JSON.stringify(used));
+  alert(`✅ バーコードを発番しました\n${p.name}\n→ ${newBc}`);
+  bcpFilter();
 }
 
 function bcpSelectAll(val){
@@ -4734,6 +4810,7 @@ function nkPrintLabels(startPos){
 
 // ページ読み込み完了時に自動起動
 document.addEventListener('DOMContentLoaded', function(){
+  restoreCsvProducts(); // CSVデータ復元
   autoInit();
 });
 
