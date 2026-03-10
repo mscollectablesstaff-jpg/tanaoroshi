@@ -4073,7 +4073,7 @@ function renderTable(){
       </td>
       <td class="sticky-col sticky-del" style="text-align:center;padding:2px">
         <button class="del-btn" onclick="delRow('${curKey}',${ri})" title="この行を削除">✕</button>
-        ${order.length>1?`<button onclick="openMoveRowModal('${curKey}',${ri})" title="別ページへ移動" style="display:block;margin-top:2px;width:100%;background:#e8f0fb;color:#1a4a8a;border:none;border-radius:3px;font-size:10px;cursor:pointer;padding:1px 0;font-family:inherit">↗移動</button>`:''}
+        ${order.length>1?`<button onclick="openMoveRowModal('${curKey}',${ri})" title="別ページへ移動" style="display:inline-block;margin-top:1px;background:#e8f0fb;color:#1a4a8a;border:none;border-radius:3px;font-size:9px;cursor:pointer;padding:1px 3px;font-family:inherit;line-height:1.2">↗</button>`:''}
       </td>
       <td class="sticky-col sticky-name"><input class="ci" value="${e(r.n)}" ${d} onchange="upd('${curKey}',${ri},'n',this.value)" placeholder="商品名"></td>
       <td><select class="ci c" ${d} onchange="upd('${curKey}',${ri},'z',this.value)">
@@ -4091,7 +4091,7 @@ function renderTable(){
       <td class="sp-hide"><div class="ac-wrap"><input class="ci" value="${e(r.ss)}" ${d} data-ac="ss" onchange="upd('${curKey}',${ri},'ss',this.value);acAdd('ss',this.value)" onfocus="showAcList(this,'ss',${ri},'${curKey}')" oninput="showAcList(this,'ss',${ri},'${curKey}')" placeholder="仕入先"></div></td>
       <td class="sp-hide"><div class="ac-wrap"><input class="ci r" type="text" inputmode="decimal" value="${r.sr}" ${d} data-ac="sr" onchange="upd('${curKey}',${ri},'sr',this.value);acAdd('sr',this.value)" onfocus="showAcList(this,'sr',${ri},'${curKey}')" oninput="showAcList(this,'sr',${ri},'${curKey}')" placeholder="%"></div></td>
       <td class="sp-hide"><div class="ac-wrap"><input class="ci r" type="text" inputmode="decimal" value="${r.st}" ${d} data-ac="st" onchange="upd('${curKey}',${ri},'st',this.value);acAdd('st',this.value)" onfocus="showAcList(this,'st',${ri},'${curKey}')" oninput="showAcList(this,'st',${ri},'${curKey}')" placeholder="${c.st&&!r.st?c.st:''}" title="${c.st&&!r.st?'自動計算: ¥'+fm(c.st):'手入力'}"></div></td>
-      <td style="${bz}"><span class="cc g" style="${!c.zkBySt&&c.zk?'color:#aaa;':'color:#1a7a4a;'}">${c.zk?fy(c.zk):''}</span>${c.zk&&!c.zkBySt?'<br><span style="font-size:9px;color:#aaa">売価ベース</span>':(c.st&&!r.st&&c.zk?'<br><span style="font-size:9px;color:#888">自動計算</span>':'')}</td>
+      <td style="${bz}"><span class="cc g" style="${!c.zkBySt&&c.zk?'color:#aaa;':'color:#1a7a4a;'}">${c.zk?fy(c.zk):''}</span>${c.zk&&!c.zkBySt?'<span style="font-size:9px;color:#aaa;display:inline-block;margin-left:2px">売価</span>':(c.st&&!r.st&&c.zk?'<span style="font-size:9px;color:#888;display:inline-block;margin-left:2px">自動</span>':'')}</td>
       <td style="white-space:nowrap" class="sp-hide"><div class="ac-wrap"><input class="ci" value="${e(r.b)}" ${d} data-ac="b" onchange="upd('${curKey}',${ri},'b',this.value);acAdd('b',this.value)" onfocus="showAcList(this,'b',${ri},'${curKey}')" oninput="showAcList(this,'b',${ri},'${curKey}')" placeholder="備考"></div></td>
     </tr>`;
   });
@@ -4919,14 +4919,12 @@ function bcpPrint(startPos){
 // A-one 31397: 20×8mm、8列×25行、左余白8mm、上余白9mm
 // 列ピッチ24.86mm、行ピッチ11.33mm
 function bcpBuildLabelHtml(items, startPos){
-  // A-one 31397 公式仕様
-  // 用紙: A4縦(210×297mm) / ラベル: 20mm×8mm / 8列×25行=200面
+  // A-one 31397: 20mm×8mm、8列×25行=200面
   // 左余白:8.0mm 上余白:9.0mm 列ピッチ:24.86mm 行ピッチ:11.33mm
   const COLS=8, PER=200;
   const LW=20, LH=8;
   const ML=8.0, MT=9.0;
   const CP=24.86, RP=11.33;
-  const QR_SIZE=6.2;  // QRコード(mm) - ラベル高さ8mmに合わせ若干余白付き
   const offset = Math.max(0, Math.min(199,(startPos||1)-1));
 
   const padded=[];
@@ -4944,17 +4942,17 @@ function bcpBuildLabelHtml(items, startPos){
       const row=Math.floor(ci/COLS), col=ci%COLS;
       const left=(ML+col*CP).toFixed(4);
       const top =(MT+row*RP).toFixed(4);
-      const uid='qr_'+s+'_'+ci;
+      const uid='bc_'+s+'_'+ci;
       const nm=(p.name||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
       const pr=p.price?('\u00a5'+Number(p.price).toLocaleString()):'';
-      const bc=String(p.barcode||'').replace(/&/g,'&amp;');
+      const bc=String(p.barcode||'').replace(/[^0-9A-Za-z\-\.\ \$\/\+\%]/g,'');
       cells+=
         '<div class="lbl" style="left:'+left+'mm;top:'+top+'mm;">' +
-          '<div class="lbl-txt">' +
+          '<div class="lbl-info">' +
             '<div class="lbl-nm">'+nm+'</div>' +
             '<div class="lbl-pr">'+pr+'</div>' +
           '</div>' +
-          '<div id="'+uid+'" data-bc="'+bc+'" class="lbl-qr"></div>' +
+          '<svg id="'+uid+'" data-bc="'+bc+'" class="lbl-bc"></svg>' +
         '</div>';
     });
     sheetData+='<div class="sheet" id="sheet_'+s+'">'+cells+'</div>';
@@ -4968,18 +4966,16 @@ function bcpBuildLabelHtml(items, startPos){
       '<td style="font-family:monospace;font-size:11px;color:#1a6ea6">'+bc+'</td></tr>';
   }).join('');
 
-  const qrSrc='https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js';
+  const jsBarcodeUrl='https://cdnjs.cloudflare.com/ajax/libs/jsbarcode/3.11.5/JsBarcode.all.min.js';
 
   return `<!DOCTYPE html>
 <html lang="ja"><head><meta charset="UTF-8">
-<title>QRシール印刷 — エムコレ</title>
+<title>バーコードシール印刷 — エムコレ</title>
 <style>
-/* ── 印刷設定（A-one 31397 / ブラウザ印刷：余白なし・倍率100%必須）── */
 @page{size:210mm 297mm;margin:0mm}
 *{box-sizing:border-box;margin:0;padding:0}
 body{font-family:'Hiragino Kaku Gothic Pro','Meiryo',sans-serif;background:#dde3ea}
 
-/* ── ツールバー ── */
 .toolbar{
   position:fixed;top:0;left:0;right:0;z-index:9999;
   background:#0f2744;color:#fff;
@@ -4987,7 +4983,7 @@ body{font-family:'Hiragino Kaku Gothic Pro','Meiryo',sans-serif;background:#dde3
   box-shadow:0 2px 12px rgba(0,0,0,.4);flex-wrap:wrap;
 }
 .toolbar-title{font-size:13px;font-weight:800}
-.toolbar-sub{font-size:10px;color:#8db4d8;white-space:nowrap}
+.toolbar-sub{font-size:10px;color:#8db4d8}
 .tbtn{padding:7px 16px;border:none;border-radius:6px;font-size:12px;font-weight:700;cursor:pointer;font-family:inherit}
 .tbtn-print{background:#1a7a4a;color:#fff}
 .tbtn-close{background:#444;color:#fff}
@@ -4997,19 +4993,14 @@ body{font-family:'Hiragino Kaku Gothic Pro','Meiryo',sans-serif;background:#dde3
 .adj span{font-size:10px;min-width:36px;text-align:right;font-family:monospace;color:#aef}
 .hint{font-size:10px;color:#6b8eaa;line-height:1.6;padding:4px 8px;background:rgba(255,255,255,.08);border-radius:5px}
 
-/* ── メインコンテンツ ── */
 .main{padding:70px 16px 24px;display:flex;gap:16px;align-items:flex-start;flex-wrap:wrap}
-
-/* ── 印刷リスト ── */
 .list-card{background:#fff;border-radius:10px;padding:14px;box-shadow:0 2px 8px rgba(0,0,0,.12);min-width:280px;flex:1;max-width:460px}
 .list-card h3{font-size:12px;font-weight:700;color:#0f2744;margin-bottom:8px;padding-bottom:6px;border-bottom:2px solid #f0f2f5}
 .list-table{width:100%;border-collapse:collapse;font-size:10px}
-.list-table th{background:#f2f5f9;color:#6b7a8d;font-weight:700;padding:4px 6px;border-bottom:1.5px solid #e0e6ed;white-space:nowrap}
-.list-table td{padding:4px 6px;border-bottom:1px solid #f4f6f8;color:#333;vertical-align:middle}
-.list-table tr:last-child td{border-bottom:none}
+.list-table th{background:#f2f5f9;color:#6b7a8d;font-weight:700;padding:4px 6px;border-bottom:1.5px solid #e0e6ed}
+.list-table td{padding:4px 6px;border-bottom:1px solid #f4f6f8;color:#333}
 .list-table td:first-child{color:#999;text-align:center;width:24px}
 
-/* ── シート ── */
 .sheets-wrap{flex:0 0 auto}
 .sheet{
   position:relative;
@@ -5019,63 +5010,49 @@ body{font-family:'Hiragino Kaku Gothic Pro','Meiryo',sans-serif;background:#dde3
   box-shadow:0 3px 16px rgba(0,0,0,.18);
 }
 
-/* ── ラベル ── */
-/* テキスト幅 = LW(20mm) - QR(${QR_SIZE}mm) - 内余白(~1.4mm) ≒ 12.4mm */
+/* ラベル：縦3段レイアウト */
 .lbl{
   position:absolute;
   width:${LW}mm;height:${LH}mm;
   overflow:hidden;
-  display:flex;align-items:center;
-  padding:0.2mm 0.3mm;
-  gap:0.2mm;
+  display:flex;
+  flex-direction:column;
+  padding:0.3mm 0.5mm 0.2mm;
+  gap:0;
 }
-.lbl-txt{
-  flex:1;min-width:0;
-  display:flex;flex-direction:column;justify-content:center;
-  height:100%;overflow:hidden;
-  padding-right:0.3mm;
+.lbl-info{
+  display:flex;
+  align-items:baseline;
+  gap:0.8mm;
+  flex-shrink:0;
 }
 .lbl-nm{
-  font-size:3.5pt;font-weight:700;color:#111;
-  line-height:1.15;
-  white-space:nowrap;
-  overflow:hidden;
-  text-overflow:ellipsis;  /* 長い商品名は…で切る */
-  display:block;
-  max-width:100%;
+  font-size:3.2pt;font-weight:700;color:#111;
+  white-space:nowrap;overflow:hidden;text-overflow:ellipsis;
+  flex:1;min-width:0;
+  line-height:1.2;
 }
 .lbl-pr{
-  font-size:6.5pt;font-weight:900;color:#000;
-  letter-spacing:-0.04em;line-height:1.1;
-  margin-top:0.3mm;white-space:nowrap;
+  font-size:5.5pt;font-weight:900;color:#000;
+  white-space:nowrap;flex-shrink:0;
   font-feature-settings:"tnum";
-  overflow:hidden;text-overflow:ellipsis;
+  letter-spacing:-0.03em;
+  line-height:1.2;
 }
-.lbl-qr{
-  width:${QR_SIZE}mm;height:${QR_SIZE}mm;
-  flex-shrink:0;align-self:center;
-  overflow:hidden;
-  display:flex;align-items:center;justify-content:center;
-}
-.lbl-qr img,.lbl-qr canvas{
-  width:${QR_SIZE}mm!important;
-  height:${QR_SIZE}mm!important;
+/* Code128バーコード：幅いっぱい、高さ残り */
+.lbl-bc{
+  width:100%;
+  flex:1;
   display:block;
+  overflow:visible;
 }
 
-/* ── 印刷時 ── */
 @media print{
   html,body{background:#fff!important}
   .toolbar,.main>.list-card{display:none!important}
-  .main{padding:0!important;display:block!important;margin:0!important}
-  .sheets-wrap{display:block!important;transform:none!important}
-  .sheet{
-    margin:0!important;
-    box-shadow:none!important;
-    border-radius:0!important;
-    page-break-after:always;
-    break-after:page;
-  }
+  .main{padding:0!important;display:block!important}
+  .sheets-wrap{display:block!important}
+  .sheet{margin:0!important;box-shadow:none!important;border-radius:0!important;page-break-after:always;break-after:page;}
 }
 </style>
 </head>
@@ -5083,7 +5060,7 @@ body{font-family:'Hiragino Kaku Gothic Pro','Meiryo',sans-serif;background:#dde3
 
 <div class="toolbar">
   <div>
-    <div class="toolbar-title">🖨️ QRシール印刷</div>
+    <div class="toolbar-title">🖨️ バーコードシール印刷（Code128）</div>
     <div class="toolbar-sub">${items.length}件 ／ 開始: ${offset+1}番　A-one 31397</div>
   </div>
   <div class="adj">
@@ -5099,8 +5076,8 @@ body{font-family:'Hiragino Kaku Gothic Pro','Meiryo',sans-serif;background:#dde3
   <button class="tbtn tbtn-print" onclick="window.print()">🖨️ 印刷</button>
   <button class="tbtn tbtn-close" onclick="window.close()">✕ 閉じる</button>
   <div class="hint">
-    ⚠️ 印刷設定：<strong>余白なし・倍率100%・用紙サイズA4縦</strong><br>
-    「ページに合わせる」は使わない。ズレる場合は左右/上下スライダーで調整。
+    ⚠️ 印刷設定：<strong>余白なし・倍率100%・用紙A4縦</strong><br>
+    ズレる場合は左右/上下スライダーで微調整
   </div>
 </div>
 
@@ -5115,25 +5092,44 @@ body{font-family:'Hiragino Kaku Gothic Pro','Meiryo',sans-serif;background:#dde3
   <div class="sheets-wrap" id="sheetsWrap">${sheetData}</div>
 </div>
 
-<script src="${qrSrc}"><\/script>
+<script src="${jsBarcodeUrl}"><\/script>
 <script>
 window.addEventListener('load', function(){
-  // QRコード生成
+  // px/mm 換算（96dpi基準）
+  var PX_PER_MM = 96 / 25.4; // ≒3.78
+
   document.querySelectorAll('[data-bc]').forEach(function(el){
     var bc = el.getAttribute('data-bc');
     if(!bc) return;
+
+    // ラベル幅(mm)をpxに変換してバーコード幅を決定
+    var lblEl = el.closest('.lbl');
+    var lblWpx = lblEl ? lblEl.getBoundingClientRect().width : ${LW} * PX_PER_MM;
+    var bcWpx  = Math.floor(lblWpx - 2); // 左右1px余白
+    var bcHpx  = Math.floor(el.getBoundingClientRect().height - 1);
+    if(bcHpx < 8) bcHpx = 18;
+
     try{
-      new QRCode(el, {
-        text: bc,
-        width: 64, height: 64,
-        colorDark: '#000000', colorLight: '#ffffff',
-        correctLevel: QRCode.CorrectLevel.M
+      JsBarcode(el, bc, {
+        format:        'CODE128',
+        width:         1,          // バーの最小幅(px) — 1で細く統一
+        height:        bcHpx,
+        displayValue:  false,      // テキスト表示なし（商品名は上に別途表示）
+        margin:        0,
+        background:    '#ffffff',
+        lineColor:     '#000000',
       });
-    }catch(e){}
+      // SVGをラベル幅にフィット
+      el.setAttribute('preserveAspectRatio','none');
+      el.style.width  = '100%';
+      el.style.height = '100%';
+    }catch(e){
+      // バーコード生成失敗時はエラー文字表示
+      el.innerHTML = '<text x="2" y="10" font-size="6" fill="red">ERR</text>';
+    }
   });
 });
 
-// 位置微調整
 var _adjX=0, _adjY=0;
 function applyAdj(){
   _adjX = parseFloat(document.getElementById('adjX').value)||0;
