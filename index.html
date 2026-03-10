@@ -3265,38 +3265,18 @@ function doPrint(){
   const zs  = z10+z8;
   const sg  = sb+zs;
 
-  // ページ数計算（表紙1枚 + 明細ページ）
-  // 明細：A4横で1行18px、使えるエリア約155mm＝約47行
-  const ROWS_PER_SHEET = 42;
-  // 全商品行を集める
-  const allDetailRows = [];
+  // ページ（カテゴリー）ごとに1シート作成
+  // 商品が多い場合も同じシート内に収める（縦スクロール可）
+  const pageSheets = []; // [{pi, k, pg, s, rows}]
   order.forEach((k,pi)=>{
     const pg   = pages[k]||{};
     const rows = (pg.rows||[]).filter(r=>r.n);
     if(!rows.length) return;
     const s = pageSub(pg.rows||[]);
-    // ページ見出し行
-    allDetailRows.push({type:'head', pi, k, pg, s});
-    rows.forEach((r,ri)=>allDetailRows.push({type:'row', r, ri, pi}));
-    // 小計行
-    allDetailRows.push({type:'sub', pi, s});
+    pageSheets.push({pi, k, pg, s, rows});
   });
 
-  // シートに分割
-  const detailSheets = [];
-  let cur = [];
-  allDetailRows.forEach(row=>{
-    if(row.type==='head' && cur.length > ROWS_PER_SHEET-3){
-      detailSheets.push(cur); cur=[];
-    }
-    cur.push(row);
-    if(cur.length >= ROWS_PER_SHEET && row.type!=='head'){
-      detailSheets.push(cur); cur=[];
-    }
-  });
-  if(cur.length) detailSheets.push(cur);
-
-  const totalPages = 1 + detailSheets.length;
+  const totalPages = 1 + pageSheets.length;
   let sheets = '';
 
   // ────────────────────────────────
@@ -3355,28 +3335,31 @@ function doPrint(){
   </div>`;
 
   // ────────────────────────────────
-  // シート2〜：商品明細
+  // シート2〜：ページごとに1枚ずつ
   // ────────────────────────────────
-  detailSheets.forEach((sheetRows, si)=>{
-    const sheetNo = si+2;
+  pageSheets.forEach((ps, si)=>{
+    const sheetNo  = si + 2;
+    const {pi, pg, s, rows} = ps;
+    const pageTitle = pg.tanto || pg.ownerName || '未設定';
+
     sheets += `<div class="print-sheet">
     ${psHead(company,date,basho,tanto,gyomu,sheetNo,totalPages)}
-    <div class="ps-sec">■ 商品明細（${sheetNo-1}/${detailSheets.length}）</div>
+    <div class="ps-sec">■ 商品明細　${e(pageTitle)}（${si+1}/${pageSheets.length}）</div>
     <table class="ps-dtbl" style="table-layout:fixed;width:100%">
       <colgroup>
-        <col style="width:24px"><!-- No -->
-        <col style="width:auto"><!-- 商品名：残り幅すべて -->
-        <col style="width:38px"><!-- 税率 -->
-        <col style="width:34px"><!-- 個数 -->
-        <col style="width:28px"><!-- 単位 -->
-        <col style="width:66px"><!-- 税込単価 -->
-        <col style="width:66px"><!-- 税抜単価 -->
-        <col style="width:72px"><!-- 10%仕入計 -->
-        <col style="width:72px"><!-- 8%仕入計 -->
-        <col style="width:60px"><!-- 仕入先 -->
-        <col style="width:36px"><!-- 仕入率 -->
-        <col style="width:70px"><!-- 在庫価格 -->
-        <col style="width:60px"><!-- 備考 -->
+        <col style="width:24px">
+        <col style="width:auto">
+        <col style="width:38px">
+        <col style="width:34px">
+        <col style="width:28px">
+        <col style="width:66px">
+        <col style="width:66px">
+        <col style="width:72px">
+        <col style="width:72px">
+        <col style="width:60px">
+        <col style="width:36px">
+        <col style="width:70px">
+        <col style="width:60px">
       </colgroup>
       <thead><tr>
         <th class="c">No</th>
@@ -3395,49 +3378,36 @@ function doPrint(){
       </tr></thead>
       <tbody>`;
 
-    sheetRows.forEach(row=>{
-      if(row.type==='head'){
-        const {pi,pg,s} = row;
-        sheets += `<tr class="pg-head">
-          <td class="c">${pi+1}P</td>
-          <td colspan="7">${e(pg.tanto||pg.ownerName||'未設定')}${pg.catId?' 　カテゴリーID: '+e(pg.catId):''}</td>
-          <td class="r">${s.p8?'¥'+fm(s.p8):''}</td>
-          <td colspan="2"></td>
-          <td class="r">${s.z?'¥'+fm(s.z):''}</td>
-          <td></td>
-        </tr>`;
-      } else if(row.type==='sub'){
-        const {s} = row;
-        sheets += `<tr class="pg-sub">
-          <td colspan="7" class="r">ページ小計</td>
-          <td class="r">${s.p10?'¥'+fm(s.p10):''}</td>
-          <td class="r">${s.p8?'¥'+fm(s.p8):''}</td>
-          <td colspan="2"></td>
-          <td class="r" style="color:#1a5c2e">¥${fm(s.z)||0}</td>
-          <td></td>
-        </tr>`;
-      } else {
-        const {r,ri} = row;
-        const c   = calc(r);
-        const taxCls = r.z==='8'?'tax8':'tax10';
-        const taxLbl = r.z==='8'?'8%':'10%';
-        sheets += `<tr>
-          <td class="c">${ri+1}</td>
-          <td style="white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:0">${e(r.n)}</td>
-          <td class="c"><span class="${taxCls}">${taxLbl}</span></td>
-          <td class="r">${r.k||''}</td>
-          <td class="c">${e(r.u||'')}</td>
-          <td class="r">${r.p?'¥'+fm(r.p):''}</td>
-          <td class="r">${c.zt?'¥'+fm(c.zt):''}</td>
-          <td class="r">${c.j?'¥'+fm(c.j):''}</td>
-          <td class="r">${c.h?'¥'+fm(c.h):''}</td>
-          <td style="overflow:hidden;text-overflow:ellipsis;text-align:center">${e(r.ss||'')}</td>
-          <td class="r">${r.sr?r.sr+'%':''}</td>
-          <td class="r" style="font-weight:700;color:#1a5c2e">${c.zk?'¥'+fm(c.zk):''}</td>
-          <td style="overflow:hidden;text-overflow:ellipsis">${e(r.b||'')}</td>
-        </tr>`;
-      }
+    rows.forEach((r, ri)=>{
+      const c      = calc(r);
+      const taxCls = r.z==='8'?'tax8':'tax10';
+      const taxLbl = r.z==='8'?'8%':'10%';
+      sheets += `<tr>
+        <td class="c">${ri+1}</td>
+        <td style="white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:0">${e(r.n)}</td>
+        <td class="c"><span class="${taxCls}">${taxLbl}</span></td>
+        <td class="r">${r.k||''}</td>
+        <td class="c">${e(r.u||'')}</td>
+        <td class="r">${r.p?'¥'+fm(r.p):''}</td>
+        <td class="r">${c.zt?'¥'+fm(c.zt):''}</td>
+        <td class="r">${c.j?'¥'+fm(c.j):''}</td>
+        <td class="r">${c.h?'¥'+fm(c.h):''}</td>
+        <td style="overflow:hidden;text-overflow:ellipsis;text-align:center">${e(r.ss||'')}</td>
+        <td class="r">${r.sr?r.sr+'%':''}</td>
+        <td class="r" style="font-weight:700;color:#1a5c2e">${c.zk?'¥'+fm(c.zk):''}</td>
+        <td style="overflow:hidden;text-overflow:ellipsis">${e(r.b||'')}</td>
+      </tr>`;
     });
+
+    // ページ小計行
+    sheets += `<tr class="pg-sub">
+      <td colspan="7" class="r" style="font-weight:700">ページ小計</td>
+      <td class="r">${s.p10?'¥'+fm(s.p10):''}</td>
+      <td class="r">${s.p8?'¥'+fm(s.p8):''}</td>
+      <td colspan="2"></td>
+      <td class="r" style="color:#1a5c2e;font-weight:700">¥${fm(s.z)||0}</td>
+      <td></td>
+    </tr>`;
 
     sheets += `</tbody></table>
     ${psFoot(printAt,sheetNo,totalPages)}
@@ -4679,89 +4649,90 @@ function bcpClearAllBarcodes(){
 
 // ─── 描画 ──────────────────────────────────────────────────
 
-// 選択中のページキーセット（ページチェックで商品エリアを表示）
-let _bcpCheckedPages = new Set();
+// 状態管理（DOMではなく変数で保持）
+let _bcpCheckedPages   = new Set(); // チェック中のpageKey
+let _bcpSelectedItems  = new Set(); // チェック中のアイテムID
 
 function bcpRender(){
-  _bcpCheckedPages = new Set();
+  _bcpCheckedPages  = new Set();
+  _bcpSelectedItems = new Set();
   bcpRenderSections();
 }
 
 function bcpRenderSections(){
   const container = document.getElementById('bcpPageSections');
-  if(!container){ console.error('bcpPageSections not found'); return; }
+  if(!container) return;
 
   let data;
   try{
     data = bcpGetPagedData();
-    console.log('[BCP] sections:', data.length, 'order:', order.length, 'master:', nkGetProducts().length);
   }catch(err){
     container.innerHTML = '<div style="color:red;padding:16px">⚠️ エラー: '+err.message+'</div>';
     return;
   }
 
-  const total = data.reduce((s, pg) => s + pg.items.length, 0);
+  const total = data.reduce((s,pg)=>s+pg.items.length, 0);
   if(!total){
     container.innerHTML = '<div style="text-align:center;color:#aab;padding:32px;font-size:13px">'
       +'商品がありません。<br>棚卸入力か商品マスタに商品を登録してください。</div>';
-    bcpUpdateCount();
-    return;
+    bcpUpdateCount(); return;
   }
 
-  // ── STEP1: ページ（カテゴリー）チェックリスト ──
-  const step1 = data.map((pg, pi) => {
-    const key  = pg.pageKey;
-    const isOn = _bcpCheckedPages.has(key);
-    const bcCnt  = pg.items.filter(it => it.barcode).length;
-    const allCnt = pg.items.length;
-    const badge  = bcCnt < allCnt
-      ? '<span style="font-size:10px;background:#fff3e0;color:#c06000;border-radius:4px;padding:1px 6px;font-weight:700;white-space:nowrap">発番済 '+bcCnt+'/'+allCnt+'</span>'
-      : '<span style="font-size:10px;background:#e8f5e9;color:#1a7a4a;border-radius:4px;padding:1px 6px;font-weight:700;white-space:nowrap">✓ 全発番済 '+allCnt+'</span>';
-    return '<label style="display:flex;align-items:center;gap:10px;padding:10px 14px;'
-      +'border-bottom:1px solid #eef1f6;cursor:pointer;transition:.1s;'
-      +(isOn ? 'background:#eef4ff;' : 'background:#fff;')
-      +'" onmouseover="this.style.background=\''+(isOn?'#e4edff':'#f8faff')+'\'" '
-      +'onmouseout="this.style.background=\''+(isOn?'#eef4ff':'#fff')+'\'">'
+  // ── STEP 1: カテゴリーチェックリスト ──
+  const step1Rows = data.map(pg => {
+    const isOn  = _bcpCheckedPages.has(pg.pageKey);
+    const bcCnt = pg.items.filter(it=>it.barcode).length;
+    const allCnt= pg.items.length;
+    const badge = bcCnt < allCnt
+      ? '<span style="font-size:10px;background:#fff3e0;color:#c06000;border-radius:4px;padding:1px 7px;font-weight:700">発番済 '+bcCnt+'/'+allCnt+'</span>'
+      : '<span style="font-size:10px;background:#e8f5e9;color:#1a7a4a;border-radius:4px;padding:1px 7px;font-weight:700">✓ 全発番済 '+allCnt+'件</span>';
+    return '<label style="display:flex;align-items:center;gap:10px;padding:10px 16px;'
+      +'border-bottom:1px solid #eef1f6;cursor:pointer;background:'+(isOn?'#eef4ff':'#fff')+'">'
       +'<input type="checkbox" '+(isOn?'checked':'')
       +' style="width:18px;height:18px;accent-color:#1a6ea6;cursor:pointer;flex-shrink:0"'
-      +' onchange="bcpTogglePage(\''+key+'\','+pi+',this.checked)">'
+      +' onchange="bcpTogglePage(\''+pg.pageKey.replace(/\\/g,'\\\\').replace(/'/g,"\\'")+'\',this.checked)">'
       +'<span style="font-size:13px;font-weight:700;color:#0f2744;flex:1">'+e(pg.pageLabel)+'</span>'
-      + badge
-      +'</label>';
+      +badge+'</label>';
   }).join('');
 
-  // ── STEP2: 選択中ページの商品リスト ──
+  // ── STEP 2: 選択中カテゴリーの商品リスト ──
+  const checkedData = data.filter(pg=>_bcpCheckedPages.has(pg.pageKey));
   let step2html = '';
-  const checkedData = data.filter(pg => _bcpCheckedPages.has(pg.pageKey));
 
   if(checkedData.length > 0){
-    const productRows = checkedData.map((pg, gi) => {
-      const pgRows = pg.items.map((item, ii) => {
-        const hasBC = !!item.barcode;
-        const globalId = 'bcpChk_' + pg.pageKey.replace(/[^a-zA-Z0-9]/g,'_') + '_' + ii;
+    const productRows = checkedData.map(pg => {
+      const rows = pg.items.map((item,ii) => {
+        const itemId = item.id || (pg.pageKey+'::'+ii);
+        const hasBC  = !!item.barcode;
+        const isSel  = _bcpSelectedItems.has(itemId);
         const bcDisp = hasBC
-          ? '<span style="font-family:monospace;font-size:11px;color:#1a6ea6;background:#eef4ff;padding:2px 7px;border-radius:4px">'+ e(item.barcode) +'</span>'
-          : '<button onclick="bcpAssignOneByKey(\''+pg.pageKey+'\','+ii+')" '
+          ? '<span style="font-family:monospace;font-size:11px;color:#1a6ea6;background:#eef4ff;padding:2px 7px;border-radius:4px">'+e(item.barcode)+'</span>'
+          : '<button onclick="bcpAssignOneByKey(\''+pg.pageKey.replace(/'/g,"\\'")+'\','+ii+')" '
             +'style="padding:3px 10px;background:#e8f4e8;color:#1a7a4a;border:1px solid #a8d4a8;'
             +'border-radius:4px;font-size:11px;font-weight:700;cursor:pointer;font-family:inherit">＋ 発番</button>';
         const priceDisp = item.price ? ('¥'+Number(item.price).toLocaleString()) : '—';
-        return '<div style="display:flex;align-items:center;gap:8px;padding:7px 14px;border-bottom:1px solid #f0f4f8">'
-          +'<input type="checkbox" id="'+globalId+'"'+(hasBC?'':' disabled title="発番後に選択できます"')
-          +' style="width:16px;height:16px;flex-shrink:0;cursor:'+(hasBC?'pointer':'not-allowed')+';accent-color:#1a6ea6" onchange="bcpUpdateCount()">'
-          +'<span style="flex:1;font-size:12px;font-weight:600;color:#0f2744;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">'+ e(item.name) +'</span>'
-          +'<span style="font-size:12px;color:#555;min-width:60px;text-align:right;flex-shrink:0">'+ priceDisp +'</span>'
-          +'<span style="min-width:110px;text-align:right;flex-shrink:0">'+ bcDisp +'</span>'
+        const safeId = 'bcpChk_'+itemId.replace(/[^a-zA-Z0-9]/g,'_');
+        return '<div style="display:flex;align-items:center;gap:8px;padding:7px 14px;border-bottom:1px solid #f0f4f8;background:'+(isSel?'#f0f6ff':'#fff')+'">'
+          +'<input type="checkbox" id="'+safeId+'" data-iid="'+e(itemId)+'"'
+          +(hasBC?'':' disabled title="発番後に選択できます"')
+          +(isSel&&hasBC?' checked':'')
+          +' style="width:16px;height:16px;flex-shrink:0;cursor:'+(hasBC?'pointer':'not-allowed')+';accent-color:#1a6ea6"'
+          +' onchange="bcpItemCheck(\''+itemId.replace(/'/g,"\\'")+'\',this.checked)">'
+          +'<span style="flex:1;font-size:12px;font-weight:600;color:#0f2744;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">'+e(item.name)+'</span>'
+          +'<span style="font-size:12px;color:#555;min-width:60px;text-align:right;flex-shrink:0">'+priceDisp+'</span>'
+          +'<span style="min-width:110px;text-align:right;flex-shrink:0">'+bcDisp+'</span>'
           +'</div>';
       }).join('');
-
       return '<div style="margin-bottom:2px">'
         +'<div style="background:#dde6f2;padding:5px 14px;display:flex;align-items:center;gap:8px;border-bottom:1px solid #c5d4e8">'
-        +'<span style="font-size:11px;font-weight:700;color:#1a4a7a;flex:1">📂 '+e(pg.pageLabel)+'　<span style="font-weight:400;color:#6b7a8d">'+pg.items.length+'件</span></span>'
-        +'<button onclick="bcpSelectByKey(\''+pg.pageKey+'\',true)" style="padding:2px 9px;font-size:10px;background:#fff;border:1px solid #c5d4e8;border-radius:4px;cursor:pointer;font-family:inherit">全選択</button>'
-        +'<button onclick="bcpSelectByKey(\''+pg.pageKey+'\',false)" style="padding:2px 9px;font-size:10px;background:#fff;border:1px solid #c5d4e8;border-radius:4px;cursor:pointer;font-family:inherit">全解除</button>'
+        +'<span style="font-size:11px;font-weight:700;color:#1a4a7a;flex:1">📂 '+e(pg.pageLabel)
+        +'　<span style="font-weight:400;color:#6b7a8d">'+pg.items.length+'件</span></span>'
+        +'<button onclick="bcpSelectByKey(\''+pg.pageKey.replace(/'/g,"\\'")+'\',true)" '
+        +'style="padding:2px 9px;font-size:10px;background:#fff;border:1px solid #c5d4e8;border-radius:4px;cursor:pointer;font-family:inherit">全選択</button>'
+        +'<button onclick="bcpSelectByKey(\''+pg.pageKey.replace(/'/g,"\\'")+'\',false)" '
+        +'style="padding:2px 9px;font-size:10px;background:#fff;border:1px solid #c5d4e8;border-radius:4px;cursor:pointer;font-family:inherit">全解除</button>'
         +'</div>'
-        +'<div>'+pgRows+'</div>'
-        +'</div>';
+        +'<div>'+rows+'</div></div>';
     }).join('');
 
     step2html = '<div style="margin-top:12px;border:1.5px solid #1a6ea6;border-radius:8px;overflow:hidden">'
@@ -4770,8 +4741,7 @@ function bcpRenderSections(){
       +'<button onclick="bcpSelectAllInView(true)" style="padding:4px 12px;font-size:11px;background:rgba(255,255,255,.2);color:#fff;border:1px solid rgba(255,255,255,.4);border-radius:4px;cursor:pointer;font-family:inherit">全選択</button>'
       +'<button onclick="bcpSelectAllInView(false)" style="padding:4px 12px;font-size:11px;background:rgba(255,255,255,.2);color:#fff;border:1px solid rgba(255,255,255,.4);border-radius:4px;cursor:pointer;font-family:inherit">全解除</button>'
       +'</div>'
-      +'<div style="background:#fff">'+productRows+'</div>'
-      +'</div>';
+      +'<div style="background:#fff">'+productRows+'</div></div>';
   } else {
     step2html = '<div style="margin-top:12px;background:#f8faff;border:1.5px dashed #c5d4e8;border-radius:8px;'
       +'padding:20px;text-align:center;font-size:12px;color:#8899bb">'
@@ -4782,67 +4752,92 @@ function bcpRenderSections(){
     '<div style="border:1.5px solid #e0e6ed;border-radius:8px;overflow:hidden;margin-bottom:0">'
     +'<div style="background:#0f2744;padding:8px 14px">'
     +'<span style="font-size:13px;font-weight:700;color:#fff">① 印刷するカテゴリーを選んでください</span>'
-    +'</div>'
-    +'<div style="background:#fff">'+step1+'</div>'
-    +'</div>'
+    +'</div><div style="background:#fff">'+step1Rows+'</div></div>'
     + step2html;
 
   bcpUpdateCount();
 }
 
-// ページチェック切替
-function bcpTogglePage(key, pi, checked){
-  if(checked) _bcpCheckedPages.add(key);
-  else _bcpCheckedPages.delete(key);
+// カテゴリーチェック切替
+function bcpTogglePage(key, checked){
+  if(checked){
+    _bcpCheckedPages.add(key);
+  } else {
+    _bcpCheckedPages.delete(key);
+    // このページの商品選択を解除
+    const data = bcpGetPagedData();
+    const pg = data.find(d=>d.pageKey===key);
+    if(pg) pg.items.forEach((item,ii)=>{
+      const itemId = item.id||(key+'::'+ii);
+      _bcpSelectedItems.delete(itemId);
+    });
+  }
   bcpRenderSections();
 }
 
-// 商品キーで全選択/解除
-function bcpSelectByKey(key, val){
-  const safeKey = key.replace(/[^a-zA-Z0-9]/g,'_');
-  document.querySelectorAll('[id^="bcpChk_'+safeKey+'_"]:not([disabled])').forEach(cb=>{ cb.checked=val; });
+// 商品チェック状態を変数に保存
+function bcpItemCheck(itemId, checked){
+  if(checked) _bcpSelectedItems.add(itemId);
+  else _bcpSelectedItems.delete(itemId);
   bcpUpdateCount();
 }
 
-// 表示中の全商品を選択/解除
+// ページ内全選択/解除
+function bcpSelectByKey(key, val){
+  const data = bcpGetPagedData();
+  const pg = data.find(d=>d.pageKey===key); if(!pg) return;
+  pg.items.forEach((item,ii)=>{
+    if(!item.barcode) return; // 未発番はスキップ
+    const itemId = item.id||(key+'::'+ii);
+    if(val) _bcpSelectedItems.add(itemId);
+    else    _bcpSelectedItems.delete(itemId);
+  });
+  bcpRenderSections();
+}
+
+// 表示中の全選択/解除
 function bcpSelectAllInView(val){
-  document.querySelectorAll('#bcpPageSections input[type=checkbox]:not([disabled])').forEach(cb=>{ cb.checked=val; });
-  bcpUpdateCount();
+  const data = bcpGetPagedData();
+  data.filter(pg=>_bcpCheckedPages.has(pg.pageKey)).forEach(pg=>{
+    pg.items.forEach((item,ii)=>{
+      if(!item.barcode) return;
+      const itemId = item.id||(pg.pageKey+'::'+ii);
+      if(val) _bcpSelectedItems.add(itemId);
+      else    _bcpSelectedItems.delete(itemId);
+    });
+  });
+  bcpRenderSections();
 }
 
 // 発番（キーとインデックスで特定）
 function bcpAssignOneByKey(key, ii){
   const data = bcpGetPagedData();
-  const pg = data.find(d => d.pageKey === key); if(!pg) return;
+  const pg = data.find(d=>d.pageKey===key); if(!pg) return;
   const item = pg.items[ii]; if(!item) return;
   try{
-    const bc = bcpAssignBarcode(item);
-    toast('発番しました: ' + bc);
+    bcpAssignBarcode(item);
+    toast('発番しました: '+item.barcode);
     bcpRenderSections();
-  } catch(err){ alert(err.message); }
+  }catch(err){ alert(err.message); }
 }
 
-// 旧関数（互換用）
-function bcpAssignOne(pi, ii){
-  const data = bcpGetPagedData();
-  const pg = data[pi]; if(!pg) return;
-  bcpAssignOneByKey(pg.pageKey, ii);
+// 旧互換
+function bcpAssignOne(pi,ii){
+  const data=bcpGetPagedData();
+  const pg=data[pi]; if(!pg) return;
+  bcpAssignOneByKey(pg.pageKey,ii);
 }
-
-function bcpSelectPage(pi, val){
-  const data = bcpGetPagedData();
-  const pg = data[pi]; if(!pg) return;
-  bcpSelectByKey(pg.pageKey, val);
+function bcpSelectPage(pi,val){
+  const data=bcpGetPagedData();
+  const pg=data[pi]; if(!pg) return;
+  bcpSelectByKey(pg.pageKey,val);
 }
-
-function bcpSelectAllGlobal(val){
-  bcpSelectAllInView(val);
-}
+function bcpSelectAllGlobal(val){ bcpSelectAllInView(val); }
 
 function bcpUpdateCount(){
-  const n = document.querySelectorAll('#bcpPageSections input[type=checkbox]:checked').length;
+  const n = _bcpSelectedItems.size;
   const el = document.getElementById('bcpSelectedCount');
-  if(el) el.textContent = n + '件選択中';
+  if(el) el.textContent = n ? n+'件選択中' : '0件選択中';
 }
 
 
@@ -4850,45 +4845,45 @@ function bcpUpdateCount(){
 // ─── ピッカー ──────────────────────────────────────────────
 
 function bcpOpenPicker(){
-  const n = document.querySelectorAll('#bcpPageSections input[type=checkbox]:checked').length;
+  const n = _bcpSelectedItems.size;
   if(!n){ alert('印刷する商品にチェックを入れてください。\nバーコードのない商品は先に「発番」してください。'); return; }
-
   _bcpStartPos = 1;
   const grid = document.getElementById('bcpPickerGrid');
+  if(!grid){ alert('ピッカーが見つかりません'); return; }
   grid.innerHTML = '';
-  for(let i = 1; i <= 200; i++){
-    const cell = document.createElement('div');
-    cell.style.cssText = 'aspect-ratio:5/2;background:#fff;border-radius:2px;cursor:pointer;display:flex;align-items:center;justify-content:center;font-size:6px;color:#bbb;transition:.08s';
-    cell.id = 'bcpCell_' + i;
-    cell.title = i + '番';
-    cell.onclick = (function(pos){ return function(){ bcpPickerSelect(pos); }; })(i);
+  for(let i=1;i<=200;i++){
+    const cell=document.createElement('div');
+    cell.style.cssText='aspect-ratio:5/2;background:#fff;border-radius:2px;cursor:pointer;display:flex;align-items:center;justify-content:center;font-size:6px;color:#bbb;transition:.08s';
+    cell.id='bcpCell_'+i;
+    cell.title=i+'番';
+    cell.onclick=(function(pos){return function(){bcpPickerSelect(pos);};})(i);
     grid.appendChild(cell);
   }
   bcpPickerSelect(1);
-  document.getElementById('bcpPickerOverlay').style.display = 'block';
-  document.getElementById('bcpPickerModal').style.display = 'block';
+  document.getElementById('bcpPickerOverlay').style.display='block';
+  document.getElementById('bcpPickerModal').style.display='block';
 }
 
 function bcpPickerSelect(pos){
-  _bcpStartPos = pos;
-  const lbl = document.getElementById('bcpPickerPosLabel');
-  if(lbl) lbl.textContent = pos + '番';
-  for(let i = 1; i <= 200; i++){
-    const cell = document.getElementById('bcpCell_' + i);
+  _bcpStartPos=pos;
+  const lbl=document.getElementById('bcpPickerPosLabel');
+  if(lbl) lbl.textContent=pos+'番';
+  for(let i=1;i<=200;i++){
+    const cell=document.getElementById('bcpCell_'+i);
     if(!cell) continue;
-    if(i < pos){
-      cell.style.background = '#dde3ea'; cell.style.color = '#aaa'; cell.textContent = '済';
-    } else if(i === pos){
-      cell.style.background = '#1a6ea6'; cell.style.color = '#fff'; cell.textContent = '★';
+    if(i<pos){
+      cell.style.background='#dde3ea';cell.style.color='#aaa';cell.textContent='済';
+    } else if(i===pos){
+      cell.style.background='#1a6ea6';cell.style.color='#fff';cell.textContent='★';
     } else {
-      cell.style.background = '#fff'; cell.style.color = '#bbb'; cell.textContent = '';
+      cell.style.background='#fff';cell.style.color='#bbb';cell.textContent='';
     }
   }
 }
 
 function bcpClosePicker(){
-  document.getElementById('bcpPickerOverlay').style.display = 'none';
-  document.getElementById('bcpPickerModal').style.display = 'none';
+  document.getElementById('bcpPickerOverlay').style.display='none';
+  document.getElementById('bcpPickerModal').style.display='none';
 }
 
 function bcpDoPrint(){
@@ -4899,21 +4894,26 @@ function bcpDoPrint(){
 // ─── 印刷HTML生成 ──────────────────────────────────────────
 
 function bcpPrint(startPos){
-  const data = bcpGetPagedData();
-  const items = [];
-  document.querySelectorAll('#bcpPageSections input[type=checkbox]:checked').forEach(cb => {
-    const m = cb.id.match(/bcpChk_(\d+)_(\d+)/);
-    if(!m) return;
-    const pg = data[parseInt(m[1])]; if(!pg) return;
-    const item = pg.items[parseInt(m[2])]; if(!item || !item.barcode) return;
-    items.push({ name: item.name, price: item.price, barcode: item.barcode });
+  const data=bcpGetPagedData();
+  const idToItem={};
+  data.forEach(pg=>{
+    pg.items.forEach((item,ii)=>{
+      const itemId=item.id||(pg.pageKey+'::'+ii);
+      idToItem[itemId]=item;
+    });
   });
-  if(!items.length){ alert('印刷する商品を選択してください'); return; }
-  const html = bcpBuildLabelHtml(items, startPos || 1);
-  const win = window.open('', '_blank', 'width=960,height=760');
+  const items=[];
+  _bcpSelectedItems.forEach(itemId=>{
+    const item=idToItem[itemId];
+    if(item&&item.barcode) items.push({name:item.name,price:item.price,barcode:item.barcode});
+  });
+  if(!items.length){alert('印刷する商品を選択してください');return;}
+  const html=bcpBuildLabelHtml(items,startPos||1);
+  const win=window.open('','_blank','width=960,height=760');
   win.document.write(html);
   win.document.close();
 }
+
 
 // A-one 31397: 20×8mm、8列×25行、左余白8mm、上余白9mm
 // 列ピッチ24.86mm、行ピッチ11.33mm
@@ -5338,4 +5338,6 @@ document.addEventListener('DOMContentLoaded', function(){
   </div>
 </div>
 
-</body></html>
+
+</body>
+</html>
