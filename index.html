@@ -368,7 +368,7 @@ function nkParseOcrLines(lines){
 
 // ページ起動
 function doNyuuka(){
-  showPage('pgNyuuka');
+  showPage('pgApp');
   document.getElementById('nkDate').value=new Date().toISOString().slice(0,10);
   nkArrivalRows=[];
   nkAddRow();
@@ -1587,7 +1587,7 @@ svg.trend-chart text{font-family:inherit}
           <table>
             <thead><tr>
               <th class="sticky-col-head sticky-drag"></th>
-              <th class="sticky-col-head sticky-no"><span class="th-label">No</span><div class="col-resizer"></div></th>
+              <th class="sticky-col-head sticky-no" title="全選択／解除"><input type="checkbox" id="chkAll" onchange="toggleSelectAll(this.checked)" style="cursor:pointer;width:14px;height:14px"></th>
               <th class="sticky-col-head sticky-del" style="width:28px"></th>
               <th class="sticky-col-head sticky-name" style="width:200px"><span class="th-label">商品名</span><div class="col-resizer"></div></th>
               <th style="width:70px"><span class="th-label">税率</span><div class="col-resizer"></div></th>
@@ -1881,19 +1881,69 @@ function mkRows(){
 // ============================================================
 
 // ============================================================
-// 行の別ページ移動
+// 行の別ページ移動（単体・複数対応）
 // ============================================================
-let _moveRowSrcKey=null, _moveRowSrcRi=null;
+let _moveRowSrcKey=null, _moveRowSrcRi=null; // 単体用（後方互換）
 
+// チェック状態の変化時
+function onRowCheck(){
+  const checked=document.querySelectorAll('.row-chk:checked');
+  const bar=document.getElementById('bulkMoveBar');
+  const allChk=document.getElementById('chkAll');
+  const total=document.querySelectorAll('.row-chk').length;
+  if(checked.length>0){
+    bar.style.display='flex';
+    document.getElementById('bulkMoveCount').textContent=checked.length+'件選択中';
+  } else {
+    bar.style.display='none';
+  }
+  if(allChk) allChk.checked=(checked.length===total&&total>0);
+}
+
+function toggleSelectAll(checked){
+  document.querySelectorAll('.row-chk').forEach(c=>{ c.checked=checked; });
+  onRowCheck();
+}
+
+function clearRowSelection(){
+  document.querySelectorAll('.row-chk').forEach(c=>{ c.checked=false; });
+  const allChk=document.getElementById('chkAll');
+  if(allChk) allChk.checked=false;
+  document.getElementById('bulkMoveBar').style.display='none';
+}
+
+// まとめて移動ボタン → モーダルを開く
+function openBulkMoveModal(){
+  const checked=[...document.querySelectorAll('.row-chk:checked')];
+  if(!checked.length) return;
+  const ris=checked.map(c=>parseInt(c.dataset.ri));
+  _moveRowSrcKey=curKey;
+  _moveRowSrcRi=ris; // 配列で渡す
+  const rows=pages[curKey]?.rows||[];
+  const names=ris.map(i=>(rows[i]?.n||'商品名未入力')).join('、');
+  document.getElementById('moveModalTitle').textContent='↗ '+ris.length+'件をまとめて移動';
+  document.getElementById('moveRowName').textContent=names;
+  _renderMovePageList(curKey);
+  document.getElementById('moveRowModal').style.display='flex';
+}
+
+// 単体移動ボタン → 従来通り
 function openMoveRowModal(srcKey, ri){
-  _moveRowSrcKey=srcKey; _moveRowSrcRi=ri;
+  _moveRowSrcKey=srcKey;
+  _moveRowSrcRi=[ri]; // 配列で統一
   const r=(pages[srcKey]?.rows||[])[ri];
   if(!r) return;
+  document.getElementById('moveModalTitle').textContent='↗ 行を別ページへ移動';
   document.getElementById('moveRowName').textContent=(r.n||'（商品名未入力）')+(r.p?' ¥'+Number(r.p).toLocaleString():'');
+  _renderMovePageList(srcKey);
+  document.getElementById('moveRowModal').style.display='flex';
+}
+
+function _renderMovePageList(srcKey){
   const list=document.getElementById('moveRowPageList');
   list.innerHTML='';
   order.forEach(k=>{
-    if(k===srcKey) return; // 同じページは除外
+    if(k===srcKey) return;
     const pg=pages[k]||{};
     const label=pg.tanto||pg.ownerName||k.slice(-4);
     const btn=document.createElement('button');
@@ -1907,7 +1957,6 @@ function openMoveRowModal(srcKey, ri){
   if(!list.children.length){
     list.innerHTML='<div style="color:#888;font-size:12px;padding:10px">移動先のページがありません</div>';
   }
-  document.getElementById('moveRowModal').style.display='flex';
 }
 
 function closeMoveRowModal(){
@@ -1916,18 +1965,19 @@ function closeMoveRowModal(){
 }
 
 function doMoveRow(destKey){
-  if(!_moveRowSrcKey||_moveRowSrcRi===null) return;
+  if(!_moveRowSrcKey||!_moveRowSrcRi) return;
+  const ris=Array.isArray(_moveRowSrcRi)?_moveRowSrcRi:[_moveRowSrcRi];
   const srcRows=pages[_moveRowSrcKey]?.rows||[];
-  const row=srcRows[_moveRowSrcRi];
-  if(!row){ closeMoveRowModal(); return; }
 
-  // 移動元から削除
-  srcRows.splice(_moveRowSrcRi, 1);
+  // 移動する行を取得（インデックス降順で削除するため先に確保）
+  const rowsToMove=ris.map(i=>srcRows[i]).filter(Boolean);
+  // インデックス降順で削除（後ろから消さないとズレる）
+  [...ris].sort((a,b)=>b-a).forEach(i=>{ srcRows.splice(i,1); });
   pages[_moveRowSrcKey].rows=srcRows;
 
   // 移動先に追加
   if(!pages[destKey].rows) pages[destKey].rows=[];
-  pages[destKey].rows.push(row);
+  rowsToMove.forEach(r=>{ pages[destKey].rows.push(r); });
 
   // Firebase同期
   if(!offline&&db&&sid){
@@ -1936,9 +1986,11 @@ function doMoveRow(destKey){
   }
 
   const destLabel=pages[destKey]?.tanto||pages[destKey]?.ownerName||destKey.slice(-4);
+  const movedNames=rowsToMove.map(r=>r.n||'商品').join('、');
   closeMoveRowModal();
+  clearRowSelection();
   renderAll();
-  alert('✅ 「'+(row.n||'商品')+'」を「'+destLabel+'ページ」に移動しました');
+  alert('✅ '+rowsToMove.length+'件を「'+destLabel+'ページ」に移動しました\n'+movedNames);
 }
 
 // ============================================================
@@ -2006,7 +2058,7 @@ function autoInit(){
 }
 
 function showPage(id){
-  ['pgHome','pgSetup','pgSession','pgApp','pgMstock','pgNyuuka'].forEach(p=>{
+  ['pgHome','pgSetup','pgSession','pgApp','pgMstock'].forEach(p=>{
     const el=document.getElementById(p);
     if(el) el.classList.remove('show');
   });
@@ -2017,14 +2069,23 @@ function showPage(id){
 
 // ホーム画面ナビゲーション
 function hmGoTana(){
-  // セッション画面へ（既存の棚卸開始フロー）
   showPage('pgSession');
 }
 function hmGoNyuuka(){
   doNyuuka();
 }
 function hmGoMstock(){
-  doMstock();
+  // ホームからはアーカイブ・履歴タブで開く
+  saveDraft();
+  showPage('pgMstock');
+  const now=new Date();
+  const msInp=document.getElementById('msMonthInp');
+  if(msInp) msInp.value=now.getFullYear()+'-'+String(now.getMonth()+1).padStart(2,'0');
+  const data=msGetDepts();
+  if(!msCurDept&&data.depts.length) msCurDept=data.depts[0].id;
+  msRenderDeptTabs();
+  msShowTab('hist'); // ← 履歴・グラフタブを最初に表示
+  msRenderCountArea();
 }
 function hmUpdateStatus(msg){
   const el=document.getElementById('hmStatus');
@@ -2458,23 +2519,6 @@ function msSaveRecords(list){
 }
 
 // --- 画面遷移 ---
-function doMstock(){
-  // 棚卸入力中なら遷移前に下書き保存（商品マスタインポートで確実に参照できるように）
-  saveDraft();
-  showPage('pgMstock');
-  const now=new Date();
-  document.getElementById('msMonthInp').value=now.getFullYear()+'-'+String(now.getMonth()+1).padStart(2,'0');
-  msRenderDeptTabs();
-  msShowTab('input');
-  if(!msCurDept){
-    const data=msGetDepts();
-    if(data.depts.length) msCurDept=data.depts[0].id;
-  }
-  msRenderDeptTabs();
-  msRenderCountArea();
-}
-function msDone(){ showPage('pgSession'); }
-
 function msShowTab(name){
   ['input','master','hist'].forEach(n=>{
     const p=document.getElementById('mspnl-'+n);
@@ -3967,7 +4011,9 @@ function renderTable(){
     const d=ro?'disabled':'';
     h+=`<tr data-ri="${ri}" draggable="true">
       <td class="drag-handle sticky-col sticky-drag" title="ドラッグして並び替え">⠿</td>
-      <td class="noc sticky-col sticky-no">${ri+1}</td>
+      <td class="noc sticky-col sticky-no" style="text-align:center;padding:2px">
+        <input type="checkbox" class="row-chk" data-ri="${ri}" onchange="onRowCheck()" style="cursor:pointer;width:14px;height:14px">
+      </td>
       <td class="sticky-col sticky-del" style="text-align:center;padding:2px">
         <button class="del-btn" onclick="delRow('${curKey}',${ri})" title="この行を削除">✕</button>
         ${order.length>1?`<button onclick="openMoveRowModal('${curKey}',${ri})" title="別ページへ移動" style="display:block;margin-top:2px;width:100%;background:#e8f0fb;color:#1a4a8a;border:none;border-radius:3px;font-size:10px;cursor:pointer;padding:1px 0;font-family:inherit">↗移動</button>`:''}
@@ -4942,11 +4988,18 @@ document.addEventListener('DOMContentLoaded', function(){
         </div>
       </div>
 
+<!-- ★ まとめて移動バー ★ -->
+<div id="bulkMoveBar" style="display:none;position:fixed;bottom:80px;left:50%;transform:translateX(-50%);z-index:9100;background:#0f2744;color:#fff;border-radius:40px;padding:12px 20px;box-shadow:0 4px 20px rgba(0,0,0,.4);display:none;align-items:center;gap:14px;white-space:nowrap">
+  <span id="bulkMoveCount" style="font-size:13px;font-weight:700"></span>
+  <button onclick="openBulkMoveModal()" style="background:#1a6ea6;color:#fff;border:none;border-radius:20px;padding:8px 18px;font-size:13px;font-weight:700;cursor:pointer;font-family:inherit">↗ まとめて移動</button>
+  <button onclick="clearRowSelection()" style="background:rgba(255,255,255,.15);color:#fff;border:none;border-radius:20px;padding:8px 14px;font-size:13px;cursor:pointer;font-family:inherit">✕ 解除</button>
+</div>
+
 <!-- ★ 行移動モーダル ★ -->
 <div id="moveRowModal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.6);z-index:9300;align-items:center;justify-content:center">
   <div style="background:#fff;border-radius:16px;width:min(95vw,420px);box-shadow:0 8px 40px rgba(0,0,0,.4);overflow:hidden">
     <div style="background:#0f2744;color:#fff;padding:14px 18px;display:flex;align-items:center;justify-content:space-between">
-      <span style="font-size:15px;font-weight:700">↗ 行を別ページへ移動</span>
+      <span id="moveModalTitle" style="font-size:15px;font-weight:700">↗ 行を別ページへ移動</span>
       <button onclick="closeMoveRowModal()" style="background:rgba(255,255,255,.15);color:#fff;border:none;border-radius:6px;padding:6px 12px;font-size:13px;cursor:pointer;font-family:inherit">✕</button>
     </div>
     <div style="padding:16px 18px">
