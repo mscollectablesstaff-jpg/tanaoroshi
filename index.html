@@ -4542,6 +4542,21 @@ function buildQrLabelHtml(items, startPos){
 <script src="${qrSrc}"><\/script>
 <script>
 var _sc=96, _adjX=0, _adjY=0;
+var LSKEY='tb_print_adj_v1';
+function saveAdj(){
+  try{ localStorage.setItem(LSKEY, JSON.stringify({sc:_sc,x:_adjX,y:_adjY})); }catch(e){}
+}
+function loadAdj(){
+  try{
+    var d=JSON.parse(localStorage.getItem(LSKEY)||'{}');
+    _sc  = d.sc!=null ? d.sc  : 96;
+    _adjX= d.x !=null ? d.x  : 0;
+    _adjY= d.y !=null ? d.y  : 0;
+    document.getElementById('adjScale').value = _sc;
+    document.getElementById('adjX').value = _adjX;
+    document.getElementById('adjY').value = _adjY;
+  }catch(e){}
+}
 function applyAdj(){
   _sc   = parseFloat(document.getElementById('adjScale').value)||96;
   _adjX = parseFloat(document.getElementById('adjX').value)||0;
@@ -4551,13 +4566,13 @@ function applyAdj(){
   document.getElementById('adjYv').textContent = (_adjY>=0?'+':'')+_adjY.toFixed(1)+'mm';
   var ratio = _sc / 100;
   var wrap = document.getElementById('sheetsWrap');
-  /* シート全体をtransform:scaleで縮小 ＋ translate でオフセット */
   wrap.style.transformOrigin = '0 0';
   wrap.style.transform = 'scale('+ratio+') translate('+_adjX+'mm,'+_adjY+'mm)';
-  /* 縮小した分の高さ余白を補正（複数シートが重ならないように） */
   wrap.style.marginBottom = (297*(ratio-1)*-1)+'mm';
+  saveAdj();
 }
 window.onload=function(){
+  loadAdj();
   applyAdj();
   var els=document.querySelectorAll('[data-bc]');
   els.forEach(function(el){
