@@ -1752,20 +1752,14 @@ svg.trend-chart text{font-family:inherit}
         </div>
 
         <!-- フィルター行 -->
-        <div style="display:flex;gap:10px;flex-wrap:wrap;margin-bottom:12px;align-items:flex-end">
-          <div style="flex:1;min-width:140px">
-            <div style="font-size:11px;font-weight:700;color:#6b7a8d;margin-bottom:4px">カテゴリー／ページで絞り込み</div>
-            <select id="bcpCatFilter" onchange="bcpFilter()"
-              style="width:100%;padding:8px 10px;border:1px solid #dde3ea;border-radius:6px;font-size:13px;background:#fff;font-family:inherit">
-              <option value="">すべてのカテゴリー</option>
-            </select>
-          </div>
-          <div style="flex:2;min-width:160px">
-            <div style="font-size:11px;font-weight:700;color:#6b7a8d;margin-bottom:4px">商品名で検索</div>
-            <input id="bcpSearch" type="text" placeholder="商品名を入力..." oninput="bcpFilter()"
-              style="width:100%;padding:8px 10px;border:1px solid #dde3ea;border-radius:6px;font-size:13px;font-family:inherit;box-sizing:border-box">
-          </div>
-          <div style="display:flex;gap:6px;flex-wrap:wrap;align-items:center">
+        <div style="margin-bottom:12px">
+          <!-- ページ絞り込みチェックリスト -->
+          <div style="font-size:11px;font-weight:700;color:#6b7a8d;margin-bottom:6px">ページで絞り込み（複数選択可）</div>
+          <div id="bcpPageFilter" style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:10px"></div>
+          <!-- 商品名検索 + ボタン -->
+          <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center">
+            <input id="bcpSearch" type="text" placeholder="商品名で検索..." oninput="bcpFilter()"
+              style="flex:1;min-width:160px;padding:8px 10px;border:1px solid #dde3ea;border-radius:6px;font-size:13px;font-family:inherit;box-sizing:border-box">
             <button onclick="bcpSelectAll(true)" style="padding:8px 12px;background:#f0f2f5;border:1px solid #dde3ea;border-radius:6px;font-size:12px;font-weight:700;cursor:pointer;font-family:inherit">全選択</button>
             <button onclick="bcpSelectAll(false)" style="padding:8px 12px;background:#f0f2f5;border:1px solid #dde3ea;border-radius:6px;font-size:12px;font-weight:700;cursor:pointer;font-family:inherit">全解除</button>
             <button onclick="openLabelPosPicker('bcp')" style="padding:8px 14px;background:#1a4a2e;color:#fff;border:none;border-radius:6px;font-size:13px;font-weight:700;cursor:pointer;font-family:inherit">📍 開始位置を選んで印刷</button>
@@ -2072,20 +2066,29 @@ function hmGoTana(){
   showPage('pgSession');
 }
 function hmGoNyuuka(){
-  doNyuuka();
+  // セッション中なら入荷登録タブへ、未接続ならセッション画面へ
+  if(sid && pages && Object.keys(pages).length){
+    showPage('pgApp');
+    showTab('entry'); // 棚卸入力タブへ（入荷はセッション内から行う）
+    alert('入荷・商品登録は、棚卸入力画面の「入荷登録」ボタンから行えます。\nまたはバーコード印刷タブで商品管理ができます。');
+  } else {
+    showPage('pgSession');
+  }
 }
 function hmGoMstock(){
-  // ホームからはアーカイブ・履歴タブで開く
-  saveDraft();
+  // 集計・アーカイブ画面へ
+  try{ saveDraft(); }catch(e){}
   showPage('pgMstock');
   const now=new Date();
   const msInp=document.getElementById('msMonthInp');
   if(msInp) msInp.value=now.getFullYear()+'-'+String(now.getMonth()+1).padStart(2,'0');
-  const data=msGetDepts();
-  if(!msCurDept&&data.depts.length) msCurDept=data.depts[0].id;
-  msRenderDeptTabs();
-  msShowTab('hist'); // ← 履歴・グラフタブを最初に表示
-  msRenderCountArea();
+  try{
+    const data=msGetDepts();
+    if(!msCurDept&&data&&data.depts&&data.depts.length) msCurDept=data.depts[0].id;
+    msRenderDeptTabs();
+    msRenderCountArea();
+  }catch(e){}
+  msShowTab('hist'); // アーカイブ・履歴タブ
 }
 function hmUpdateStatus(msg){
   const el=document.getElementById('hmStatus');
@@ -4566,48 +4569,92 @@ function bcpGetAllSources(){
 }
 
 function bcpRender(){
-  const catSel=document.getElementById('bcpCatFilter');
-  const prevCat=catSel.value;
+  const filterDiv=document.getElementById('bcpPageFilter');
+  if(!filterDiv) return;
 
-  // カテゴリー一覧をマスタ商品から収集
-  const cats=new Map(); // catId/catName → label
-  bcpGetAllSources().forEach(p=>{
-    const cat=(p.category||p.catId||'').trim();
-    if(cat && !cats.has(cat)) cats.set(cat, cat);
-  });
-  // セッションページ名も追加（ページ名で絞りたい場合のため）
+  // ページ一覧を収集（セッションページ + マスタのカテゴリー）
+  const pageSet=new Map(); // key → label
+
+  // ① セッションページ（実際に入力されているページ）
   order.forEach(k=>{
     const pg=pages[k]||{};
-    const label=pg.tanto||'';
-    if(label && !cats.has('__page__'+label)) cats.set('__page__'+label, '📋 '+label);
+    const label=(pg.tanto||'').trim();
+    if(label) pageSet.set('page:'+label, label);
   });
 
-  catSel.innerHTML='<option value="">すべて表示</option>';
-  cats.forEach((label,key)=>{
-    const o=document.createElement('option');
-    o.value=key; o.textContent=label; catSel.appendChild(o);
+  // ② マスタ商品のカテゴリー（ページと重複しないもの）
+  nkGetProducts().forEach(p=>{
+    const cat=(p.category||'').trim();
+    if(cat && !Array.from(pageSet.values()).includes(cat)){
+      pageSet.set('cat:'+cat, cat);
+    }
   });
-  if(catSel.querySelector('option[value="'+prevCat+'"]')) catSel.value=prevCat;
+
+  // 既存チェック状態を保存
+  const prevChecked=new Set();
+  filterDiv.querySelectorAll('input[type=checkbox]:checked').forEach(cb=>prevChecked.add(cb.value));
+
+  // チェックボックス描画
+  if(pageSet.size===0){
+    filterDiv.innerHTML='<span style="font-size:12px;color:#aaa">（ページ情報がありません）</span>';
+  } else {
+    filterDiv.innerHTML=[...pageSet.entries()].map(([key,label])=>{
+      const checked=prevChecked.size===0||prevChecked.has(key) ? 'checked' : '';
+      return `<label style="display:inline-flex;align-items:center;gap:5px;background:${checked?'#0f2744':'#f0f4fa'};color:${checked?'#fff':'#333'};border:1.5px solid ${checked?'#0f2744':'#dde3ea'};border-radius:20px;padding:5px 12px;font-size:12px;font-weight:700;cursor:pointer;user-select:none;transition:.15s" onclick="bcpTogglePageChip(this)">
+        <input type="checkbox" value="${key}" ${checked} style="display:none">${label}
+      </label>`;
+    }).join('');
+  }
+  bcpFilter();
+}
+
+function bcpTogglePageChip(label){
+  const cb=label.querySelector('input');
+  cb.checked=!cb.checked;
+  if(cb.checked){
+    label.style.background='#0f2744'; label.style.color='#fff'; label.style.borderColor='#0f2744';
+  } else {
+    label.style.background='#f0f4fa'; label.style.color='#333'; label.style.borderColor='#dde3ea';
+  }
   bcpFilter();
 }
 
 function bcpFilter(){
-  const sel=(document.getElementById('bcpCatFilter').value||'').trim();
+  const filterDiv=document.getElementById('bcpPageFilter');
   const kw=(document.getElementById('bcpSearch').value||'').trim().toLowerCase();
+
+  // チェックされているページ/カテゴリーキー
+  const checkedKeys=new Set();
+  if(filterDiv){
+    filterDiv.querySelectorAll('input[type=checkbox]:checked').forEach(cb=>checkedKeys.add(cb.value));
+  }
+  const filterActive=checkedKeys.size>0;
+
+  // 商品名→ページ名マップ（セッション行から）
+  const nameToPage={};
+  order.forEach(k=>{
+    const pg=pages[k]||{};
+    const label=(pg.tanto||'').trim();
+    (pg.rows||[]).forEach(r=>{
+      const name=(r.n||'').trim();
+      if(name&&label) nameToPage[name]=label;
+    });
+  });
+
   _bcpFiltered=bcpGetAllSources().filter(p=>{
-    if(sel){
-      if(sel.startsWith('__page__')){
-        // ページ名フィルタ
-        const pageName=sel.replace('__page__','');
-        if((p._pageLabel||'')!==pageName) return false;
-      } else {
-        // カテゴリーフィルタ
-        const pCat=(p.category||p.catId||'').trim();
-        if(pCat!==sel) return false;
-      }
-    }
     if(kw&&!(p.name||'').toLowerCase().includes(kw)) return false;
-    return true;
+    if(!filterActive) return true;
+
+    // ページ名マップで照合（マスタ商品でも棚卸行に入力があれば一致）
+    const pLabel=nameToPage[p.name]||p._pageLabel||'';
+    const pCat=(p.category||'').trim();
+
+    // チェック中のキーに合致するか
+    for(const key of checkedKeys){
+      if(key.startsWith('page:') && pLabel===key.slice(5)) return true;
+      if(key.startsWith('cat:') && pCat===key.slice(4)) return true;
+    }
+    return false;
   });
   bcpRenderList();
 }
