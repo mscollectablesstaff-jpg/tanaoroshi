@@ -4440,149 +4440,214 @@ function confirmLabelPos(){
   else nkPrintLabels(_lpSelected);
 }
 
-// ── QRシール印刷共通ロジック（bcpPrint/nkPrintLabels から呼ばれる） ──
-// A-one 31297/31397 F200A4-1 正確寸法
-// ラベル: 20×8mm / 8列×25行
-// 左余白: 8.0mm / 上余白: 9.0mm
-// 列ピッチ: 24.86mm (20+4.86) / 行ピッチ: 11.33mm (8+3.33)
-// → 各ラベルをabsolute位置で配置（grid方式より印刷精度が高い）
+// ── QRシール PDF生成（A-one 31297/31397 完全対応） ──
+// ブラウザ印刷のスケーリング問題を回避するため jsPDF でPDF直接生成
+// 300DPIキャンバスにレンダリング → PDF埋め込み → ダウンロード
+// これによりラベル屋さんと同等の印刷精度を実現
 function buildQrLabelHtml(items, startPos){
-  const COLS=8, ROWS=25, PER=200;
-  const LW=20, LH=8;                 // ラベルサイズ mm
-  const ML=8.0, MT=9.0;              // 左・上余白 mm
-  const CP=24.86, RP=11.33;          // 列・行ピッチ mm
-  const offset=Math.max(0, Math.min(199, (startPos||1)-1));
+  const offset = Math.max(0, Math.min(199, (startPos||1)-1));
+  // JSONエスケープ（</script>対策）
+  const itemsJson = JSON.stringify(items.map(p=>({
+    name:   String(p.name||''),
+    price:  p.price!=null ? String(p.price) : '',
+    barcode:String(p.barcode||p.bc||'')
+  }))).replace(/<\//g,'<\\/');
 
-  const padded=[];
-  for(let i=0;i<offset;i++) padded.push(null);
-  items.forEach(p=>padded.push(p));
-
-  let sheetData='';
-  const totalSheets=Math.ceil(padded.length/PER);
-  for(let s=0;s<totalSheets;s++){
-    const chunk=padded.slice(s*PER,(s+1)*PER);
-    let cells='';
-    chunk.forEach((p,ci)=>{
-      if(!p) return;
-      const row=Math.floor(ci/COLS), col=ci%COLS;
-      const left=(ML+col*CP).toFixed(4);
-      const top=(MT+row*RP).toFixed(4);
-      const uid='qr_'+s+'_'+ci;
-      const nm=String(p.name||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
-      const pr=p.price?'\u00a5'+Number(p.price).toLocaleString():'';
-      const bc=String(p.barcode||p.bc||'').replace(/&/g,'&amp;');
-      cells+=`<div style="position:absolute;left:${left}mm;top:${top}mm;width:${LW}mm;height:${LH}mm;overflow:hidden;display:flex;align-items:center;padding:0 0.6mm;gap:0.3mm;box-sizing:border-box;">
-  <div style="flex:1;min-width:0;display:flex;flex-direction:column;justify-content:center;overflow:hidden;line-height:1.2;">
-    <div style="font-size:4.5pt;font-weight:700;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;color:#111;">${nm}</div>
-    <div style="font-size:6.5pt;font-weight:900;color:#000;white-space:nowrap;margin-top:0.3mm;letter-spacing:-0.02em;">${pr}</div>
-  </div>
-  <div id="${uid}" data-bc="${bc}" style="width:6.5mm;height:6.5mm;flex-shrink:0;overflow:hidden;display:flex;align-items:center;justify-content:center;"></div>
-</div>`;
-    });
-    sheetData+=`<div class="sheet">${cells}</div>`;
-  }
-
-  const qrSrc='https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js';
   return `<!DOCTYPE html><html><head><meta charset="UTF-8">
-<title>QRシール印刷</title>
+<title>QRシールPDF生成中...</title>
 <style>
-  @page{ size:A4 portrait; margin:0 }
-  *{ box-sizing:border-box; margin:0; padding:0 }
-  body{ background:#f0f0f0; font-family:'Hiragino Kaku Gothic Pro','Meiryo',sans-serif }
-  .toolbar{
-    position:fixed;top:0;left:0;right:0;background:#1a1a2e;color:#fff;
-    padding:8px 14px;display:flex;gap:10px;align-items:center;z-index:9999;flex-wrap:wrap;
-  }
-  .toolbar button{ padding:7px 18px;border:none;border-radius:6px;font-size:13px;font-weight:700;cursor:pointer }
-  .adj-group{ display:flex;align-items:center;gap:6px;background:rgba(255,255,255,.12);padding:5px 10px;border-radius:6px; }
-  .adj-group label{ font-size:11px;color:#cce;white-space:nowrap }
-  .adj-group input[type=range]{ width:80px;accent-color:#4caf50 }
-  .adj-group span{ font-size:11px;min-width:36px;text-align:right;font-family:monospace;color:#aef }
-  .adj-hint{ font-size:10px;color:#8899aa;line-height:1.4 }
-  .sheets-wrap{ padding-top:60px }
-  .sheet{
-    position:relative;
-    width:210mm;height:297mm;
-    overflow:hidden;page-break-after:always;
-    background:#fff;
-    margin:8mm auto;
-    box-shadow:0 2px 12px rgba(0,0,0,.2);
-  }
-  @media print{
-    .toolbar{ display:none!important }
-    .sheets-wrap{ padding-top:0 }
-    .sheet{ margin:0;box-shadow:none }
-  }
+  body{margin:0;background:#1a1a2e;color:#fff;font-family:'Meiryo','Hiragino Kaku Gothic Pro',sans-serif;
+       display:flex;flex-direction:column;align-items:center;justify-content:center;min-height:100vh;gap:16px}
+  #msg{font-size:18px;font-weight:700}
+  #sub{font-size:13px;color:#88aacc}
+  #prog-wrap{width:320px;background:#333;border-radius:8px;overflow:hidden;height:12px}
+  #prog{height:12px;background:#1a7a4a;width:0%;transition:width .2s}
+  #dlBtn{display:none;padding:14px 32px;background:#1a7a4a;color:#fff;border:none;border-radius:10px;
+         font-size:16px;font-weight:800;cursor:pointer;margin-top:8px}
+  #dlBtn:hover{background:#145c38}
+  #errMsg{color:#ff8888;font-size:13px;display:none}
 </style>
 </head><body>
-<div class="toolbar">
-  <div style="line-height:1.4">
-    <div style="font-size:13px;font-weight:700">&#x1F5A8; QR&#x30B7;&#x30FC;&#x30EB;&#x5370;&#x5237; ${items.length}&#x679A; &#x958B;&#x59CB;:${offset+1}&#x756A;</div>
-    <div style="font-size:10px;color:#88aacc">&#x5370;&#x5237;&#x30C0;&#x30A4;&#x30A2;&#x30ED;&#x30B0;&#x3067;&#x300C;&#x4F59;&#x767D;&#x306A;&#x3057;&#x300D;&#x300C;&#x500D;&#x7387;100%&#x300D;&#x306B;&#x8A2D;&#x5B9A;</div>
-  </div>
-  <div class="adj-group">
-    <label>&#x5168;&#x4F53;&#x30B5;&#x30A4;&#x30BA;</label>
-    <input type="range" id="adjScale" min="88" max="100" step="0.5" value="96" oninput="applyAdj()">
-    <span id="adjScaleV" style="min-width:42px">96.0%</span>
-  </div>
-  <div class="adj-group">
-    <label>&#x5DE6;&#x53F3;</label>
-    <input type="range" id="adjX" min="-8" max="8" step="0.5" value="0" oninput="applyAdj()">
-    <span id="adjXv" style="min-width:40px">0mm</span>
-  </div>
-  <div class="adj-group">
-    <label>&#x4E0A;&#x4E0B;</label>
-    <input type="range" id="adjY" min="-8" max="8" step="0.5" value="0" oninput="applyAdj()">
-    <span id="adjYv" style="min-width:40px">0mm</span>
-  </div>
-  <button onclick="window.print()" style="background:#1a7a4a;color:#fff">&#x1F5A8; &#x5370;&#x5237;&#x3059;&#x308B;</button>
-  <button onclick="window.close()" style="background:#555;color:#fff">&#x2715; &#x9589;&#x3058;&#x308B;</button>
-</div>
-<div class="sheets-wrap" id="sheetsWrap">${sheetData}</div>
-<script src="${qrSrc}"><\/script>
+<div id="msg">&#x1F4C4; PDF&#x751F;&#x6210;&#x4E2D;...</div>
+<div id="sub">&#x3057;&#x3070;&#x3089;&#x304F;&#x304A;&#x5F85;&#x3061;&#x304F;&#x3060;&#x3055;&#x3044;</div>
+<div id="prog-wrap"><div id="prog"></div></div>
+<button id="dlBtn" onclick="doDownload()">&#x2B07;&#xFE0F; PDF&#x3092;&#x30C0;&#x30A6;&#x30F3;&#x30ED;&#x30FC;&#x30C9;</button>
+<div id="errMsg"></div>
+<canvas id="qrTmp" style="display:none"></canvas>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"><\/script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"><\/script>
 <script>
-var _sc=96, _adjX=0, _adjY=0;
-var LSKEY='tb_print_adj_v1';
-function saveAdj(){
-  try{ localStorage.setItem(LSKEY, JSON.stringify({sc:_sc,x:_adjX,y:_adjY})); }catch(e){}
+var _pdfBlob = null;
+var _items   = ${itemsJson};
+var _offset  = ${offset};
+
+// ── 定数 ──────────────────────────────────────
+var DPI = 300;
+var MM  = DPI / 25.4;          // 1mm → px (11.811)
+var COLS=8, PER=200;
+// A-one 31297 正確寸法
+var ML=8.0, MT=9.0;            // 左・上余白 mm
+var CP=24.86, RP=11.33;        // 列ピッチ・行ピッチ mm
+var LW=20,   LH=8;             // ラベル幅・高さ mm
+var QR_MM=6.5;                 // QRコード正方形サイズ mm
+// フォントサイズ: pt→px = pt * (DPI/72)
+var F_NAME  = Math.round(4.5 * DPI/72);   // ~19px
+var F_PRICE = Math.round(6.5 * DPI/72);   // ~27px
+
+function setProgress(pct, text){
+  document.getElementById('prog').style.width = pct+'%';
+  if(text) document.getElementById('sub').textContent = text;
 }
-function loadAdj(){
-  try{
-    var d=JSON.parse(localStorage.getItem(LSKEY)||'{}');
-    _sc  = d.sc!=null ? d.sc  : 96;
-    _adjX= d.x !=null ? d.x  : 0;
-    _adjY= d.y !=null ? d.y  : 0;
-    document.getElementById('adjScale').value = _sc;
-    document.getElementById('adjX').value = _adjX;
-    document.getElementById('adjY').value = _adjY;
-  }catch(e){}
-}
-function applyAdj(){
-  _sc   = parseFloat(document.getElementById('adjScale').value)||96;
-  _adjX = parseFloat(document.getElementById('adjX').value)||0;
-  _adjY = parseFloat(document.getElementById('adjY').value)||0;
-  document.getElementById('adjScaleV').textContent = _sc.toFixed(1)+'%';
-  document.getElementById('adjXv').textContent = (_adjX>=0?'+':'')+_adjX.toFixed(1)+'mm';
-  document.getElementById('adjYv').textContent = (_adjY>=0?'+':'')+_adjY.toFixed(1)+'mm';
-  var ratio = _sc / 100;
-  var wrap = document.getElementById('sheetsWrap');
-  wrap.style.transformOrigin = '0 0';
-  wrap.style.transform = 'scale('+ratio+') translate('+_adjX+'mm,'+_adjY+'mm)';
-  wrap.style.marginBottom = (297*(ratio-1)*-1)+'mm';
-  saveAdj();
-}
-window.onload=function(){
-  loadAdj();
-  applyAdj();
-  var els=document.querySelectorAll('[data-bc]');
-  els.forEach(function(el){
-    var bc=el.getAttribute('data-bc'); if(!bc)return;
+function setMsg(t){ document.getElementById('msg').textContent = t; }
+
+// QRコードをDataURLとして取得
+function qrToDataUrl(text){
+  return new Promise(function(resolve, reject){
+    var wrap = document.createElement('div');
+    wrap.style.cssText='position:absolute;left:-9999px;top:-9999px';
+    document.body.appendChild(wrap);
+    var size = Math.round(QR_MM*MM*1.5); // 少し大きめに生成してから縮小
     try{
-      new QRCode(el,{text:bc,width:25,height:25,
-        colorDark:'#000',colorLight:'#fff',
+      new QRCode(wrap,{text:text, width:size, height:size,
+        colorDark:'#000', colorLight:'#fff',
         correctLevel:QRCode.CorrectLevel.M});
-    }catch(e){}
+    }catch(e){ document.body.removeChild(wrap); resolve(null); return; }
+    // QRCodeはすぐcanvas/imgを生成
+    setTimeout(function(){
+      var c = wrap.querySelector('canvas');
+      var img = wrap.querySelector('img');
+      var url = c ? c.toDataURL('image/png') : (img ? img.src : null);
+      document.body.removeChild(wrap);
+      resolve(url);
+    }, 80);
   });
+}
+
+async function generate(){
+  try{
+    var { jsPDF } = window.jspdf;
+    var padded = new Array(_offset).fill(null).concat(_items);
+    var total  = padded.length;
+    var sheets = Math.ceil(total / PER);
+    var doc    = new jsPDF({unit:'mm', format:'a4', orientation:'portrait'});
+
+    // フォント設定（jsPDFはデフォルトでlatinのみ → テキストをcanvasで描画して画像埋め込み）
+    // 全ラベルをページ単位でキャンバスにレンダリング
+    var W_PX = Math.round(210 * MM);
+    var H_PX = Math.round(297 * MM);
+
+    for(var s=0; s<sheets; s++){
+      if(s>0) doc.addPage();
+      var chunk = padded.slice(s*PER, (s+1)*PER);
+
+      // ページ用キャンバス作成
+      var cv = document.createElement('canvas');
+      cv.width = W_PX; cv.height = H_PX;
+      var ctx = cv.getContext('2d');
+      ctx.fillStyle='#ffffff';
+      ctx.fillRect(0,0,W_PX,H_PX);
+
+      for(var ci=0; ci<chunk.length; ci++){
+        var p = chunk[ci];
+        if(!p) continue;
+
+        setProgress(Math.round(((s*PER+ci)/(total||1))*85)+5,
+          (s+1)+'/'+ sheets +' ページ目処理中... ('+(ci+1)+'/'+Math.min(chunk.length,PER)+')');
+
+        var row = Math.floor(ci/COLS), col = ci%COLS;
+        var lx  = Math.round((ML + col*CP)*MM);   // ラベル左端 px
+        var ly  = Math.round((MT + row*RP)*MM);    // ラベル上端 px
+        var lw  = Math.round(LW*MM);
+        var lh  = Math.round(LH*MM);
+        var qrSz= Math.round(QR_MM*MM);
+        var txtW= lw - qrSz - Math.round(1.5*MM); // テキスト幅
+
+        // ── 商品名 ──
+        ctx.save();
+        ctx.font = 'bold '+F_NAME+'px "Hiragino Kaku Gothic Pro","Meiryo","Yu Gothic",sans-serif';
+        ctx.fillStyle='#111111';
+        ctx.textBaseline='top';
+        // クリップしてはみ出し防止
+        ctx.beginPath();
+        ctx.rect(lx + Math.round(0.5*MM), ly + Math.round(0.8*MM), txtW, Math.round(3.5*MM));
+        ctx.clip();
+        ctx.fillText(p.name||'', lx + Math.round(0.5*MM), ly + Math.round(0.8*MM));
+        ctx.restore();
+
+        // ── 価格 ──
+        if(p.price){
+          ctx.save();
+          ctx.font = 'bold '+F_PRICE+'px "Hiragino Kaku Gothic Pro","Meiryo","Yu Gothic",sans-serif';
+          ctx.fillStyle='#000000';
+          ctx.textBaseline='top';
+          ctx.beginPath();
+          ctx.rect(lx + Math.round(0.5*MM), ly + Math.round(4.2*MM), txtW, Math.round(3.5*MM));
+          ctx.clip();
+          ctx.fillText('\u00A5'+Number(p.price).toLocaleString(),
+            lx + Math.round(0.5*MM), ly + Math.round(4.2*MM));
+          ctx.restore();
+        }
+
+        // ── QRコード ──
+        if(p.barcode){
+          var qrUrl = await qrToDataUrl(p.barcode);
+          if(qrUrl){
+            var qrImg = new Image();
+            await new Promise(function(res){
+              qrImg.onload = res;
+              qrImg.onerror = res;
+              qrImg.src = qrUrl;
+            });
+            var qrX = lx + lw - qrSz - Math.round(0.5*MM);
+            var qrY = ly + Math.round((lh - qrSz)/2);
+            ctx.drawImage(qrImg, qrX, qrY, qrSz, qrSz);
+          }
+        }
+      }// end chunk
+
+      // キャンバス→PNG→PDFページに埋め込み
+      setProgress(Math.round(((s+1)/sheets)*90), 'PDF変換中...');
+      var imgData = cv.toDataURL('image/png');
+      doc.addImage(imgData,'PNG',0,0,210,297);
+
+    }// end sheets
+
+    setProgress(98, 'PDF出力中...');
+    _pdfBlob = doc.output('blob');
+    setProgress(100, '完了！');
+    setMsg('\u2705 PDF\u751F\u6210\u5B8C\u4E86');
+    document.getElementById('dlBtn').style.display='block';
+    doDownload(); // 自動ダウンロード
+  }catch(err){
+    document.getElementById('errMsg').textContent = '⚠️ エラー: '+err.message;
+    document.getElementById('errMsg').style.display='block';
+    setMsg('エラーが発生しました');
+    console.error(err);
+  }
+}
+
+function doDownload(){
+  if(!_pdfBlob) return;
+  var a = document.createElement('a');
+  a.href = URL.createObjectURL(_pdfBlob);
+  a.download = 'QR\u30b7\u30fc\u30eb.pdf';
+  a.click();
+}
+
+window.onload = function(){
+  // ライブラリ読み込み確認してから開始
+  var tries=0;
+  var check = setInterval(function(){
+    if(window.jspdf && window.QRCode){
+      clearInterval(check);
+      generate();
+    } else if(++tries>60){
+      clearInterval(check);
+      document.getElementById('errMsg').textContent='ライブラリの読み込みに失敗しました。ネットワークを確認してください。';
+      document.getElementById('errMsg').style.display='block';
+    }
+  },100);
 };
 <\/script>
 </body></html>`;
