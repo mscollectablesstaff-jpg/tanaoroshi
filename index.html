@@ -4516,40 +4516,49 @@ function buildQrLabelHtml(items, startPos){
 </style>
 </head><body>
 <div class="toolbar">
-  <div>
-    <div style="font-size:13px;font-weight:700">\uD83D\uDDA8\uFE0F QR\u30b7\u30fc\u30eb\u5370\u5237 &nbsp; ${items.length}\u679a &nbsp;\u958b\u59cb\uff1a${offset+1}\u756a</div>
+  <div style="line-height:1.4">
+    <div style="font-size:13px;font-weight:700">&#x1F5A8; QR&#x30B7;&#x30FC;&#x30EB;&#x5370;&#x5237; ${items.length}&#x679A; &#x958B;&#x59CB;:${offset+1}&#x756A;</div>
+    <div style="font-size:10px;color:#88aacc">&#x5370;&#x5237;&#x30C0;&#x30A4;&#x30A2;&#x30ED;&#x30B0;&#x3067;&#x300C;&#x4F59;&#x767D;&#x306A;&#x3057;&#x300D;&#x300C;&#x500D;&#x7387;100%&#x300D;&#x306B;&#x8A2D;&#x5B9A;</div>
   </div>
   <div class="adj-group">
-    <label>\u5de6\u53f3\u8abf\u6574</label>
-    <input type="range" id="adjX" min="-5" max="5" step="0.1" value="0" oninput="applyAdj()">
-    <span id="adjXv">0.0mm</span>
+    <label>&#x5168;&#x4F53;&#x30B5;&#x30A4;&#x30BA;</label>
+    <input type="range" id="adjScale" min="88" max="100" step="0.5" value="96" oninput="applyAdj()">
+    <span id="adjScaleV" style="min-width:42px">96.0%</span>
   </div>
   <div class="adj-group">
-    <label>\u4e0a\u4e0b\u8abf\u6574</label>
-    <input type="range" id="adjY" min="-5" max="5" step="0.1" value="0" oninput="applyAdj()">
-    <span id="adjYv">0.0mm</span>
+    <label>&#x5DE6;&#x53F3;</label>
+    <input type="range" id="adjX" min="-8" max="8" step="0.5" value="0" oninput="applyAdj()">
+    <span id="adjXv" style="min-width:40px">0mm</span>
   </div>
-  <button onclick="window.print()" style="background:#1a7a4a;color:#fff">\uD83D\uDDA8\uFE0F \u5370\u5237\u3059\u308b</button>
-  <button onclick="window.close()" style="background:#555;color:#fff">\u2715 \u9589\u3058\u308b</button>
-  <div class="adj-hint">\u4f59\u767d\u306a\u3057\u30fb\u500d\u738b100%\u3067\u5370\u5237\u3057\u3066\u304f\u3060\u3055\u3044\u3002<br>\u305a\u308c\u3066\u3044\u308b\u5834\u5408\u306f\u300c\u5de6\u53f3\u8abf\u6574\u300d\u300c\u4e0a\u4e0b\u8abf\u6574\u300d\u3067\u5fae\u8abf\u6574\u3057\u3066\u304f\u3060\u3055\u3044</div>
+  <div class="adj-group">
+    <label>&#x4E0A;&#x4E0B;</label>
+    <input type="range" id="adjY" min="-8" max="8" step="0.5" value="0" oninput="applyAdj()">
+    <span id="adjYv" style="min-width:40px">0mm</span>
+  </div>
+  <button onclick="window.print()" style="background:#1a7a4a;color:#fff">&#x1F5A8; &#x5370;&#x5237;&#x3059;&#x308B;</button>
+  <button onclick="window.close()" style="background:#555;color:#fff">&#x2715; &#x9589;&#x3058;&#x308B;</button>
 </div>
 <div class="sheets-wrap" id="sheetsWrap">${sheetData}</div>
 <script src="${qrSrc}"><\/script>
 <script>
-var _adjX=0, _adjY=0;
+var _sc=96, _adjX=0, _adjY=0;
 function applyAdj(){
-  _adjX=parseFloat(document.getElementById('adjX').value)||0;
-  _adjY=parseFloat(document.getElementById('adjY').value)||0;
-  document.getElementById('adjXv').textContent=(_adjX>=0?'+':'')+_adjX.toFixed(1)+'mm';
-  document.getElementById('adjYv').textContent=(_adjY>=0?'+':'')+_adjY.toFixed(1)+'mm';
-  var sheets=document.querySelectorAll('.sheet');
-  sheets.forEach(function(sh){
-    sh.style.marginLeft = _adjX + 'mm';
-    sh.style.paddingTop = _adjY + 'mm';
-    sh.style.paddingLeft = _adjX + 'mm';
-  });
+  _sc   = parseFloat(document.getElementById('adjScale').value)||96;
+  _adjX = parseFloat(document.getElementById('adjX').value)||0;
+  _adjY = parseFloat(document.getElementById('adjY').value)||0;
+  document.getElementById('adjScaleV').textContent = _sc.toFixed(1)+'%';
+  document.getElementById('adjXv').textContent = (_adjX>=0?'+':'')+_adjX.toFixed(1)+'mm';
+  document.getElementById('adjYv').textContent = (_adjY>=0?'+':'')+_adjY.toFixed(1)+'mm';
+  var ratio = _sc / 100;
+  var wrap = document.getElementById('sheetsWrap');
+  /* シート全体をtransform:scaleで縮小 ＋ translate でオフセット */
+  wrap.style.transformOrigin = '0 0';
+  wrap.style.transform = 'scale('+ratio+') translate('+_adjX+'mm,'+_adjY+'mm)';
+  /* 縮小した分の高さ余白を補正（複数シートが重ならないように） */
+  wrap.style.marginBottom = (297*(ratio-1)*-1)+'mm';
 }
 window.onload=function(){
+  applyAdj();
   var els=document.querySelectorAll('[data-bc]');
   els.forEach(function(el){
     var bc=el.getAttribute('data-bc'); if(!bc)return;
