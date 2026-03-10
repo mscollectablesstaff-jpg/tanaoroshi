@@ -786,10 +786,11 @@ tbody tr:hover td.sticky-name{background:#e8f0f8}
 /* スクロール影（固定列の右端） */
 .sticky-name::after{box-shadow:4px 0 8px rgba(0,0,0,.08);border-right:1px solid #dde3ea}
 
-.qbar{background:#fff;border-radius:10px;padding:12px 18px;box-shadow:0 1px 4px rgba(0,0,0,.08);display:flex;gap:20px;flex-wrap:wrap;align-items:center}
-.qs{text-align:center}
-.qsl{font-size:10px;color:#6b7a8d;font-weight:700}
-.qsv{font-size:15px;font-weight:700;margin-top:2px}
+.qbar{background:#0f2744;border-radius:10px;padding:14px 18px;box-shadow:0 2px 8px rgba(0,0,0,.18);display:flex;gap:0;flex-wrap:wrap;align-items:stretch;margin-top:4px}
+.qs{text-align:center;flex:1;min-width:120px;padding:6px 12px;border-right:1px solid rgba(255,255,255,.15)}
+.qs:last-of-type{border-right:none}
+.qsl{font-size:10px;color:rgba(255,255,255,.65);font-weight:700;letter-spacing:.03em}
+.qsv{font-size:18px;font-weight:900;margin-top:4px;color:#fff}
 
 .scard{background:#fff;border-radius:10px;padding:22px;box-shadow:0 1px 4px rgba(0,0,0,.08);margin-bottom:14px}
 .scard h2{font-size:16px;color:#0f2744;margin-bottom:14px;padding-bottom:8px;border-bottom:2px solid #1a6ea6}
@@ -895,8 +896,9 @@ tbody tr:hover td.sticky-name{background:#e8f0f8}
   .sticky-name{min-width:120px!important}
 
   /* ── 小計バー ── */
-  .qbar{padding:8px 10px;gap:12px}
-  .qsv{font-size:13px}
+  .qbar{padding:10px;gap:0}
+  .qs{min-width:80px;padding:4px 8px}
+  .qsv{font-size:15px}
 
   /* ── 集計・合計パネル ── */
   .scard{padding:14px}
@@ -1486,31 +1488,7 @@ svg.trend-chart text{font-family:inherit}
     <!-- 入力パネル -->
     <div class="panel on" id="pnl-entry">
 
-      <!-- バーコードスキャナーバー -->
-      <div id="scanBar" style="display:none;background:#0f2744;padding:10px 14px;border-radius:10px;margin-bottom:10px;display:flex;align-items:center;gap:10px;flex-wrap:wrap">
-        <span style="color:#fff;font-size:13px;font-weight:700;white-space:nowrap">📡 スキャンモード</span>
-        <input id="scanInput" type="text" inputmode="none"
-          placeholder="バーコードをスキャン..."
-          style="flex:1;min-width:180px;padding:9px 14px;border:none;border-radius:7px;font-size:14px;font-family:monospace;font-weight:700;letter-spacing:2px;background:#fff;outline:none"
-          onkeydown="if(event.key==='Enter'){scanBarcode(this.value.trim());this.value='';}"
-          autocomplete="off" autocorrect="off" spellcheck="false">
-        <span id="scanMsg" style="color:#a0e0b0;font-size:12px;min-width:140px"></span>
-        <button onclick="toggleScanMode(false)"
-          style="background:rgba(255,255,255,.15);color:#fff;border:none;border-radius:6px;padding:7px 14px;font-size:12px;font-weight:700;cursor:pointer;font-family:inherit;white-space:nowrap">
-          ✕ 閉じる
-        </button>
-      </div>
-      <!-- スキャン入力ボタン（2択） -->
-      <div id="btnScanArea" style="display:flex;gap:8px;margin-bottom:10px;flex-wrap:wrap">
-        <button id="btnScanMode" onclick="toggleScanMode(true)"
-          style="display:flex;align-items:center;gap:6px;padding:9px 18px;background:#1a3a5c;color:#fff;border:none;border-radius:8px;font-size:13px;font-weight:700;cursor:pointer;font-family:inherit">
-          📡 スキャナーで入力
-        </button>
-        <button onclick="openCameraScanner()"
-          style="display:flex;align-items:center;gap:6px;padding:9px 18px;background:#1a6ea6;color:#fff;border:none;border-radius:8px;font-size:13px;font-weight:700;cursor:pointer;font-family:inherit">
-          📷 カメラでスキャン
-        </button>
-      </div>
+
 
       <!-- カメラスキャナーモーダル -->
 
@@ -1632,13 +1610,19 @@ svg.trend-chart text{font-family:inherit}
         </div>
       </div>
 
+      <!-- 行追加ボタン -->
+      <button onclick="addRow()"
+        style="display:flex;align-items:center;justify-content:center;gap:6px;width:100%;margin:8px 0;padding:10px;background:#e8f5e9;border:1.5px dashed #2d7a4f;border-radius:8px;color:#1a5c2e;font-size:13px;font-weight:700;cursor:pointer;font-family:inherit">
+        ＋ 行を追加
+      </button>
+
       <div class="qbar">
-        <b style="color:#0f2744">📊 ページ小計</b>
-        <div class="qs"><div class="qsl">10%対象（税抜）</div><div class="qsv" style="color:#1a6ea6" id="q10">¥0</div></div>
-        <div class="qs"><div class="qsl">8%対象（税抜）</div><div class="qsv" style="color:#d4a017" id="q8">¥0</div></div>
-        <div class="qs"><div class="qsl">在庫価格合計</div><div class="qsv" style="color:#1a7a4a" id="qz">¥0</div></div>
-        <div class="qs"><div class="qsl">全ページ税抜総合計</div><div class="qsv" style="color:#0f2744" id="qg">¥0</div></div>
-        <div id="roNote" style="margin-left:auto;font-size:11px"></div>
+        <b style="color:#fff;white-space:nowrap;align-self:center;padding-right:16px;font-size:13px">📊 ページ小計</b>
+        <div class="qs"><div class="qsl">10%対象（税抜）</div><div class="qsv" style="color:#7ecfff" id="q10">¥0</div></div>
+        <div class="qs"><div class="qsl">8%対象（税抜）</div><div class="qsv" style="color:#ffd97d" id="q8">¥0</div></div>
+        <div class="qs"><div class="qsl">在庫価格合計</div><div class="qsv" style="color:#7fffb0" id="qz">¥0</div></div>
+        <div class="qs"><div class="qsl">全ページ税抜総合計</div><div class="qsv" style="color:#fff" id="qg">¥0</div></div>
+        <div id="roNote" style="margin-left:auto;font-size:11px;color:rgba(255,255,255,.5)"></div>
       </div>
     </div>
 
@@ -3686,6 +3670,20 @@ function fy(n){return '¥'+(n?fm(n):'0');}
 // 描画
 // ============================================================
 function renderAll(){renderPTabs();renderTable();renderQbar();}
+
+function addRow(){
+  if(!curKey||!pages[curKey])return;
+  pages[curKey].rows.push({n:'',z:'10',k:'',u:'',p:'',ss:'',sr:'',st:'',b:'',cat:'',bc:'',pt:'通常'});
+  renderTable(); renderQbar();
+  if(!offline&&db&&sid){
+    db.ref('s/'+sid+'/pages/'+curKey+'/rows').set(pages[curKey].rows);
+  }
+  // 最終行にスクロール
+  setTimeout(()=>{
+    const rows=document.querySelectorAll('#tbody tr');
+    if(rows.length) rows[rows.length-1].scrollIntoView({behavior:'smooth',block:'nearest'});
+  },100);
+}
 
 function renderPTabs(){
   const el=document.getElementById('ptabs');if(!el)return;
