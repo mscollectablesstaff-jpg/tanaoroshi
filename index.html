@@ -947,6 +947,7 @@ tbody tr:hover td.sticky-name{background:#e8f0f8}
   .toast{bottom:70px;right:10px;left:10px;text-align:center;font-size:12px}
 }
 @media print{
+  @page{size:A4 landscape;margin:0}
   body *{visibility:hidden}
   #printArea,#printArea *{visibility:visible}
   #printArea{position:fixed;inset:0;background:#fff;z-index:99999;overflow:auto}
@@ -957,7 +958,7 @@ tbody tr:hover td.sticky-name{background:#e8f0f8}
 #printArea{display:none;position:fixed;inset:0;background:#fff;z-index:9500;overflow-y:auto;font-family:'Hiragino Kaku Gothic ProN','Yu Gothic','Meiryo',sans-serif;color:#000}
 .print-toolbar{background:#0f2744;color:#fff;padding:10px 20px;display:flex;align-items:center;gap:10px;position:sticky;top:0;z-index:10}
 .print-toolbar button{border:none;border-radius:6px;padding:8px 18px;font-size:13px;font-weight:700;cursor:pointer;font-family:inherit}
-.print-doc{width:210mm;min-height:297mm;margin:20px auto;background:#fff;padding:18mm 15mm 15mm;box-sizing:border-box;box-shadow:0 2px 12px rgba(0,0,0,.15)}
+.print-doc{width:297mm;min-height:210mm;margin:12px auto;background:#fff;padding:10mm 12mm 8mm;box-sizing:border-box;box-shadow:0 2px 12px rgba(0,0,0,.15)}
 /* 表紙 */
 .print-cover{border:2px solid #000;padding:20px;margin-bottom:20px}
 .print-title{font-size:22px;font-weight:900;text-align:center;letter-spacing:4px;margin-bottom:18px;border-bottom:3px double #000;padding-bottom:10px}
@@ -993,6 +994,79 @@ tbody tr:hover td.sticky-name{background:#e8f0f8}
 /* フッター */
 .print-footer{margin-top:20px;border-top:1px solid #000;padding-top:8px;font-size:10px;color:#555;text-align:right}
 
+
+/* ===== 棚卸印刷プレビュー（ps-*） ===== */
+/* A4横で1行に収める設計 */
+.print-sheet{
+  position:relative;width:297mm;min-height:210mm;
+  background:#fff;margin:12px auto;
+  box-shadow:0 2px 14px rgba(0,0,0,.18);
+  box-sizing:border-box;
+  padding:10mm 12mm 8mm;
+  font-family:'Hiragino Kaku Gothic ProN','Yu Gothic','Meiryo',sans-serif;
+  font-size:9pt;color:#111;
+  page-break-after:always;
+}
+/* ヘッダー */
+.ps-head{display:flex;align-items:flex-start;gap:10mm;margin-bottom:5mm;border-bottom:2px solid #0f2744;padding-bottom:4mm}
+.ps-head-title{font-size:16pt;font-weight:900;color:#0f2744;letter-spacing:2px;white-space:nowrap;writing-mode:horizontal-tb}
+.ps-head-meta{display:flex;flex-wrap:wrap;gap:0;border:1px solid #bbb;font-size:8pt;flex:1}
+.ps-hm-k{background:#e8edf5;padding:3px 8px;font-weight:700;border-right:1px solid #bbb;border-bottom:1px solid #bbb;white-space:nowrap}
+.ps-hm-v{padding:3px 10px;border-right:1px solid #bbb;border-bottom:1px solid #bbb;min-width:80px}
+.ps-head-sign{display:flex;border:1px solid #bbb;font-size:8pt;flex-shrink:0}
+.ps-sign-cell{text-align:center;border-right:1px solid #bbb;min-width:22mm}
+.ps-sign-cell:last-child{border-right:none}
+.ps-sign-label{background:#e8edf5;padding:2px 6px;font-weight:700;font-size:7pt;border-bottom:1px solid #bbb}
+.ps-sign-box{height:14mm}
+/* セクション見出し */
+.ps-sec{font-size:9pt;font-weight:700;background:#0f2744;color:#fff;padding:3px 8px;margin:4mm 0 2mm;letter-spacing:.5px}
+/* サマリーボックス */
+.ps-summary{display:flex;flex-wrap:wrap;gap:3mm;margin-bottom:4mm}
+.ps-sbox{border:1px solid #bbb;padding:3px 8px;text-align:center;min-width:40mm;flex:1}
+.ps-sbox.hi{background:#0f2744;color:#fff;border-color:#0f2744}
+.ps-sl{font-size:7pt;color:#888;margin-bottom:2px}
+.ps-sbox.hi .ps-sl{color:#acd}
+.ps-sv{font-size:12pt;font-weight:900}
+/* ページ別小計テーブル */
+.ps-ptbl{width:100%;border-collapse:collapse;font-size:8.5pt;margin-bottom:4mm}
+.ps-ptbl th{background:#1a3a5c;color:#fff;padding:4px 7px;white-space:nowrap;border:1px solid #aaa}
+.ps-ptbl td{padding:4px 7px;border:1px solid #dde;vertical-align:middle}
+.ps-ptbl tr:nth-child(even) td{background:#f8faff}
+.ps-ptbl tr.sub td{background:#e8edf5;font-weight:700}
+.ps-ptbl td.r{text-align:right}
+.ps-ptbl td.c{text-align:center}
+/* 商品明細テーブル */
+.ps-dtbl{width:100%;border-collapse:collapse;font-size:8pt;table-layout:fixed}
+.ps-dtbl th{
+  background:#1a3a5c;color:#fff;
+  padding:4px 5px;white-space:nowrap;
+  border:1px solid #777;font-size:7.5pt;
+  text-align:center;
+}
+.ps-dtbl td{
+  padding:3px 5px;border:1px solid #dde;
+  vertical-align:middle;
+  overflow:hidden;white-space:nowrap;text-overflow:ellipsis;
+}
+.ps-dtbl td.r{text-align:right}
+.ps-dtbl td.c{text-align:center}
+.ps-dtbl tr:nth-child(even) td{background:#fafbff}
+.ps-dtbl tr.pg-head td{
+  background:#dde6f0;font-weight:700;
+  font-size:8.5pt;color:#0f2744;
+}
+.ps-dtbl tr.pg-sub td{
+  background:#eef2f8;font-weight:700;font-style:italic;color:#333;
+}
+.tax10{background:#fff3e8;color:#c06000;font-size:7.5pt;font-weight:700;padding:1px 4px;border-radius:3px;white-space:nowrap}
+.tax8 {background:#e8f5ff;color:#1a5090;font-size:7.5pt;font-weight:700;padding:1px 4px;border-radius:3px;white-space:nowrap}
+/* フッター */
+.ps-foot{display:flex;justify-content:space-between;margin-top:4mm;padding-top:2mm;border-top:1px solid #bbb;font-size:7pt;color:#888}
+@media print{
+  .print-toolbar{display:none!important}
+  .print-sheet{margin:0;box-shadow:none;page-break-after:always}
+  .ps-dtbl{font-size:7.5pt}
+}
 
 /* バーコードスキャナー */
 
@@ -1185,7 +1259,7 @@ svg.trend-chart text{font-family:inherit}
   <div class="print-toolbar no-print">
     <button onclick="window.print()" style="background:#1a7a4a;color:#fff">🖨️ 印刷する</button>
     <button onclick="closePrint()" style="background:#555;color:#fff">✕ 閉じる</button>
-    <span style="font-size:12px;opacity:.7;margin-left:8px">印刷ダイアログで「用紙サイズ：A4」「余白：なし」に設定してください</span>
+    <span style="font-size:12px;opacity:.7;margin-left:8px">📄 A4<b>横</b>・余白なし・倍率100%で印刷してください</span>
   </div>
   <div class="print-doc" id="printDoc"></div>
 </div>
@@ -3288,20 +3362,35 @@ function doPrint(){
     sheets += `<div class="print-sheet">
     ${psHead(company,date,basho,tanto,gyomu,sheetNo,totalPages)}
     <div class="ps-sec">■ 商品明細（${sheetNo-1}/${detailSheets.length}）</div>
-    <table class="ps-dtbl">
+    <table class="ps-dtbl" style="table-layout:fixed;width:100%">
+      <colgroup>
+        <col style="width:24px"><!-- No -->
+        <col style="width:auto"><!-- 商品名：残り幅すべて -->
+        <col style="width:38px"><!-- 税率 -->
+        <col style="width:34px"><!-- 個数 -->
+        <col style="width:28px"><!-- 単位 -->
+        <col style="width:66px"><!-- 税込単価 -->
+        <col style="width:66px"><!-- 税抜単価 -->
+        <col style="width:72px"><!-- 10%仕入計 -->
+        <col style="width:72px"><!-- 8%仕入計 -->
+        <col style="width:60px"><!-- 仕入先 -->
+        <col style="width:36px"><!-- 仕入率 -->
+        <col style="width:70px"><!-- 在庫価格 -->
+        <col style="width:60px"><!-- 備考 -->
+      </colgroup>
       <thead><tr>
-        <th style="width:22px" class="c">No</th>
-        <th style="min-width:130px;text-align:left">商品名</th>
-        <th style="width:36px" class="c">税率</th>
-        <th style="width:36px" class="r">個数</th>
-        <th style="width:30px" class="c">単位</th>
-        <th style="width:72px" class="r">税込単価</th>
-        <th style="width:72px" class="r">税抜単価</th>
-        <th style="width:78px" class="r">10%仕入計</th>
-        <th style="width:78px" class="r">8%仕入計</th>
-        <th style="width:64px" class="c">仕入先</th>
-        <th style="width:40px" class="r">仕入率</th>
-        <th style="width:72px" class="r">在庫価格</th>
+        <th class="c">No</th>
+        <th style="text-align:left;padding-left:6px">商品名</th>
+        <th class="c">税率</th>
+        <th class="r">個数</th>
+        <th class="c">単位</th>
+        <th class="r">税込単価</th>
+        <th class="r">税抜単価</th>
+        <th class="r">10%仕入計</th>
+        <th class="r">8%仕入計</th>
+        <th class="c">仕入先</th>
+        <th class="r">仕入率</th>
+        <th class="r">在庫価格</th>
         <th style="text-align:left">備考</th>
       </tr></thead>
       <tbody>`;
@@ -3334,7 +3423,7 @@ function doPrint(){
         const taxLbl = r.z==='8'?'8%':'10%';
         sheets += `<tr>
           <td class="c">${ri+1}</td>
-          <td style="overflow:hidden;text-overflow:ellipsis">${e(r.n)}</td>
+          <td style="white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:0">${e(r.n)}</td>
           <td class="c"><span class="${taxCls}">${taxLbl}</span></td>
           <td class="r">${r.k||''}</td>
           <td class="c">${e(r.u||'')}</td>
