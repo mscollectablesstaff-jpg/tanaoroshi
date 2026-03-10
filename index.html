@@ -3714,6 +3714,85 @@ function renderPTabs(){
   initPtabTouchListeners();
 }
 
+
+
+// ── ページタブ タッチ操作 ──
+let _ptTouch = {key:null,clone:null,origEl:null,startX:0,startY:0,moved:false};
+
+function ptabTouchStart(ev,k){
+  if(!ev.target.classList.contains('ptab-drag-handle')) return;
+  const el = ev.currentTarget;
+  const t = ev.touches[0];
+  _ptTouch.key = k; _ptTouch.origEl = el;
+  _ptTouch.startX = t.clientX; _ptTouch.startY = t.clientY; _ptTouch.moved = false;
+  const rect = el.getBoundingClientRect();
+  const clone = el.cloneNode(true);
+  clone.style.cssText = `position:fixed;z-index:9999;left:${rect.left}px;top:${rect.top}px;width:${rect.width}px;opacity:.85;pointer-events:none;box-shadow:0 6px 20px rgba(0,0,0,.25);border-radius:6px;`;
+  document.body.appendChild(clone);
+  _ptTouch.clone = clone;
+  el.style.opacity = '.3';
+}
+
+function ptabTouchMove(ev){
+  if(!_ptTouch.key) return;
+  ev.preventDefault();
+  const t = ev.touches[0];
+  const dx = t.clientX - _ptTouch.startX;
+  const dy = t.clientY - _ptTouch.startY;
+  _ptTouch.moved = true;
+  if(_ptTouch.clone){
+    const rect = _ptTouch.origEl.getBoundingClientRect();
+    _ptTouch.clone.style.left = (rect.left+dx)+'px';
+    _ptTouch.clone.style.top  = (rect.top+dy)+'px';
+  }
+  document.querySelectorAll('.ptab').forEach(el=>{el.style.outline='';});
+  const under = ptabElementAt(t.clientX, t.clientY);
+  if(under && under !== _ptTouch.origEl) under.style.outline = '2px solid #E8630A';
+}
+
+function ptabTouchEnd(ev){
+  if(!_ptTouch.key) return;
+  const t = ev.changedTouches[0];
+  if(_ptTouch.clone){ _ptTouch.clone.remove(); _ptTouch.clone = null; }
+  if(_ptTouch.origEl) _ptTouch.origEl.style.opacity = '';
+  document.querySelectorAll('.ptab').forEach(el=>{el.style.outline='';});
+  if(_ptTouch.moved){
+    const under = ptabElementAt(t.clientX, t.clientY);
+    if(under) ptabReorder(under.dataset.pk);
+  }
+  _ptTouch = {key:null,clone:null,origEl:null,startX:0,startY:0,moved:false};
+}
+
+function ptabElementAt(x,y){
+  if(_ptTouch.clone) _ptTouch.clone.style.display='none';
+  const el = document.elementFromPoint(x,y);
+  if(_ptTouch.clone) _ptTouch.clone.style.display='';
+  return el ? el.closest('.ptab') : null;
+}
+
+function ptabReorder(targetKey){
+  const fromKey = ptabDraggingKey || _ptTouch.key;
+  ptabDraggingKey = null;
+  if(!fromKey || fromKey === targetKey) return;
+  const fromIdx = order.indexOf(fromKey);
+  const toIdx   = order.indexOf(targetKey);
+  if(fromIdx<0||toIdx<0) return;
+  order.splice(fromIdx,1);
+  order.splice(toIdx,0,fromKey);
+  if(!offline&&db&&sid) db.ref('s/'+sid+'/order').set(order);
+  renderPTabs();
+  if(typeof toast==='function') toast('ページ順を変更しました');
+}
+
+function initPtabTouchListeners(){
+  document.querySelectorAll('.ptab').forEach(el=>{
+    el.addEventListener('touchstart', ev=>ptabTouchStart(ev,el.dataset.pk), {passive:false});
+    el.addEventListener('touchmove',  ptabTouchMove, {passive:false});
+    el.addEventListener('touchend',   ptabTouchEnd);
+  });
+}
+
+
 function renderTable(){
   if(!curKey||!pages[curKey])return;
   const pg=pages[curKey], rows=pg.rows||[], mine=isMine(curKey), ro=!mine;
