@@ -4441,130 +4441,127 @@ function confirmLabelPos(){
 }
 
 // ── QRシール印刷共通ロジック（bcpPrint/nkPrintLabels から呼ばれる） ──
+// A-one 31297/31397 F200A4-1 正確寸法
+// ラベル: 20×8mm / 8列×25行
+// 左余白: 8.0mm / 上余白: 9.0mm
+// 列ピッチ: 24.86mm (20+4.86) / 行ピッチ: 11.33mm (8+3.33)
+// → 各ラベルをabsolute位置で配置（grid方式より印刷精度が高い）
 function buildQrLabelHtml(items, startPos){
   const COLS=8, ROWS=25, PER=200;
-  // startPos は 1〜200（1始まり）
+  const LW=20, LH=8;                 // ラベルサイズ mm
+  const ML=8.0, MT=9.0;              // 左・上余白 mm
+  const CP=24.86, RP=11.33;          // 列・行ピッチ mm
   const offset=Math.max(0, Math.min(199, (startPos||1)-1));
 
-  // 先頭に空ラベルを挿入
   const padded=[];
   for(let i=0;i<offset;i++) padded.push(null);
   items.forEach(p=>padded.push(p));
 
-  // シートに分割
-  let sheets='';
+  let sheetData='';
   const totalSheets=Math.ceil(padded.length/PER);
   for(let s=0;s<totalSheets;s++){
     const chunk=padded.slice(s*PER,(s+1)*PER);
-    while(chunk.length<PER) chunk.push(null);
     let cells='';
     chunk.forEach((p,ci)=>{
-      if(!p){ cells+=`<div class="lbl"></div>`; return; }
+      if(!p) return;
+      const row=Math.floor(ci/COLS), col=ci%COLS;
+      const left=(ML+col*CP).toFixed(4);
+      const top=(MT+row*RP).toFixed(4);
       const uid='qr_'+s+'_'+ci;
       const nm=String(p.name||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
-      const pr=p.price?'&yen;'+Number(p.price).toLocaleString():'';
-      const bc=String(p.barcode||p.bc||'');
-      cells+=`<div class="lbl">
-        <div class="lbl-txt">
-          <div class="lbl-name">${nm}</div>
-          <div class="lbl-price">${pr}</div>
-        </div>
-        <div class="lbl-qr" id="${uid}" data-bc="${bc.replace(/&/g,'&amp;')}"></div>
-      </div>`;
+      const pr=p.price?'\u00a5'+Number(p.price).toLocaleString():'';
+      const bc=String(p.barcode||p.bc||'').replace(/&/g,'&amp;');
+      cells+=`<div style="position:absolute;left:${left}mm;top:${top}mm;width:${LW}mm;height:${LH}mm;overflow:hidden;display:flex;align-items:center;padding:0 0.6mm;gap:0.3mm;box-sizing:border-box;">
+  <div style="flex:1;min-width:0;display:flex;flex-direction:column;justify-content:center;overflow:hidden;line-height:1.2;">
+    <div style="font-size:4.5pt;font-weight:700;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;color:#111;">${nm}</div>
+    <div style="font-size:6.5pt;font-weight:900;color:#000;white-space:nowrap;margin-top:0.3mm;letter-spacing:-0.02em;">${pr}</div>
+  </div>
+  <div id="${uid}" data-bc="${bc}" style="width:6.5mm;height:6.5mm;flex-shrink:0;overflow:hidden;display:flex;align-items:center;justify-content:center;"></div>
+</div>`;
     });
-    const sheetNum=s+1;
-    sheets+=`<div class="sheet" data-sheet="${sheetNum}">
-      <div class="grid">${cells}</div>
-    </div>`;
+    sheetData+=`<div class="sheet">${cells}</div>`;
   }
 
   const qrSrc='https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js';
   return `<!DOCTYPE html><html><head><meta charset="UTF-8">
-  <title>QRシール印刷</title>
-  <style>
-    @page{ size:A4 portrait; margin:0 }
-    *{ box-sizing:border-box; margin:0; padding:0 }
-    body{ background:#fff; font-family:'Hiragino Kaku Gothic Pro','Meiryo',sans-serif }
-    .no-print{
-      position:fixed;top:0;left:0;right:0;background:#1a1a2e;color:#fff;
-      padding:10px 16px;display:flex;gap:10px;align-items:center;z-index:9999;flex-wrap:wrap
-    }
-    .no-print button{ padding:7px 20px;border:none;border-radius:6px;font-size:13px;font-weight:700;cursor:pointer }
-    .sheets{ margin-top:52px }
-    .sheet{
-      width:210mm;height:297mm;
-      padding-top:9mm;padding-left:8mm;
-      overflow:hidden;page-break-after:always
-    }
-    .grid{
-      display:grid;
-      grid-template-columns:repeat(8,20mm);
-      grid-template-rows:repeat(25,8mm);
-      column-gap:4.86mm;
-      row-gap:3.33mm;
-    }
-    .lbl{
-      width:20mm;height:8mm;overflow:hidden;
-      display:flex;align-items:center;
-      padding:0.35mm 0.7mm;gap:0.4mm;  /* 左右余白を増やして端切れ防止 */
-    }
-    .lbl-txt{
-      flex:1;min-width:0;
-      display:flex;flex-direction:column;justify-content:center;
-      overflow:hidden;line-height:1.2;
-    }
-    .lbl-name{
-      font-size:4.5pt;font-weight:700;
-      white-space:nowrap;overflow:hidden;text-overflow:ellipsis;
-      color:#111;
-    }
-    .lbl-price{
-      font-size:6.5pt;font-weight:900;color:#000;
-      white-space:nowrap;margin-top:0.4mm;
-      letter-spacing:-0.02em;
-    }
-    .lbl-qr{
-      width:6.5mm;height:6.5mm;flex-shrink:0;  /* 少し小さくしてテキスト領域を確保 */
-      display:flex;align-items:center;justify-content:center;
-      overflow:hidden;
-    }
-    .lbl-qr canvas, .lbl-qr img{
-      width:6.5mm!important;height:6.5mm!important;
-      display:block;
-    }
-    @media print{
-      .no-print{ display:none!important }
-      .sheets{ margin-top:0 }
-      .sheet{ page-break-after:always }
-    }
-  </style>
-  </head><body>
-  <div class="no-print">
-    <span style="font-size:13px;font-weight:700">QRシール印刷　${items.length}枚（開始位置：${offset+1}番）</span>
-    <button onclick="window.print()" style="background:#1a7a4a;color:#fff">🖨️ 印刷する</button>
-    <button onclick="window.close()" style="background:#555;color:#fff">✕ 閉じる</button>
-    <span style="font-size:10px;color:#aaa">余白なし・倍率100%で印刷してください</span>
+<title>QRシール印刷</title>
+<style>
+  @page{ size:A4 portrait; margin:0 }
+  *{ box-sizing:border-box; margin:0; padding:0 }
+  body{ background:#f0f0f0; font-family:'Hiragino Kaku Gothic Pro','Meiryo',sans-serif }
+  .toolbar{
+    position:fixed;top:0;left:0;right:0;background:#1a1a2e;color:#fff;
+    padding:8px 14px;display:flex;gap:10px;align-items:center;z-index:9999;flex-wrap:wrap;
+  }
+  .toolbar button{ padding:7px 18px;border:none;border-radius:6px;font-size:13px;font-weight:700;cursor:pointer }
+  .adj-group{ display:flex;align-items:center;gap:6px;background:rgba(255,255,255,.12);padding:5px 10px;border-radius:6px; }
+  .adj-group label{ font-size:11px;color:#cce;white-space:nowrap }
+  .adj-group input[type=range]{ width:80px;accent-color:#4caf50 }
+  .adj-group span{ font-size:11px;min-width:36px;text-align:right;font-family:monospace;color:#aef }
+  .adj-hint{ font-size:10px;color:#8899aa;line-height:1.4 }
+  .sheets-wrap{ padding-top:60px }
+  .sheet{
+    position:relative;
+    width:210mm;height:297mm;
+    overflow:hidden;page-break-after:always;
+    background:#fff;
+    margin:8mm auto;
+    box-shadow:0 2px 12px rgba(0,0,0,.2);
+  }
+  @media print{
+    .toolbar{ display:none!important }
+    .sheets-wrap{ padding-top:0 }
+    .sheet{ margin:0;box-shadow:none }
+  }
+</style>
+</head><body>
+<div class="toolbar">
+  <div>
+    <div style="font-size:13px;font-weight:700">\uD83D\uDDA8\uFE0F QR\u30b7\u30fc\u30eb\u5370\u5237 &nbsp; ${items.length}\u679a &nbsp;\u958b\u59cb\uff1a${offset+1}\u756a</div>
   </div>
-  <div class="sheets">${sheets}</div>
-  <script src="${qrSrc}"><\/script>
-  <script>
-    window.onload=function(){
-      var els=document.querySelectorAll('[data-bc]');
-      els.forEach(function(el){
-        var bc=el.getAttribute('data-bc');
-        if(!bc) return;
-        try{
-          new QRCode(el,{
-            text:bc,
-            width:26,height:26,
-            colorDark:'#000000',colorLight:'#ffffff',
-            correctLevel:QRCode.CorrectLevel.M
-          });
-        }catch(e){}
-      });
-    };
-  <\/script>
-  </body></html>`;
+  <div class="adj-group">
+    <label>\u5de6\u53f3\u8abf\u6574</label>
+    <input type="range" id="adjX" min="-5" max="5" step="0.1" value="0" oninput="applyAdj()">
+    <span id="adjXv">0.0mm</span>
+  </div>
+  <div class="adj-group">
+    <label>\u4e0a\u4e0b\u8abf\u6574</label>
+    <input type="range" id="adjY" min="-5" max="5" step="0.1" value="0" oninput="applyAdj()">
+    <span id="adjYv">0.0mm</span>
+  </div>
+  <button onclick="window.print()" style="background:#1a7a4a;color:#fff">\uD83D\uDDA8\uFE0F \u5370\u5237\u3059\u308b</button>
+  <button onclick="window.close()" style="background:#555;color:#fff">\u2715 \u9589\u3058\u308b</button>
+  <div class="adj-hint">\u4f59\u767d\u306a\u3057\u30fb\u500d\u738b100%\u3067\u5370\u5237\u3057\u3066\u304f\u3060\u3055\u3044\u3002<br>\u305a\u308c\u3066\u3044\u308b\u5834\u5408\u306f\u300c\u5de6\u53f3\u8abf\u6574\u300d\u300c\u4e0a\u4e0b\u8abf\u6574\u300d\u3067\u5fae\u8abf\u6574\u3057\u3066\u304f\u3060\u3055\u3044</div>
+</div>
+<div class="sheets-wrap" id="sheetsWrap">${sheetData}</div>
+<script src="${qrSrc}"><\/script>
+<script>
+var _adjX=0, _adjY=0;
+function applyAdj(){
+  _adjX=parseFloat(document.getElementById('adjX').value)||0;
+  _adjY=parseFloat(document.getElementById('adjY').value)||0;
+  document.getElementById('adjXv').textContent=(_adjX>=0?'+':'')+_adjX.toFixed(1)+'mm';
+  document.getElementById('adjYv').textContent=(_adjY>=0?'+':'')+_adjY.toFixed(1)+'mm';
+  var sheets=document.querySelectorAll('.sheet');
+  sheets.forEach(function(sh){
+    sh.style.marginLeft = _adjX + 'mm';
+    sh.style.paddingTop = _adjY + 'mm';
+    sh.style.paddingLeft = _adjX + 'mm';
+  });
+}
+window.onload=function(){
+  var els=document.querySelectorAll('[data-bc]');
+  els.forEach(function(el){
+    var bc=el.getAttribute('data-bc'); if(!bc)return;
+    try{
+      new QRCode(el,{text:bc,width:25,height:25,
+        colorDark:'#000',colorLight:'#fff',
+        correctLevel:QRCode.CorrectLevel.M});
+    }catch(e){}
+  });
+};
+<\/script>
+</body></html>`;
 }
 // ── QRシール印刷（棚卸タブ）──
 function bcpPrint(startPos){
