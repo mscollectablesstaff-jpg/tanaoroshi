@@ -5,7 +5,10 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>棚卸システム v3</title>
 <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+JP:wght@400;700;900&display=swap" rel="stylesheet">
-<script src="https://cdn.jsdelivr.net/npm/encoding-japanese@2.0.0/encoding.min.js">// ============================================================
+<script src="https://cdn.jsdelivr.net/npm/encoding-japanese@2.0.0/encoding.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+<script>
+// ============================================================
 // 入荷・商品登録管理
 // ============================================================
 const PK  = 'tb_products_v1';  // 商品マスタ
@@ -280,7 +283,7 @@ function nkParseOcrLines(lines){
 }
 
 
-
+async function nkRunClaudeOcr(){
   const hint=(document.getElementById('nkOcrHint').value||'').trim();
   const hintText=hint?`\n\n補足指示：${hint}`:'';
 
@@ -364,6 +367,7 @@ function nkParseOcrLines(lines){
   }
   btn.disabled=false;
 }
+
 
 
 // ページ起動
@@ -648,7 +652,8 @@ function nkRenderHistory(){
 }
 
 
-<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+
+</script>
 <style>
 *{margin:0;padding:0;box-sizing:border-box}
 html,body{width:100%;min-height:100vh;font-family:'Noto Sans JP',sans-serif;font-size:13px;background:#f0f2f5;color:#1a2332}
