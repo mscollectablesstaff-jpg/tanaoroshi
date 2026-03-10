@@ -4679,7 +4679,11 @@ function bcpClearAllBarcodes(){
 
 // ─── 描画 ──────────────────────────────────────────────────
 
+// 選択中のページキーセット（ページチェックで商品エリアを表示）
+let _bcpCheckedPages = new Set();
+
 function bcpRender(){
+  _bcpCheckedPages = new Set();
   bcpRenderSections();
 }
 
@@ -4687,78 +4691,152 @@ function bcpRenderSections(){
   const container = document.getElementById('bcpPageSections');
   if(!container){ console.error('bcpPageSections not found'); return; }
 
-  let data, total;
+  let data;
   try{
     data = bcpGetPagedData();
-    total = data.reduce((s, pg) => s + pg.items.length, 0);
-    console.log('[BCP] sections:', data.length, 'total items:', total,
-      'order:', order.length, 'master:', nkGetProducts().length);
+    console.log('[BCP] sections:', data.length, 'order:', order.length, 'master:', nkGetProducts().length);
   }catch(err){
     container.innerHTML = '<div style="color:red;padding:16px">⚠️ エラー: '+err.message+'</div>';
-    console.error('[BCP] bcpGetPagedData error:', err);
     return;
   }
 
+  const total = data.reduce((s, pg) => s + pg.items.length, 0);
   if(!total){
     container.innerHTML = '<div style="text-align:center;color:#aab;padding:32px;font-size:13px">'
-      +'商品がありません。<br>棚卸入力か商品マスタに商品を登録してください。<br>'
-      +'<small style="color:#c99">(order:'+order.length+' master:'+nkGetProducts().length+')</small></div>';
+      +'商品がありません。<br>棚卸入力か商品マスタに商品を登録してください。</div>';
     bcpUpdateCount();
     return;
   }
 
-  container.innerHTML = data.map((pg, pi) => {
-    const rows = pg.items.map((item, ii) => {
-      const hasBC = !!item.barcode;
-      const chkId = 'bcpChk_' + pi + '_' + ii;
-      const bcDisp = hasBC
-        ? '<span style="font-family:monospace;font-size:11px;color:#1a6ea6;background:#eef4ff;padding:2px 6px;border-radius:4px">' + e(item.barcode) + '</span>'
-        : '<button onclick="bcpAssignOne(' + pi + ',' + ii + ')" style="padding:3px 10px;background:#e8f4e8;color:#1a7a4a;border:1px solid #a8d4a8;border-radius:4px;font-size:11px;font-weight:700;cursor:pointer;font-family:inherit">＋ 発番</button>';
-      const priceDisp = item.price ? ('¥' + Number(item.price).toLocaleString()) : '—';
-      return '<div style="display:flex;align-items:center;gap:8px;padding:6px 10px;border-bottom:1px solid #f4f6f8">' +
-        '<input type="checkbox" id="' + chkId + '"' + (hasBC ? '' : ' disabled title="発番後に選択できます"') +
-        ' style="width:16px;height:16px;flex-shrink:0;cursor:' + (hasBC ? 'pointer' : 'not-allowed') + ';accent-color:#1a6ea6" onchange="bcpUpdateCount()">' +
-        '<span style="flex:1;font-size:12px;color:#0f2744;font-weight:600;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">' + e(item.name) + '</span>' +
-        '<span style="font-size:12px;color:#555;min-width:64px;text-align:right;flex-shrink:0">' + priceDisp + '</span>' +
-        '<span style="min-width:120px;text-align:right;flex-shrink:0">' + bcDisp + '</span>' +
-        '</div>';
+  // ── STEP1: ページ（カテゴリー）チェックリスト ──
+  const step1 = data.map((pg, pi) => {
+    const key  = pg.pageKey;
+    const isOn = _bcpCheckedPages.has(key);
+    const bcCnt  = pg.items.filter(it => it.barcode).length;
+    const allCnt = pg.items.length;
+    const badge  = bcCnt < allCnt
+      ? '<span style="font-size:10px;background:#fff3e0;color:#c06000;border-radius:4px;padding:1px 6px;font-weight:700;white-space:nowrap">発番済 '+bcCnt+'/'+allCnt+'</span>'
+      : '<span style="font-size:10px;background:#e8f5e9;color:#1a7a4a;border-radius:4px;padding:1px 6px;font-weight:700;white-space:nowrap">✓ 全発番済 '+allCnt+'</span>';
+    return '<label style="display:flex;align-items:center;gap:10px;padding:10px 14px;'
+      +'border-bottom:1px solid #eef1f6;cursor:pointer;transition:.1s;'
+      +(isOn ? 'background:#eef4ff;' : 'background:#fff;')
+      +'" onmouseover="this.style.background=\''+(isOn?'#e4edff':'#f8faff')+'\'" '
+      +'onmouseout="this.style.background=\''+(isOn?'#eef4ff':'#fff')+'\'">'
+      +'<input type="checkbox" '+(isOn?'checked':'')
+      +' style="width:18px;height:18px;accent-color:#1a6ea6;cursor:pointer;flex-shrink:0"'
+      +' onchange="bcpTogglePage(\''+key+'\','+pi+',this.checked)">'
+      +'<span style="font-size:13px;font-weight:700;color:#0f2744;flex:1">'+e(pg.pageLabel)+'</span>'
+      + badge
+      +'</label>';
+  }).join('');
+
+  // ── STEP2: 選択中ページの商品リスト ──
+  let step2html = '';
+  const checkedData = data.filter(pg => _bcpCheckedPages.has(pg.pageKey));
+
+  if(checkedData.length > 0){
+    const productRows = checkedData.map((pg, gi) => {
+      const pgRows = pg.items.map((item, ii) => {
+        const hasBC = !!item.barcode;
+        const globalId = 'bcpChk_' + pg.pageKey.replace(/[^a-zA-Z0-9]/g,'_') + '_' + ii;
+        const bcDisp = hasBC
+          ? '<span style="font-family:monospace;font-size:11px;color:#1a6ea6;background:#eef4ff;padding:2px 7px;border-radius:4px">'+ e(item.barcode) +'</span>'
+          : '<button onclick="bcpAssignOneByKey(\''+pg.pageKey+'\','+ii+')" '
+            +'style="padding:3px 10px;background:#e8f4e8;color:#1a7a4a;border:1px solid #a8d4a8;'
+            +'border-radius:4px;font-size:11px;font-weight:700;cursor:pointer;font-family:inherit">＋ 発番</button>';
+        const priceDisp = item.price ? ('¥'+Number(item.price).toLocaleString()) : '—';
+        return '<div style="display:flex;align-items:center;gap:8px;padding:7px 14px;border-bottom:1px solid #f0f4f8">'
+          +'<input type="checkbox" id="'+globalId+'"'+(hasBC?'':' disabled title="発番後に選択できます"')
+          +' style="width:16px;height:16px;flex-shrink:0;cursor:'+(hasBC?'pointer':'not-allowed')+';accent-color:#1a6ea6" onchange="bcpUpdateCount()">'
+          +'<span style="flex:1;font-size:12px;font-weight:600;color:#0f2744;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">'+ e(item.name) +'</span>'
+          +'<span style="font-size:12px;color:#555;min-width:60px;text-align:right;flex-shrink:0">'+ priceDisp +'</span>'
+          +'<span style="min-width:110px;text-align:right;flex-shrink:0">'+ bcDisp +'</span>'
+          +'</div>';
+      }).join('');
+
+      return '<div style="margin-bottom:2px">'
+        +'<div style="background:#dde6f2;padding:5px 14px;display:flex;align-items:center;gap:8px;border-bottom:1px solid #c5d4e8">'
+        +'<span style="font-size:11px;font-weight:700;color:#1a4a7a;flex:1">📂 '+e(pg.pageLabel)+'　<span style="font-weight:400;color:#6b7a8d">'+pg.items.length+'件</span></span>'
+        +'<button onclick="bcpSelectByKey(\''+pg.pageKey+'\',true)" style="padding:2px 9px;font-size:10px;background:#fff;border:1px solid #c5d4e8;border-radius:4px;cursor:pointer;font-family:inherit">全選択</button>'
+        +'<button onclick="bcpSelectByKey(\''+pg.pageKey+'\',false)" style="padding:2px 9px;font-size:10px;background:#fff;border:1px solid #c5d4e8;border-radius:4px;cursor:pointer;font-family:inherit">全解除</button>'
+        +'</div>'
+        +'<div>'+pgRows+'</div>'
+        +'</div>';
     }).join('');
 
-    return '<div style="margin-bottom:10px;border:1px solid #e0e6ed;border-radius:8px;overflow:hidden">' +
-      '<div style="background:#f2f5f9;padding:8px 12px;display:flex;align-items:center;gap:8px;border-bottom:1px solid #e0e6ed">' +
-      '<span style="font-size:13px;font-weight:700;color:#0f2744;flex:1">📋 ' + e(pg.pageLabel) + '</span>' +
-      '<button onclick="bcpSelectPage(' + pi + ',true)" style="padding:3px 10px;font-size:11px;background:#fff;border:1px solid #dde3ea;border-radius:4px;cursor:pointer;font-family:inherit">全選択</button>' +
-      '<button onclick="bcpSelectPage(' + pi + ',false)" style="padding:3px 10px;font-size:11px;background:#fff;border:1px solid #dde3ea;border-radius:4px;cursor:pointer;font-family:inherit">全解除</button>' +
-      '<span style="font-size:11px;color:#6b7a8d">' + pg.items.length + '件</span>' +
-      '</div>' +
-      '<div>' + rows + '</div>' +
-      '</div>';
-  }).join('');
+    step2html = '<div style="margin-top:12px;border:1.5px solid #1a6ea6;border-radius:8px;overflow:hidden">'
+      +'<div style="background:#1a6ea6;padding:8px 14px;display:flex;align-items:center;gap:8px">'
+      +'<span style="font-size:13px;font-weight:700;color:#fff;flex:1">② 印刷する商品を選んでください</span>'
+      +'<button onclick="bcpSelectAllInView(true)" style="padding:4px 12px;font-size:11px;background:rgba(255,255,255,.2);color:#fff;border:1px solid rgba(255,255,255,.4);border-radius:4px;cursor:pointer;font-family:inherit">全選択</button>'
+      +'<button onclick="bcpSelectAllInView(false)" style="padding:4px 12px;font-size:11px;background:rgba(255,255,255,.2);color:#fff;border:1px solid rgba(255,255,255,.4);border-radius:4px;cursor:pointer;font-family:inherit">全解除</button>'
+      +'</div>'
+      +'<div style="background:#fff">'+productRows+'</div>'
+      +'</div>';
+  } else {
+    step2html = '<div style="margin-top:12px;background:#f8faff;border:1.5px dashed #c5d4e8;border-radius:8px;'
+      +'padding:20px;text-align:center;font-size:12px;color:#8899bb">'
+      +'↑ 上のカテゴリーにチェックを入れると商品が表示されます</div>';
+  }
+
+  container.innerHTML =
+    '<div style="border:1.5px solid #e0e6ed;border-radius:8px;overflow:hidden;margin-bottom:0">'
+    +'<div style="background:#0f2744;padding:8px 14px">'
+    +'<span style="font-size:13px;font-weight:700;color:#fff">① 印刷するカテゴリーを選んでください</span>'
+    +'</div>'
+    +'<div style="background:#fff">'+step1+'</div>'
+    +'</div>'
+    + step2html;
 
   bcpUpdateCount();
 }
 
-function bcpAssignOne(pi, ii){
+// ページチェック切替
+function bcpTogglePage(key, pi, checked){
+  if(checked) _bcpCheckedPages.add(key);
+  else _bcpCheckedPages.delete(key);
+  bcpRenderSections();
+}
+
+// 商品キーで全選択/解除
+function bcpSelectByKey(key, val){
+  const safeKey = key.replace(/[^a-zA-Z0-9]/g,'_');
+  document.querySelectorAll('[id^="bcpChk_'+safeKey+'_"]:not([disabled])').forEach(cb=>{ cb.checked=val; });
+  bcpUpdateCount();
+}
+
+// 表示中の全商品を選択/解除
+function bcpSelectAllInView(val){
+  document.querySelectorAll('#bcpPageSections input[type=checkbox]:not([disabled])').forEach(cb=>{ cb.checked=val; });
+  bcpUpdateCount();
+}
+
+// 発番（キーとインデックスで特定）
+function bcpAssignOneByKey(key, ii){
   const data = bcpGetPagedData();
-  const pg = data[pi]; if(!pg) return;
+  const pg = data.find(d => d.pageKey === key); if(!pg) return;
   const item = pg.items[ii]; if(!item) return;
   try{
     const bc = bcpAssignBarcode(item);
     toast('発番しました: ' + bc);
     bcpRenderSections();
-  } catch(e){ alert(e.message); }
+  } catch(err){ alert(err.message); }
+}
+
+// 旧関数（互換用）
+function bcpAssignOne(pi, ii){
+  const data = bcpGetPagedData();
+  const pg = data[pi]; if(!pg) return;
+  bcpAssignOneByKey(pg.pageKey, ii);
 }
 
 function bcpSelectPage(pi, val){
-  const sections = document.querySelectorAll('#bcpPageSections > div');
-  const sec = sections[pi]; if(!sec) return;
-  sec.querySelectorAll('input[type=checkbox]:not([disabled])').forEach(cb => { cb.checked = val; });
-  bcpUpdateCount();
+  const data = bcpGetPagedData();
+  const pg = data[pi]; if(!pg) return;
+  bcpSelectByKey(pg.pageKey, val);
 }
 
 function bcpSelectAllGlobal(val){
-  document.querySelectorAll('#bcpPageSections input[type=checkbox]:not([disabled])').forEach(cb => { cb.checked = val; });
-  bcpUpdateCount();
+  bcpSelectAllInView(val);
 }
 
 function bcpUpdateCount(){
@@ -4766,6 +4844,8 @@ function bcpUpdateCount(){
   const el = document.getElementById('bcpSelectedCount');
   if(el) el.textContent = n + '件選択中';
 }
+
+
 
 // ─── ピッカー ──────────────────────────────────────────────
 
