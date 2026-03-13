@@ -353,12 +353,12 @@ tbody td{padding:7px 10px;vertical-align:middle}
 <!-- バーコード振り直しモーダル -->
 <div class="ov" id="bcResetOv" style="display:none" onclick="if(event.target===this)closeBcReset()">
 <div class="md" style="max-width:560px">
-  <div class="mh"><h2>🔢 バーコード振り直し（13桁）</h2><button class="mc" onclick="closeBcReset()">✕</button></div>
+  <div class="mh"><h2>🔢 バーコード振り直し（8桁）</h2><button class="mc" onclick="closeBcReset()">✕</button></div>
   <div class="mb">
 
     <div style="background:#e8f0fb;border-radius:8px;padding:10px 14px;font-size:12px;color:#1a3a5c;margin-bottom:14px">
-      📌 <b style="font-family:monospace">2XXXXXXXXXXX C</b>　2固定 ＋ 11桁連番 ＋ チェックディジット自動計算（EAN-13）<br>
-      <span style="color:#6b7a8d">例：<b style="font-family:monospace">2000000000015</b>、<b style="font-family:monospace">2000000000022</b>…（Airレジ自動発番と同じ形式）</span>
+      📌 <b style="font-family:monospace">2XXXXXX C</b>　2固定 ＋ 6桁連番 ＋ チェックディジット自動計算（EAN-8）<br>
+      <span style="color:#6b7a8d">例：<b style="font-family:monospace">20000011</b>、<b style="font-family:monospace">20000028</b>…</span>
     </div>
 
     <!-- 開始番号 & 全選択 -->
@@ -861,17 +861,17 @@ function doAirUpdate(){
 }
 
 
-// ===== バーコード振り直し（商品選択式・EAN-13固定） =====
-// EAN-13: 2 + 11桁連番 + チェックディジット1桁 = 13桁
-function calcEan13Check(body12){
-  // 奇数位置×1、偶数位置×3（左から1始まり）
-  const d = body12.split('').map(Number);
-  const sum = d.reduce((s,v,i) => s + v * (i%2===0 ? 1 : 3), 0);
+// ===== バーコード振り直し（商品選択式・EAN-8固定） =====
+// EAN-8: 2 + 6桁連番 + チェックディジット1桁 = 8桁
+function calcEan8Check(body7){
+  // 奇数位置×3、偶数位置×1（左から1始まり）
+  const d = body7.split('').map(Number);
+  const sum = d.reduce((s,v,i) => s + v * (i%2===0 ? 3 : 1), 0);
   return (10 - (sum % 10)) % 10;
 }
 function genBarcode(seq){
-  const body = '2' + String(seq).padStart(11, '0');
-  return body + calcEan13Check(body);
+  const body = '2' + String(seq).padStart(6, '0');
+  return body + calcEan8Check(body);
 }
 
 // 選択状態（productId → true/false）
