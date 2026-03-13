@@ -329,13 +329,13 @@ function buildMapTable(){
 }
 
 function buildResult(){
-  const an=new Set(airRows.map(r=>norm(r.name)));
-  // 商品マスタを名前→行 のMapに
-  const tanMap=new Map(tanRows.map(r=>[norm(r.name),r]));
+  const an=new Set(airRows.map(r=>normKey(r.name,r.cols[C.price]||'')));
+  // 商品マスタを「名前＋価格」→行 のMapに（同名異価格を区別）
+  const tanMap=new Map(tanRows.map(r=>[normKey(r.name,r.price),r]));
   merged=[];
   // Airレジ既存CSV（ある場合のみ）
   airRows.forEach(r=>{
-    const tanR=tanMap.get(norm(r.name));
+    const tanR=tanMap.get(normKey(r.name,r.cols[C.price]||''));
     // 商品マスタに同名があり、バーコードが新しく設定されている場合は上書き
     const newBc = tanR?.barcode || '';
     const airBc = r.barcode || '';
@@ -349,7 +349,7 @@ function buildResult(){
   });
   // 商品マスタ / 棚卸CSV
   tanRows.forEach(r=>{
-    const isDup=an.has(norm(r.name));
+    const isDup=an.has(normKey(r.name,r.price));
     const pg=pageMap[r.page]||{};
     merged.push({status:isDup?'dup':'new',name:r.name,price:r.price,
       taxRate:r.tax==='8%'?'軽減税率':'標準税率',
@@ -457,6 +457,7 @@ function doDownload(){
 }
 
 function norm(s){return String(s||'').trim().replace(/\s+/g,' ')}
+function normKey(name,price){return norm(name)+'__'+String(price||'').replace(/[¥,\s]/g,'')}
 function esc(s){return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;')}
 function csvQ(s){s=String(s||'');return(s.includes(',')||s.includes('"')||s.includes('\n'))?'"'+s.replace(/"/g,'""')+'"':s}
 function splitLine(line){
