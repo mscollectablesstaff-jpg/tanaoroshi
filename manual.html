@@ -1,0 +1,632 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>業務ツール 使い方マニュアル — m's collectables</title>
+<style>
+@import url('https://fonts.googleapis.com/css2?family=Noto+Sans+JP:wght@400;500;700;900&family=Noto+Serif+JP:wght@600&display=swap');
+*{box-sizing:border-box;margin:0;padding:0}
+:root{
+  --ink:#0d1b2a;--cream:#f8f5f0;--gold:#c9a84c;
+  --blue:#1a3a6c;--blue-l:#e8f0fb;
+  --green:#1a5c2e;--green-l:#e8f5ec;
+  --red:#b91c1c;--red-l:#fef2f2;
+  --orange:#c06000;--orange-l:#fff7ed;
+  --gray:#6b7a8d;--border:#dde3ea;
+}
+body{font-family:'Noto Sans JP',sans-serif;background:var(--cream);color:var(--ink);font-size:14px;line-height:1.7}
+
+/* ===== ヘッダー ===== */
+.site-header{background:linear-gradient(135deg,#0d1b2a,#1a3a6c);color:#fff;padding:0}
+.header-inner{max-width:900px;margin:0 auto;padding:36px 24px 32px}
+.header-brand{font-size:11px;letter-spacing:.3em;text-transform:uppercase;color:rgba(255,255,255,.5);margin-bottom:8px}
+.header-title{font-family:'Noto Serif JP',serif;font-size:clamp(22px,4vw,32px);font-weight:600;line-height:1.3;margin-bottom:10px}
+.header-title span{color:var(--gold)}
+.header-sub{font-size:12px;color:rgba(255,255,255,.6);line-height:1.8}
+.header-badge{display:inline-block;background:rgba(201,168,76,.2);border:1px solid rgba(201,168,76,.4);color:var(--gold);font-size:10px;font-weight:700;padding:3px 10px;border-radius:20px;letter-spacing:.1em;margin-bottom:14px}
+
+/* ===== ナビ ===== */
+.nav{background:#fff;border-bottom:2px solid var(--gold);position:sticky;top:0;z-index:100;box-shadow:0 2px 12px rgba(0,0,0,.08)}
+.nav-inner{max-width:900px;margin:0 auto;padding:0 24px;display:flex;gap:0;overflow-x:auto}
+.nav a{display:block;padding:14px 16px;font-size:12px;font-weight:700;color:var(--gray);text-decoration:none;white-space:nowrap;border-bottom:3px solid transparent;transition:.2s;margin-bottom:-2px}
+.nav a:hover,.nav a.active{color:var(--blue);border-bottom-color:var(--blue)}
+.nav a .num{display:inline-block;background:var(--blue);color:#fff;font-size:10px;border-radius:50%;width:18px;height:18px;text-align:center;line-height:18px;margin-right:5px}
+
+/* ===== メイン ===== */
+.main{max-width:900px;margin:0 auto;padding:32px 24px 80px}
+.section{margin-bottom:56px}
+.section-title{font-family:'Noto Serif JP',serif;font-size:20px;font-weight:600;color:var(--ink);border-left:4px solid var(--gold);padding-left:14px;margin-bottom:24px;line-height:1.4}
+.section-sub{font-size:17px;font-weight:700;color:var(--blue);margin:28px 0 14px;display:flex;align-items:center;gap:8px}
+.section-sub::before{content:'';display:block;width:6px;height:6px;background:var(--gold);border-radius:50%}
+
+/* ===== フローチャート ===== */
+.flow{display:flex;align-items:center;gap:0;margin:20px 0 28px;flex-wrap:wrap}
+.flow-item{background:#fff;border:2px solid var(--border);border-radius:10px;padding:12px 16px;font-size:12px;font-weight:700;text-align:center;min-width:110px;position:relative;box-shadow:0 1px 4px rgba(0,0,0,.05)}
+.flow-item .fi-num{display:block;font-size:9px;color:var(--gray);font-weight:400;margin-bottom:2px;letter-spacing:.05em}
+.flow-item .fi-icon{font-size:20px;display:block;margin-bottom:4px}
+.flow-arrow{font-size:20px;color:var(--gold);padding:0 6px;flex-shrink:0}
+.flow-item.hi{border-color:var(--blue);background:var(--blue-l)}
+
+/* ===== ステップ ===== */
+.steps{display:flex;flex-direction:column;gap:16px}
+.step{display:flex;gap:16px;align-items:flex-start}
+.step-num{width:32px;height:32px;background:var(--blue);color:#fff;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:13px;font-weight:900;flex-shrink:0;margin-top:2px}
+.step-body{flex:1}
+.step-title{font-weight:700;font-size:14px;margin-bottom:6px;color:var(--ink)}
+.step-desc{font-size:13px;color:#374151;line-height:1.75}
+
+/* ===== ボタン再現 ===== */
+.ui-btn{display:inline-flex;align-items:center;gap:5px;padding:6px 13px;border-radius:6px;font-size:12px;font-weight:700;font-family:inherit;border:none;cursor:default;vertical-align:middle;white-space:nowrap}
+.btn-dark{background:#1a2a3a;color:#fff}
+.btn-blue{background:#1a3a6c;color:#fff}
+.btn-green{background:#1a5c2e;color:#fff}
+.btn-orange{background:#c06000;color:#fff}
+.btn-gold{background:var(--gold);color:#fff}
+.btn-outline{background:#fff;color:var(--ink);border:1.5px solid var(--border)}
+.btn-red{background:var(--red);color:#fff}
+.btn-teal{background:#0e7490;color:#fff}
+
+/* ===== コールアウト ===== */
+.callout{border-radius:10px;padding:14px 18px;margin:14px 0;font-size:13px;line-height:1.75;display:flex;gap:12px;align-items:flex-start}
+.callout-icon{font-size:20px;flex-shrink:0;margin-top:1px}
+.callout-body{flex:1}
+.callout-body b{display:block;font-size:13px;margin-bottom:2px}
+.c-warn{background:var(--red-l);border:1px solid #fca5a5}
+.c-info{background:var(--blue-l);border:1px solid #bfdbfe}
+.c-tip{background:var(--green-l);border:1px solid #86efac}
+.c-note{background:var(--orange-l);border:1px solid #fdba74}
+
+/* ===== 画面モック ===== */
+.mock{background:#fff;border:2px solid var(--border);border-radius:10px;overflow:hidden;margin:14px 0;box-shadow:0 2px 12px rgba(0,0,0,.07)}
+.mock-bar{background:#1a2a3a;padding:10px 14px;display:flex;align-items:center;gap:8px}
+.mock-bar-title{color:#fff;font-size:12px;font-weight:700;flex:1}
+.mock-bar-dot{width:9px;height:9px;border-radius:50%;background:#ff5f57;margin-right:2px}
+.mock-bar-dot+.mock-bar-dot{background:#febc2e}
+.mock-bar-dot+.mock-bar-dot+.mock-bar-dot{background:#28c840}
+.mock-body{padding:14px 16px}
+.mock-toolbar{display:flex;gap:6px;flex-wrap:wrap;padding:10px 14px;background:#f5f7fa;border-bottom:1px solid var(--border)}
+.mock-row{display:flex;align-items:center;gap:10px;padding:8px 12px;border-bottom:1px solid #f0f2f5;font-size:12px}
+.mock-row:last-child{border-bottom:none}
+
+/* ===== ハイライトアニメーション ===== */
+@keyframes pulse-ring{0%{box-shadow:0 0 0 0 rgba(201,168,76,.6)}70%{box-shadow:0 0 0 8px rgba(201,168,76,0)}100%{box-shadow:0 0 0 0 rgba(201,168,76,0)}}
+.hi-btn{animation:pulse-ring 1.8s infinite;border-radius:6px;display:inline-flex}
+@keyframes bounce-arrow{0%,100%{transform:translateX(0)}50%{transform:translateX(5px)}}
+.bounce{animation:bounce-arrow 1s infinite}
+
+/* ===== テーブル ===== */
+table{width:100%;border-collapse:collapse;font-size:12px;margin:10px 0}
+th{background:#1a2a3a;color:#fff;padding:8px 12px;text-align:left;font-weight:700}
+td{padding:7px 12px;border-bottom:1px solid var(--border)}
+tr:nth-child(even) td{background:#f8f9fb}
+
+/* ===== 区切り ===== */
+.divider{height:1px;background:linear-gradient(90deg,transparent,var(--gold),transparent);margin:48px 0}
+
+/* ===== チェックリスト ===== */
+.checklist{list-style:none;display:flex;flex-direction:column;gap:8px;margin:10px 0}
+.checklist li{display:flex;gap:10px;align-items:flex-start;font-size:13px}
+.checklist li::before{content:'✅';flex-shrink:0}
+
+/* ===== 画面スクリーン枠 ===== */
+.screen{background:#f0f4f8;border:2px solid var(--border);border-radius:10px;padding:16px;margin:14px 0;position:relative}
+.screen-label{position:absolute;top:-11px;left:14px;background:var(--blue);color:#fff;font-size:10px;font-weight:700;padding:2px 10px;border-radius:20px;letter-spacing:.05em}
+
+/* ===== 矢印付き説明 ===== */
+.point{display:flex;align-items:flex-start;gap:10px;margin:8px 0;font-size:13px}
+.point-arrow{color:var(--gold);font-size:18px;flex-shrink:0;margin-top:-1px}
+
+/* ===== フッター ===== */
+footer{background:#0d1b2a;color:rgba(255,255,255,.4);text-align:center;padding:24px;font-size:11px}
+
+/* ===== 印刷非表示 ===== */
+@media print{.nav{display:none}.main{padding:0 0 40px}}
+</style>
+</head>
+<body>
+
+<div class="site-header">
+  <div class="header-inner">
+    <div class="header-brand">m's collectables</div>
+    <div class="header-badge">STAFF MANUAL</div>
+    <h1 class="header-title">業務ツール<span>使い方マニュアル</span></h1>
+    <div class="header-sub">
+      商品マスタ管理 / Airレジ CSV統合ツール / ラベル印刷ツール / 棚卸システム<br>
+      ※ このマニュアルをブラウザで開いておくと確認しながら作業できます
+    </div>
+  </div>
+</div>
+
+<nav class="nav">
+  <div class="nav-inner">
+    <a href="#overview"><span class="num">0</span>全体の流れ</a>
+    <a href="#master"><span class="num">1</span>商品マスタ管理</a>
+    <a href="#aircsv"><span class="num">2</span>Airレジ統合ツール</a>
+    <a href="#label"><span class="num">3</span>ラベル印刷</a>
+    <a href="#inventory"><span class="num">4</span>棚卸システム</a>
+    <a href="#faq"><span class="num">❓</span>よくある質問</a>
+  </div>
+</nav>
+
+<div class="main">
+
+<!-- ===== 0. 全体の流れ ===== -->
+<section class="section" id="overview">
+  <h2 class="section-title">0. 全体の流れ</h2>
+  <p style="margin-bottom:16px;font-size:13px;color:#374151">4つのツールがあります。普段の業務では下の順番で使います。</p>
+
+  <div class="flow">
+    <div class="flow-item">
+      <span class="fi-icon">📦</span>
+      <span class="fi-num">STEP 1</span>
+      商品マスタ管理
+    </div>
+    <div class="flow-arrow bounce">→</div>
+    <div class="flow-item">
+      <span class="fi-icon">🏷️</span>
+      <span class="fi-num">STEP 2</span>
+      Airレジ<br>統合ツール
+    </div>
+    <div class="flow-arrow bounce">→</div>
+    <div class="flow-item">
+      <span class="fi-icon">🖨</span>
+      <span class="fi-num">STEP 3</span>
+      ラベル<br>印刷ツール
+    </div>
+    <div class="flow-arrow" style="color:#aaa">／</div>
+    <div class="flow-item">
+      <span class="fi-icon">📋</span>
+      <span class="fi-num">別途</span>
+      棚卸<br>システム
+    </div>
+  </div>
+
+  <table>
+    <tr><th>ツール</th><th>何をするツール？</th><th>使うタイミング</th></tr>
+    <tr><td>📦 商品マスタ管理</td><td>商品の登録・編集、バーコード振り直し、CSVの書き出し</td><td>新商品入荷時・バーコード変更時</td></tr>
+    <tr><td>🏷️ Airレジ統合ツール</td><td>商品マスタのCSVをAirレジに取り込める形式に変換</td><td>商品マスタを更新したとき</td></tr>
+    <tr><td>🖨 ラベル印刷（ラベル屋さん）</td><td>ラベルCSVをラベル屋さんで読み込んで印刷</td><td>ラベルを貼り替えるとき</td></tr>
+    <tr><td>📋 棚卸システム</td><td>棚卸の入力・集計・CSV出力</td><td>棚卸のとき</td></tr>
+  </table>
+
+  <div class="callout c-info" style="margin-top:16px">
+    <span class="callout-icon">🌐</span>
+    <div class="callout-body">
+      <b>ツールはすべてブラウザで開きます</b>
+      GitHubのURLをブックマークしておくと便利です。インターネットがつながっていれば、どのパソコンからでも使えます。
+    </div>
+  </div>
+</section>
+
+<div class="divider"></div>
+
+<!-- ===== 1. 商品マスタ管理 ===== -->
+<section class="section" id="master">
+  <h2 class="section-title">1. 商品マスタ管理</h2>
+
+  <!-- 1-1. 商品を登録する -->
+  <div class="section-sub">商品を新しく登録する</div>
+  <div class="steps">
+    <div class="step">
+      <div class="step-num">1</div>
+      <div class="step-body">
+        <div class="step-title">「＋ 商品追加」ボタンを押す</div>
+        <div class="step-desc">
+          画面右上の <span class="hi-btn"><span class="ui-btn btn-outline">＋ 商品追加</span></span> を押します。<br>
+          入力フォームが画面右側にスライドして開きます。
+        </div>
+      </div>
+    </div>
+    <div class="step">
+      <div class="step-num">2</div>
+      <div class="step-body">
+        <div class="step-title">必要な項目を入力する</div>
+        <div class="step-desc">
+          <b>必須：</b>商品名・税込価格・税率（10%か8%）<br>
+          <b>任意：</b>カテゴリー・単位・仕入先・仕入単価・備考<br>
+          バーコードは後で一括で振り直せるので、最初は空白でOKです。
+        </div>
+      </div>
+    </div>
+    <div class="step">
+      <div class="step-num">3</div>
+      <div class="step-body">
+        <div class="step-title">「保存」ボタンを押す</div>
+        <div class="step-desc">
+          フォーム下部の <span class="ui-btn btn-blue">💾 保存</span> を押します。<br>
+          一覧に商品が追加されれば完了です。
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="callout c-warn" style="margin-top:16px">
+    <span class="callout-icon">⚠️</span>
+    <div class="callout-body">
+      <b>同じ商品名・同じ価格の商品は登録しない</b>
+      名前と価格が完全に同じ商品がある場合、Airレジへの取り込みでエラーになることがあります。色違いやサイズ違いなど、区別できる情報を商品名に含めてください（例：「オーガニックガーデン タイツ Mサイズ」）。
+    </div>
+  </div>
+
+  <!-- 1-2. バーコード振り直し -->
+  <div class="section-sub">バーコードを振り直す（8桁）</div>
+  <div class="steps">
+    <div class="step">
+      <div class="step-num">1</div>
+      <div class="step-body">
+        <div class="step-title">「バーコード振り直し」ボタンを押す</div>
+        <div class="step-desc">
+          画面右上の <span class="hi-btn"><span class="ui-btn btn-outline">🔢 バーコード振り直し</span></span> を押します。<br>
+          商品の選択画面が開きます。
+        </div>
+      </div>
+    </div>
+    <div class="step">
+      <div class="step-num">2</div>
+      <div class="step-body">
+        <div class="step-title">対象商品を選ぶ</div>
+        <div class="step-desc">
+          <span class="ui-btn btn-outline" style="font-size:11px">バーコードなしのみ</span> ボタンを押すと、まだバーコードがない商品だけにチェックが入ります。<br>
+          すでにバーコードがある商品には <b>触らない</b> のが基本です（振り直すと既存ラベルと一致しなくなります）。
+        </div>
+      </div>
+    </div>
+    <div class="step">
+      <div class="step-num">3</div>
+      <div class="step-body">
+        <div class="step-title">「振り直す」ボタンを押す</div>
+        <div class="step-desc">
+          選んだ商品に8桁のバーコード（例：<code style="background:#f0f0f0;padding:1px 5px;border-radius:3px;font-size:12px">20000011</code>）が自動的に割り当てられます。
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="callout c-warn">
+    <span class="callout-icon">⚠️</span>
+    <div class="callout-body">
+      <b>すでにラベルを貼っている商品のバーコードは変えない</b>
+      バーコードを変えると、貼ってあるラベルと一致しなくなります。新しくラベルを貼り替えるタイミングに合わせて変更してください。
+    </div>
+  </div>
+
+  <!-- 1-3. CSV出力 -->
+  <div class="section-sub">CSVを出力する（2種類）</div>
+
+  <div class="screen">
+    <div class="screen-label">ツールバーのボタン配置</div>
+    <div class="mock-toolbar">
+      <span class="ui-btn btn-outline" style="font-size:11px">● 同期中</span>
+      <span class="ui-btn btn-dark" style="font-size:11px">📷 スキャン</span>
+      <span class="ui-btn btn-orange" style="font-size:11px">Airレジ上書き</span>
+      <span class="ui-btn btn-outline" style="font-size:11px">⬆ インポート</span>
+      <span class="ui-btn btn-blue" style="font-size:11px">⬇ CSV出力</span>
+      <span class="hi-btn"><span class="ui-btn btn-green" style="font-size:11px">🏷 ラベルCSV</span></span>
+      <span class="ui-btn btn-outline" style="font-size:11px">＋ 商品追加</span>
+      <span class="ui-btn btn-outline" style="font-size:11px">カテゴリー</span>
+      <span class="ui-btn btn-outline" style="font-size:11px">🔢 バーコード振り直し</span>
+    </div>
+  </div>
+
+  <table>
+    <tr><th>ボタン</th><th>何が出力される？</th><th>次の使い道</th></tr>
+    <tr>
+      <td><span class="ui-btn btn-blue" style="font-size:11px">⬇ CSV出力</span></td>
+      <td>全商品の詳細データ（在庫管理・バックアップ用）</td>
+      <td>手元に保管しておく</td>
+    </tr>
+    <tr>
+      <td><span class="ui-btn btn-green" style="font-size:11px">🏷 ラベルCSV</span></td>
+      <td>商品名・価格・バーコードだけの軽いCSV</td>
+      <td>ラベル印刷ツールに読み込む</td>
+    </tr>
+  </table>
+
+  <div class="callout c-tip">
+    <span class="callout-icon">💡</span>
+    <div class="callout-body">
+      <b>ラベルを印刷したいときは「🏷 ラベルCSV」を使う</b>
+      「⬇ CSV出力」と間違えやすいので注意してください。ラベル印刷ツールが読めるのは「🏷 ラベルCSV」で出したファイルです。
+    </div>
+  </div>
+</section>
+
+<div class="divider"></div>
+
+<!-- ===== 2. Airレジ統合ツール ===== -->
+<section class="section" id="aircsv">
+  <h2 class="section-title">2. Airレジ CSV統合ツール</h2>
+  <p style="margin-bottom:16px;font-size:13px;color:#374151">商品マスタのデータをAirレジに取り込める形式のCSVに変換するツールです。</p>
+
+  <div class="callout c-info">
+    <span class="callout-icon">📋</span>
+    <div class="callout-body">
+      <b>事前に準備するファイル</b>
+      ① 商品マスタの「⬇ CSV出力」で出したファイル（必須）<br>
+      ② Airレジ → 商品一括編集 → ダウンロードしたCSV（任意・重複チェック用）<br>
+      ③ Airレジ → カテゴリー → ダウンロードしたCSV（任意・カテゴリー設定用）
+    </div>
+  </div>
+
+  <div class="steps">
+    <div class="step">
+      <div class="step-num">1</div>
+      <div class="step-body">
+        <div class="step-title">「棚卸システム CSV」エリアにファイルを読み込む</div>
+        <div class="step-desc">
+          画面右側の点線ボックス <b>「棚卸システム CSV」</b> をクリックするか、ファイルをドロップします。<br>
+          商品マスタの「⬇ CSV出力」ファイルを選んでください。
+        </div>
+        <div class="callout c-warn" style="margin-top:8px">
+          <span class="callout-icon">⚠️</span>
+          <div class="callout-body">
+            <b>左側（Airレジ既存CSV）と間違えないように</b>
+            左の枠はAirレジからダウンロードしたファイル用です。商品マスタのCSVは必ず<b>右の枠</b>に入れてください。
+          </div>
+        </div>
+      </div>
+    </div>
+    <div class="step">
+      <div class="step-num">2</div>
+      <div class="step-body">
+        <div class="step-title">（任意）Airレジ既存CSVとカテゴリーCSVも読み込む</div>
+        <div class="step-desc">
+          重複チェックやカテゴリーを自動設定したい場合は左の枠・カテゴリー枠にも読み込みます。<br>
+          なくても動作します。
+        </div>
+      </div>
+    </div>
+    <div class="step">
+      <div class="step-num">3</div>
+      <div class="step-body">
+        <div class="step-title">テーブルを確認する</div>
+        <div class="step-desc">
+          下のテーブルに商品一覧が表示されます。色の意味は次の通りです：<br>
+          <span style="display:inline-block;width:10px;height:10px;background:#22c55e;border-radius:2px;margin-right:5px"></span><b>🟢 新規</b>：新しく追加される商品<br>
+          <span style="display:inline-block;width:10px;height:10px;background:#f97316;border-radius:2px;margin-right:5px"></span><b>🟠 重複</b>：Airレジにすでにある商品（スキップされます）<br>
+          <span style="display:inline-block;width:10px;height:10px;background:#94a3b8;border-radius:2px;margin-right:5px"></span><b>⚪ 既存</b>：そのまま引き継がれる商品
+        </div>
+      </div>
+    </div>
+    <div class="step">
+      <div class="step-num">4</div>
+      <div class="step-body">
+        <div class="step-title">「Airレジ用CSV ダウンロード」ボタンを押す</div>
+        <div class="step-desc">
+          <span class="hi-btn"><span class="ui-btn btn-blue">⬇ Airレジ用CSV ダウンロード</span></span> を押すとCSVが保存されます。<br>
+          このファイルをAirレジの「商品一括編集」→「アップロード」に使います。
+        </div>
+      </div>
+    </div>
+    <div class="step">
+      <div class="step-num">5</div>
+      <div class="step-body">
+        <div class="step-title">Airレジにアップロードする</div>
+        <div class="step-desc">
+          Airレジ → 商品管理 → 商品一括編集 → ファイルを選択 → アップロード
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="callout c-note">
+    <span class="callout-icon">📝</span>
+    <div class="callout-body">
+      <b>バーコードの上書きについて</b>
+      商品マスタでバーコードを変更した商品は、「出所」欄に「✏️ バーコード更新（旧→新）」と表示されます。更新内容を確認してからダウンロードしてください。
+    </div>
+  </div>
+</section>
+
+<div class="divider"></div>
+
+<!-- ===== 3. ラベル印刷 ===== -->
+<section class="section" id="label">
+  <h2 class="section-title">3. ラベル印刷（ラベル屋さん）</h2>
+  <p style="margin-bottom:16px;font-size:13px;color:#374151">商品マスタから出力したCSVを「ラベル屋さん」に読み込んで、A-one 31297（20×8mm・200面）に印刷します。</p>
+
+  <div class="callout c-info">
+    <span class="callout-icon">🖨</span>
+    <div class="callout-body">
+      <b>事前に準備するもの</b>
+      ・A-one 31297 のラベル用紙（プリンターにセット）<br>
+      ・商品マスタの「🏷 ラベルCSV」で出力したCSVファイル<br>
+      ・ラベル屋さん（<a href="https://www.labelya.com/" target="_blank" style="color:var(--blue)">https://www.labelya.com/</a>）
+    </div>
+  </div>
+
+  <div class="steps">
+    <div class="step">
+      <div class="step-num">1</div>
+      <div class="step-body">
+        <div class="step-title">商品マスタから「🏷 ラベルCSV」を出力する</div>
+        <div class="step-desc">
+          商品マスタ管理ツールの <span class="ui-btn btn-green" style="font-size:11px">🏷 ラベルCSV</span> を押してCSVファイルをダウンロードします。<br>
+          ファイル名は「ラベル_YYYY-MM-DD.csv」という形式で保存されます。
+        </div>
+      </div>
+    </div>
+    <div class="step">
+      <div class="step-num">2</div>
+      <div class="step-body">
+        <div class="step-title">ラベル屋さんで用紙を選ぶ</div>
+        <div class="step-desc">
+          ラベル屋さんを開き、品番 <b>31297</b> を検索して選択します。<br>
+          テンプレートの選択画面が表示されます。
+        </div>
+      </div>
+    </div>
+    <div class="step">
+      <div class="step-num">3</div>
+      <div class="step-body">
+        <div class="step-title">CSVを取り込む</div>
+        <div class="step-desc">
+          ラベル屋さんの「差し込み印刷」または「CSVから作成」機能で、先ほどのCSVファイルを読み込みます。<br>
+          出力列は <b>商品名・税込価格・バーコード</b> の3列です。
+        </div>
+        <div class="callout c-note" style="margin-top:8px">
+          <span class="callout-icon">📝</span>
+          <div class="callout-body">
+            バーコードの形式は <b>EAN-8（8桁）</b> です。ラベル屋さんでバーコードの種類を選ぶ際は「EAN-8」または「JAN-8」を選択してください。
+          </div>
+        </div>
+      </div>
+    </div>
+    <div class="step">
+      <div class="step-num">4</div>
+      <div class="step-body">
+        <div class="step-title">レイアウトを確認して印刷する</div>
+        <div class="step-desc">
+          プレビューでラベルのレイアウトを確認し、問題なければ印刷します。<br>
+          プリンターの印刷品質は <b>「高品質」</b> に設定するとバーコードが読み取りやすくなります。
+        </div>
+        <div class="callout c-warn" style="margin-top:8px">
+          <span class="callout-icon">⚠️</span>
+          <div class="callout-body">
+            <b>印刷品質が低いとバーコードが読み取れないことがあります</b>
+            プリンタードライバーの設定で「きれい」「高品質」を選んでください。
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<div class="divider"></div>
+
+<!-- ===== 4. 棚卸システム ===== -->
+<section class="section" id="inventory">
+  <h2 class="section-title">4. 棚卸システム</h2>
+
+  <div class="section-sub">棚卸を新しく始める</div>
+  <div class="steps">
+    <div class="step">
+      <div class="step-num">1</div>
+      <div class="step-body">
+        <div class="step-title">名前を入力してセッションを開始する</div>
+        <div class="step-desc">
+          自分の名前を入力し、<span class="ui-btn btn-dark" style="font-size:11px">✨ 新しい棚卸を開始する</span> を押します。<br>
+          前回の続きから始める場合は、セッションコードのカードを押してください。
+        </div>
+      </div>
+    </div>
+    <div class="step">
+      <div class="step-num">2</div>
+      <div class="step-body">
+        <div class="step-title">会社名・棚卸日・担当者名を入力する</div>
+        <div class="step-desc">
+          画面上部のフォームに入力します。会社名は「m's collectables」など。
+        </div>
+      </div>
+    </div>
+    <div class="step">
+      <div class="step-num">3</div>
+      <div class="step-body">
+        <div class="step-title">マイページ（棚）を選んで商品を入力する</div>
+        <div class="step-desc">
+          上部のタブ（1P はちみつ関連 など）を選んで、その棚の商品を入力します。<br>
+          商品名・個数・税込価格を入力します。バーコードリーダーを使う場合はスキャンで入力できます。
+        </div>
+      </div>
+    </div>
+    <div class="step">
+      <div class="step-num">4</div>
+      <div class="step-body">
+        <div class="step-title">完了したら「完了保存」を押す</div>
+        <div class="step-desc">
+          画面右上の <span class="ui-btn btn-green" style="font-size:11px">✅ 完了保存</span> を押すと保存されます。<br>
+          CSVとして出力したい場合は <span class="ui-btn btn-blue" style="font-size:11px">📊 CSV</span> を押してください。
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="callout c-tip">
+    <span class="callout-icon">💡</span>
+    <div class="callout-body">
+      <b>複数人で同時入力できます</b>
+      セッションコードを共有すると、別のスタッフがスマホやタブレットから同じ棚卸に参加できます。リアルタイムで同期されます。
+    </div>
+  </div>
+
+  <div class="callout c-warn">
+    <span class="callout-icon">⚠️</span>
+    <div class="callout-body">
+      <b>「退出」ボタンは棚卸が終わるまで押さない</b>
+      「退出」を押すと参加中のセッションから抜けます。誤って押した場合は、セッションコードで再参加できます。
+    </div>
+  </div>
+</section>
+
+<div class="divider"></div>
+
+<!-- ===== FAQ ===== -->
+<section class="section" id="faq">
+  <h2 class="section-title">❓ よくある質問・トラブル</h2>
+
+  <div class="section-sub">Airレジへのアップロードでエラーが出る</div>
+  <table>
+    <tr><th>エラー内容</th><th>原因</th><th>対処方法</th></tr>
+    <tr>
+      <td>他の商品に設定されているバーコード値です</td>
+      <td>同じバーコードが複数の商品に使われている</td>
+      <td>商品マスタでバーコードを振り直し、統合ツールで再出力する</td>
+    </tr>
+    <tr>
+      <td>既にバーコードが設定されています</td>
+      <td>バーコードありの商品に「自動採番」フラグが付いている</td>
+      <td>Airレジの最新CSVを統合ツールに読み込んでから再出力する</td>
+    </tr>
+  </table>
+
+  <div class="section-sub">バーコードが読み取れない</div>
+  <div class="callout c-note">
+    <span class="callout-icon">📝</span>
+    <div class="callout-body">
+      プリンターの印刷品質を「高品質」に設定してください。Canon G6000では、用紙の種類設定が「普通紙」になっているとかすれる場合があります。
+      別のプリンターで印刷してみると読み取れる場合があります。
+    </div>
+  </div>
+
+  <div class="section-sub">ラベルの位置がずれる</div>
+  <div class="callout c-note">
+    <span class="callout-icon">📝</span>
+    <div class="callout-body">
+      ラベル屋さんの用紙設定で品番「31297」を選択しているか確認してください。<br>
+      余白や間隔がずれている場合は、ラベル屋さんの「用紙設定」で上下左右のマージンを微調整してください。
+    </div>
+  </div>
+
+  <div class="section-sub">Firebase / 同期のエラーが出る</div>
+  <div class="callout c-note">
+    <span class="callout-icon">📝</span>
+    <div class="callout-body">
+      インターネット接続を確認してください。接続が切れると同期できませんが、入力したデータは端末に保存されています。再接続すると自動で同期されます。
+    </div>
+  </div>
+</section>
+
+</div><!-- /main -->
+
+<footer>
+  m's collectables 業務ツールマニュアル　—　スタッフ用
+</footer>
+
+<script>
+// ナビのアクティブ切り替え
+const sections = document.querySelectorAll('section[id]');
+const navLinks = document.querySelectorAll('.nav a');
+window.addEventListener('scroll', () => {
+  let current = '';
+  sections.forEach(s => {
+    if (window.scrollY >= s.offsetTop - 80) current = s.id;
+  });
+  navLinks.forEach(a => {
+    a.classList.toggle('active', a.getAttribute('href') === '#' + current);
+  });
+});
+</script>
+
+</body>
+</html>
