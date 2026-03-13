@@ -1,0 +1,1082 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>商品マスタ管理</title>
+<style>
+*{box-sizing:border-box;margin:0;padding:0}
+body{font-family:'Hiragino Kaku Gothic ProN','Yu Gothic',Meiryo,sans-serif;background:#f0f4f8;min-height:100vh;color:#1a2a3a;font-size:13px}
+.page{display:none}.page.active{display:block}
+
+/* セットアップ */
+.setup-wrap{min-height:100vh;display:flex;align-items:center;justify-content:center;padding:20px;background:linear-gradient(135deg,#0f2744 0%,#1a4a8a 100%)}
+.setup-card{background:#fff;border-radius:16px;padding:32px 28px;width:100%;max-width:460px;box-shadow:0 12px 48px rgba(0,0,0,.3)}
+.setup-logo{font-size:24px;font-weight:900;color:#0f2744;margin-bottom:4px}
+.setup-sub{font-size:12px;color:#6b7a8d;margin-bottom:20px}
+.steps{background:#f0f4f8;border-radius:10px;padding:14px 16px;margin-bottom:20px;font-size:12px;line-height:2.2;color:#0f2744}
+.steps ol{margin-left:18px}
+.lbl{font-size:11px;font-weight:700;color:#6b7a8d;margin-bottom:5px;letter-spacing:.3px;margin-top:12px}
+.inp{width:100%;padding:9px 12px;border:1.5px solid #d0d7de;border-radius:8px;font-size:13px;font-family:inherit;outline:none;transition:.15s}
+.inp:focus{border-color:#1a6ea6;background:#f8fafd}
+.btn-main{width:100%;padding:12px;background:#1a6ea6;color:#fff;border:none;border-radius:9px;font-size:14px;font-weight:700;cursor:pointer;font-family:inherit;margin-top:14px;transition:.15s}
+.btn-main:hover{background:#145a8a}
+.parse-msg{font-size:12px;min-height:18px;margin:6px 0 4px;text-align:center}
+.offline-link{display:block;text-align:center;margin-top:10px;font-size:12px;color:#6b7a8d;cursor:pointer;text-decoration:underline}
+
+/* ヘッダー */
+.hdr{background:linear-gradient(135deg,#1a3a5c 0%,#2a6496 100%);color:#fff;padding:12px 18px;display:flex;align-items:center;gap:12px;box-shadow:0 2px 10px rgba(0,0,0,.2)}
+.hdr-title{font-size:16px;font-weight:900}
+.hdr-sub{font-size:11px;opacity:.65;margin-top:1px}
+.hdr-right{margin-left:auto;display:flex;gap:7px;align-items:center;flex-wrap:wrap}
+.sdot{width:8px;height:8px;border-radius:50%;background:#4caf50;box-shadow:0 0 0 2px rgba(76,175,80,.3);flex-shrink:0}
+.sdot.off{background:#aab;box-shadow:none}
+
+/* タブ */
+.tabs{background:#fff;border-bottom:2px solid #e2e8f0;display:flex;padding:0 14px}
+.tab{padding:11px 16px;font-size:13px;font-weight:700;color:#6b7a8d;cursor:pointer;border-bottom:3px solid transparent;margin-bottom:-2px;transition:.15s}
+.tab.on{color:#1a3a5c;border-color:#1a3a5c}
+
+/* ボタン */
+.btn{display:inline-flex;align-items:center;gap:5px;padding:7px 13px;border:none;border-radius:7px;font-size:12px;font-weight:700;cursor:pointer;font-family:inherit;transition:.15s;white-space:nowrap}
+.bn{background:#2a6496;color:#fff}.bn:hover{background:#1d4f78}
+.bg{background:#e8f5e9;color:#1a5c2e;border:1.5px solid #a5d6a7}.bg:hover{background:#d0ecd2}
+.bo{background:#fff3e8;color:#c06000;border:1.5px solid #ffb74d}.bo:hover{background:#ffe8cc}
+.bh{background:#e8edf5;color:#1a3a5c}.bh:hover{background:#d8e0ee}
+
+/* ツールバー */
+.toolbar{background:#fff;border-bottom:1px solid #dde3ea;padding:9px 14px;display:flex;align-items:center;gap:8px;flex-wrap:wrap}
+.sbox{display:flex;align-items:center;gap:6px;background:#f5f7fa;border:1.5px solid #dde3ea;border-radius:7px;padding:5px 10px;flex:1;max-width:280px}
+.sbox input{border:none;background:transparent;outline:none;font-size:13px;font-family:inherit;width:100%}
+.fsel{padding:5px 8px;border:1.5px solid #dde3ea;border-radius:7px;font-size:12px;font-family:inherit;background:#f5f7fa;outline:none}
+.ci{font-size:12px;color:#6b7a8d;font-weight:700;white-space:nowrap;margin-left:auto}
+
+/* テーブル */
+.mp{padding:14px}
+.tw{background:#fff;border-radius:10px;box-shadow:0 1px 8px rgba(0,0,0,.07);overflow:hidden}
+.ts{overflow-x:auto;overflow-y:auto}
+table{width:100%;border-collapse:collapse;font-size:12px}
+thead th{background:#1a3a5c;color:#fff;padding:8px 10px;text-align:left;white-space:nowrap;position:sticky;top:0;z-index:10;font-size:11px;font-weight:700}
+th.r,td.r{text-align:right}
+tbody tr{border-bottom:1px solid #eef0f3;cursor:pointer}
+tbody tr:hover{background:#eef4fb}
+tbody tr:nth-child(even){background:#fafbfd}
+tbody tr:nth-child(even):hover{background:#eef4fb}
+tbody td{padding:7px 10px;vertical-align:middle}
+.ab{padding:3px 8px;border:none;border-radius:4px;font-size:11px;font-weight:700;cursor:pointer;font-family:inherit}
+.ae{background:#e8f0fb;color:#1a4a8a}.ae:hover{background:#d0e4f8}
+.ad{background:#fee;color:#c0392b}.ad:hover{background:#fcc}
+.bj{display:inline-block;padding:1px 6px;border-radius:3px;font-size:11px;font-weight:700}
+.bc{background:#e8edf5;color:#1a3a5c}
+.b8{background:#e8f5ff;color:#1a5090}
+.b10{background:#fff3e8;color:#c06000}
+.empty{text-align:center;padding:50px;color:#aab}
+
+/* 入荷フォーム */
+.af{display:grid;grid-template-columns:1fr 1fr 1fr 1fr auto;gap:8px;align-items:end;margin-bottom:14px}
+@media(max-width:700px){.af{grid-template-columns:1fr 1fr}}
+
+/* モーダル */
+.ov{position:fixed;inset:0;background:rgba(0,0,0,.45);z-index:1000;display:flex;align-items:center;justify-content:center;padding:16px}
+.md{background:#fff;border-radius:12px;width:100%;max-width:500px;box-shadow:0 8px 40px rgba(0,0,0,.2);max-height:92vh;overflow-y:auto}
+.mh{background:linear-gradient(135deg,#1a3a5c,#2a6496);color:#fff;padding:13px 16px;display:flex;align-items:center;gap:8px;position:sticky;top:0;z-index:5}
+.mh h2{font-size:14px;font-weight:900;flex:1}
+.mc{background:transparent;border:none;color:#fff;font-size:20px;cursor:pointer;padding:0 4px;opacity:.8;line-height:1}
+.mb{padding:16px}
+.fr{margin-bottom:12px}
+.fr label{display:block;font-size:11px;font-weight:700;color:#6b7a8d;margin-bottom:4px}
+.req{color:#e74c3c;margin-left:2px}
+.fi{width:100%;padding:8px 10px;border:1.5px solid #d0d7de;border-radius:7px;font-size:13px;font-family:inherit;outline:none}
+.fi:focus{border-color:#2a6496;background:#f8fafd}
+.fir{text-align:right}
+.f2{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+.tg{display:flex;gap:6px}
+.tb{flex:1;padding:8px;border:2px solid #d0d7de;border-radius:7px;font-size:12px;font-weight:700;cursor:pointer;font-family:inherit;background:#fff;text-align:center}
+.t10{border-color:#FF6600;background:#fff3e8;color:#c06000}
+.t8{border-color:#1a5090;background:#e8f5ff;color:#1a5090}
+.mf{padding:12px 16px;border-top:1px solid #eee;display:flex;gap:8px;justify-content:flex-end;position:sticky;bottom:0;background:#fff}
+.sv{background:#2a6496;color:#fff;padding:9px 24px;font-size:13px}
+.cn{background:#e8edf5;color:#555;padding:9px 14px;font-size:13px}
+
+/* カテゴリータグ */
+.ctag{display:flex;align-items:center;gap:4px;background:#e8edf5;border-radius:20px;padding:4px 10px 4px 12px;font-size:12px;font-weight:700;color:#1a3a5c}
+.cdb{background:none;border:none;cursor:pointer;font-size:14px;color:#aab;padding:0;line-height:1}
+.cdb:hover{color:#e74c3c}
+
+/* インポートDZ */
+.idz{border:2px dashed #b0bec5;border-radius:8px;padding:22px;text-align:center;cursor:pointer;transition:.2s;background:#fafbfc;margin-bottom:10px}
+.idz:hover,.idz.drag{border-color:#2a6496;background:#e8f4fd}
+.idz.ok{border-color:#2ecc71;background:#f0fff8}
+
+/* バーコードスキャン */
+.scan-video-wrap{position:relative;background:#000;border-radius:10px;overflow:hidden;margin-bottom:12px;aspect-ratio:4/3;max-height:300px}
+.scan-video-wrap video{width:100%;height:100%;object-fit:cover;display:block}
+.scan-line{position:absolute;left:10%;right:10%;height:2px;background:rgba(255,80,80,.8);box-shadow:0 0 8px rgba(255,80,80,.6);animation:scanAnim 2s ease-in-out infinite}
+@keyframes scanAnim{0%,100%{top:20%}50%{top:75%}}
+.scan-corners::before,.scan-corners::after{content:'';position:absolute;width:28px;height:28px;border-color:#fff;border-style:solid;top:12%;left:8%}
+.scan-corners::before{border-width:3px 0 0 3px}
+.scan-corners::after{border-width:0 0 3px 3px;top:auto;bottom:12%}
+.scan-result-box{background:#f0f4f8;border-radius:8px;padding:12px 14px;font-size:13px;text-align:center;min-height:56px;display:flex;align-items:center;justify-content:center;gap:10px;flex-direction:column}
+
+/* Airレジ上書きプレビュー */
+.upd-tbl{width:100%;border-collapse:collapse;font-size:12px;max-height:280px;overflow-y:auto;display:block}
+.upd-tbl th{background:#1a3a5c;color:#fff;padding:7px 10px;text-align:left;font-size:11px;position:sticky;top:0}
+.upd-tbl td{padding:6px 10px;border-bottom:1px solid #eee;vertical-align:middle}
+.upd-tbl tr:nth-child(even) td{background:#fafbff}
+.tag-upd{background:#e8f5e9;color:#1a5c2e;border-radius:3px;padding:1px 6px;font-size:11px;font-weight:700}
+.tag-new{background:#e8edf5;color:#1a3a5c;border-radius:3px;padding:1px 6px;font-size:11px;font-weight:700}
+.tag-nm{background:#ffe0cc;color:#b03a00;border-radius:3px;padding:1px 6px;font-size:11px;font-weight:700}
+
+/* トースト */
+.toast{position:fixed;bottom:20px;right:20px;background:#0f2744;color:#fff;padding:11px 18px;border-radius:8px;font-size:13px;font-weight:700;z-index:9999;opacity:0;transform:translateY(10px);transition:.25s;pointer-events:none;max-width:90vw}
+.toast.show{opacity:1;transform:translateY(0)}
+</style>
+</head>
+<body>
+
+<!-- ===== SETUP ===== -->
+<div class="page active" id="pgSetup">
+<div class="setup-wrap"><div class="setup-card">
+  <div class="setup-logo">📦 商品マスタ管理</div>
+  <div class="setup-sub">Firebase設定（棚卸システムと同じプロジェクトでOK）</div>
+  <div class="steps">
+    <b>初回のみ設定が必要です</b>
+    <ol>
+      <li><a href="https://console.firebase.google.com/" target="_blank">Firebase Console</a> を開く</li>
+      <li>棚卸で使っているプロジェクトを選択</li>
+      <li>⚙「プロジェクトの設定」→「アプリ」→ firebaseConfig をコピー</li>
+      <li>↓に貼り付けて「読み取り」を押す</li>
+    </ol>
+  </div>
+  <div class="lbl">firebaseConfig をそのまま貼り付け</div>
+  <textarea class="inp" id="fcPaste" rows="5" style="height:100px;font-family:monospace;font-size:11px;resize:none;background:#f8f9fb"
+    placeholder='const firebaseConfig = {&#10;  apiKey: "AIza...",&#10;  databaseURL: "https://xxx-rtdb.firebaseio.com",&#10;  projectId: "..."&#10;};'></textarea>
+  <button class="btn-main" style="padding:9px;font-size:13px;background:#e8edf5;color:#1a3a5c;margin-top:8px" onclick="doParse()">🔍 コードから自動読み取り</button>
+  <div class="parse-msg" id="parseMsg"></div>
+  <div class="lbl">データベースURL</div><input class="inp" id="sDbUrl" placeholder="https://xxxxx-default-rtdb.firebaseio.com">
+  <div class="lbl">APIキー</div><input class="inp" id="sApiKey" placeholder="AIzaSy...">
+  <div class="lbl">プロジェクトID</div><input class="inp" id="sProjId" placeholder="my-project-id">
+  <button class="btn-main" onclick="doSetup()">💾 保存して接続</button>
+  <span class="offline-link" onclick="startOffline()">⚠ オフラインモードで使う（端末内のみ・同期なし）</span>
+</div></div>
+</div>
+
+<!-- ===== MAIN ===== -->
+<div class="page" id="pgMain">
+<div class="hdr">
+  <div><div class="hdr-title">📦 商品マスタ管理</div><div class="hdr-sub" id="hdrSub">読み込み中...</div></div>
+  <div class="hdr-right">
+    <div class="sdot" id="sdot"></div><span style="font-size:11px;opacity:.8" id="slabel">接続中</span>
+    <button class="btn" style="background:#4a2080;color:#fff" onclick="openScan()">📷 スキャン</button>
+    <button class="btn bo" onclick="openAirUpdate()">🔄 Airレジ上書き</button>
+    <button class="btn bo" onclick="openImport()">📥 インポート</button>
+    <button class="btn bg" onclick="doExportCsv()">⬇ CSV出力</button>
+    <button class="btn" style="background:#1a5c2e;color:#fff" onclick="openLabelCsv()">🏷 ラベルCSV</button>
+    <button class="btn bn" onclick="openAdd()">＋ 商品追加</button>
+    <button class="btn bh" onclick="openCatModal()">🏷 カテゴリー</button>
+    <button class="btn bh" onclick="openBcReset()">🔢 バーコード振り直し</button>
+    <button class="btn bh" style="font-size:11px" onclick="doLogout()">⚙ 設定</button>
+  </div>
+</div>
+<div class="tabs">
+  <div class="tab on" id="tab-p" onclick="switchTab('p')">📦 商品一覧</div>
+  <div class="tab" id="tab-a" onclick="switchTab('a')">🚚 入荷記録</div>
+</div>
+
+<!-- 商品一覧 -->
+<div id="pnl-p">
+<div class="toolbar">
+  <div class="sbox"><span style="color:#6b7a8d">🔍</span><input id="si" placeholder="商品名・バーコードで検索…" oninput="renderP()"></div>
+  <select class="fsel" id="cf" onchange="renderP()"><option value="">すべてのカテゴリー</option></select>
+  <select class="fsel" id="tf" onchange="renderP()"><option value="">すべての税率</option><option value="10">10%</option><option value="8">8%</option></select>
+  <span class="ci" id="cinfo"></span>
+</div>
+<div class="mp"><div class="tw"><div class="ts" style="max-height:calc(100vh - 230px)">
+  <table><thead><tr>
+    <th style="width:30px">No</th><th>商品名</th><th>カテゴリー</th>
+    <th class="r">税込価格</th><th>税率</th><th>バーコード</th><th>単位</th>
+    <th>仕入先</th><th class="r">仕入単価</th><th>備考</th><th style="width:76px"></th>
+  </tr></thead><tbody id="pb"></tbody></table>
+  <div class="empty" id="ep" style="display:none"><div style="font-size:40px;margin-bottom:10px">📦</div><div style="font-weight:700;color:#6b7a8d;margin-bottom:6px">商品が登録されていません</div><div style="font-size:12px;color:#aab">「＋ 商品追加」から登録してください</div></div>
+</div></div></div>
+</div>
+
+<!-- 入荷記録 -->
+<div id="pnl-a" style="display:none"><div class="mp">
+  <div class="tw" style="padding:16px;margin-bottom:14px">
+    <div style="font-size:13px;font-weight:700;color:#1a3a5c;margin-bottom:12px">🚚 入荷を記録する</div>
+    <div class="af">
+      <div><div class="lbl">日付</div><input class="fi" type="date" id="adate"></div>
+      <div><div class="lbl">商品</div><select class="fi" id="aprod"><option value="">商品を選択</option></select></div>
+      <div><div class="lbl">入荷数</div><input class="fi fir" type="number" id="aqty" placeholder="0" min="1"></div>
+      <div><div class="lbl">備考</div><input class="fi" id="anote" placeholder="ロット・メモなど"></div>
+      <div><button class="btn bn" style="height:36px;margin-top:18px" onclick="addArrival()">＋ 記録</button></div>
+    </div>
+  </div>
+  <div class="tw">
+    <div class="toolbar" style="border-radius:0">
+      <div class="sbox"><span style="color:#6b7a8d">🔍</span><input id="asi" placeholder="商品名で検索…" oninput="renderA()"></div>
+      <span class="ci" id="acnt"></span>
+    </div>
+    <div class="ts" style="max-height:380px">
+      <table><thead><tr><th>日付</th><th>商品名</th><th>カテゴリー</th><th class="r">入荷数</th><th>備考</th><th style="width:50px"></th></tr></thead>
+      <tbody id="ab"></tbody></table>
+      <div class="empty" id="ea" style="display:none"><div style="font-size:36px;margin-bottom:8px">🚚</div><div style="font-weight:700;color:#6b7a8d">入荷記録がありません</div></div>
+    </div>
+  </div>
+</div></div>
+
+</div><!-- /pgMain -->
+
+<!-- 商品編集モーダル -->
+<div class="ov" id="editOv" style="display:none" onclick="if(event.target===this)closeEdit()">
+<div class="md">
+  <div class="mh"><h2 id="et">商品追加</h2><button class="mc" onclick="closeEdit()">✕</button></div>
+  <div class="mb">
+    <div class="fr"><label>商品名 <span class="req">*</span></label><input class="fi" id="fn" placeholder="例：マヌカ大瓶"></div>
+    <div class="fr"><label>カテゴリー</label><select class="fi" id="fc"><option value="">（未設定）</option></select></div>
+    <div class="f2">
+      <div class="fr"><label>税込価格 <span class="req">*</span></label><input class="fi fir" id="fp" type="number" placeholder="0" min="0"></div>
+      <div class="fr"><label>税率</label><div class="tg"><button class="tb t10" id="t10" onclick="setTax('10')">10%</button><button class="tb" id="t8" onclick="setTax('8')">8% 軽減</button></div></div>
+    </div>
+    <div class="f2">
+      <div class="fr"><label>単位</label><input class="fi" id="fu" placeholder="個・点・本"></div>
+      <div class="fr"><label>バーコード</label>
+        <div style="display:flex;gap:6px">
+          <input class="fi" id="fb" placeholder="空白=Airレジで自動発番" style="flex:1">
+          <button type="button" class="btn bh" style="padding:6px 10px;font-size:16px;flex-shrink:0" onclick="openScanIntoField('fb')" title="カメラで読み取り">📷</button>
+        </div>
+      </div>
+    </div>
+    <div class="f2">
+      <div class="fr"><label>仕入先</label><input class="fi" id="fs" placeholder="例：○○商事"></div>
+      <div class="fr"><label>仕入単価</label><input class="fi fir" id="fco" type="number" placeholder="0" min="0"></div>
+    </div>
+    <div class="fr"><label>備考</label><input class="fi" id="fno" placeholder="メモ・説明など"></div>
+  </div>
+  <div class="mf">
+    <button class="btn" id="editDelBtn" style="background:#fee;color:#c0392b;border:1.5px solid #f5a5a5;margin-right:auto;display:none" onclick="delFromModal()">🗑 この商品を削除</button>
+    <button class="btn cn" onclick="closeEdit()">キャンセル</button>
+    <button class="btn sv" onclick="saveP()">保存</button>
+  </div>
+</div></div>
+
+<!-- カテゴリーモーダル -->
+<div class="ov" id="catOv" style="display:none" onclick="if(event.target===this)closeCatModal()">
+<div class="md" style="max-width:380px">
+  <div class="mh"><h2>🏷 カテゴリー管理</h2><button class="mc" onclick="closeCatModal()">✕</button></div>
+  <div class="mb">
+    <div style="display:flex;flex-wrap:wrap;gap:8px;margin-bottom:14px" id="catListEl"></div>
+    <div style="display:flex;gap:8px">
+      <input class="fi" id="cai" placeholder="新しいカテゴリー名" onkeydown="if(event.key==='Enter')addCat()" style="flex:1">
+      <button class="btn bn" onclick="addCat()">＋ 追加</button>
+    </div>
+  </div>
+  <div class="mf"><button class="btn cn" onclick="closeCatModal()">閉じる</button></div>
+</div></div>
+
+<!-- インポートモーダル -->
+<div class="ov" id="impOv" style="display:none" onclick="if(event.target===this)closeImport()">
+<div class="md" style="max-width:420px">
+  <div class="mh"><h2>📥 CSVインポート</h2><button class="mc" onclick="closeImport()">✕</button></div>
+  <div class="mb">
+    <div class="idz" id="idz" onclick="document.getElementById('impF').click()"
+         ondragover="event.preventDefault();this.classList.add('drag')"
+         ondragleave="this.classList.remove('drag')"
+         ondrop="event.preventDefault();this.classList.remove('drag');impDrop(event)">
+      <div style="font-size:30px;margin-bottom:8px">📂</div>
+      <div style="font-size:13px;font-weight:700;color:#555" id="idzT">クリックまたはドロップ</div>
+      <div style="font-size:11px;color:#999;margin-top:4px">棚卸CSVまたは商品マスタCSVを読み込めます</div>
+    </div>
+    <input type="file" id="impF" accept=".csv" style="display:none" onchange="impSel(this)">
+    <div id="impPrev" style="font-size:12px;color:#1a5c2e;font-weight:700;display:none;margin-bottom:8px"></div>
+    <p style="font-size:11px;color:#888;line-height:1.7">※ 商品名が一致する場合はスキップします<br>※「商品名」「税込単価」列が必要です</p>
+  </div>
+  <div class="mf"><button class="btn cn" onclick="closeImport()">キャンセル</button><button class="btn sv" id="impBtn" onclick="doImport()" disabled style="background:#ccc">インポート実行</button></div>
+</div></div>
+
+<!-- バーコードスキャンモーダル -->
+<div class="ov" id="scanOv" style="display:none" onclick="if(event.target===this)closeScan()">
+<div class="md" style="max-width:400px">
+  <div class="mh"><h2>📷 バーコードスキャン</h2><button class="mc" onclick="closeScan()">✕</button></div>
+  <div class="mb">
+    <div class="scan-video-wrap" id="scanVideoWrap">
+      <video id="scanVideo" autoplay playsinline muted></video>
+      <div class="scan-line"></div>
+      <div class="scan-corners"></div>
+    </div>
+    <div class="scan-result-box" id="scanResult">
+      <span style="color:#6b7a8d;font-size:12px">カメラを商品バーコードに向けてください</span>
+    </div>
+    <div style="margin-top:10px;display:flex;gap:8px;justify-content:center" id="scanActions" style="display:none"></div>
+  </div>
+  <div class="mf">
+    <select class="fsel" id="scanCamSel" onchange="switchCamera()" style="flex:1;max-width:200px"></select>
+    <button class="btn cn" onclick="closeScan()">閉じる</button>
+  </div>
+</div></div>
+
+<!-- Airレジ上書きモーダル -->
+<div class="ov" id="airUpdOv" style="display:none" onclick="if(event.target===this)closeAirUpdate()">
+<div class="md" style="max-width:560px">
+  <div class="mh"><h2>🔄 Airレジ CSV 上書きインポート</h2><button class="mc" onclick="closeAirUpdate()">✕</button></div>
+  <div class="mb">
+    <div style="background:#e8f0fb;border-radius:8px;padding:11px 14px;font-size:12px;color:#1a3a5c;margin-bottom:14px;line-height:1.8">
+      <b>使い方：</b> AirレジでバーコードIDが自動発番された後、Airレジから「商品一括編集CSV」をダウンロードし、ここで読み込むと商品マスタにバーコードを反映します。<br>
+      ※ 商品名で照合。価格・税率・バーコードを上書きします。
+    </div>
+    <div class="idz" id="auDz" onclick="document.getElementById('auF').click()"
+         ondragover="event.preventDefault();this.classList.add('drag')"
+         ondragleave="this.classList.remove('drag')"
+         ondrop="event.preventDefault();this.classList.remove('drag');auDrop(event)">
+      <div style="font-size:28px;margin-bottom:6px">🏪</div>
+      <div style="font-size:13px;font-weight:700;color:#555" id="auDzT">クリックまたはドロップ</div>
+      <div style="font-size:11px;color:#999;margin-top:3px">Airレジ「商品一括編集CSV」（Shift-JIS）</div>
+    </div>
+    <input type="file" id="auF" accept=".csv" style="display:none" onchange="auSel(this)">
+    <div id="auSummary" style="display:none;margin-bottom:10px">
+      <div style="display:flex;gap:8px;margin-bottom:10px;flex-wrap:wrap" id="auStats"></div>
+      <div style="overflow-x:auto;max-height:260px;overflow-y:auto;border-radius:8px;border:1px solid #e2e8f0">
+        <table class="upd-tbl" id="auTbl">
+          <thead><tr><th>判定</th><th>商品名</th><th>バーコード（新）</th><th>価格</th><th>税率</th></tr></thead>
+          <tbody id="auBody"></tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+  <div class="mf">
+    <button class="btn cn" onclick="closeAirUpdate()">キャンセル</button>
+    <button class="btn sv" id="auBtn" onclick="doAirUpdate()" disabled style="background:#ccc">上書き実行</button>
+  </div>
+</div></div>
+
+<!-- バーコード振り直しモーダル -->
+<div class="ov" id="bcResetOv" style="display:none" onclick="if(event.target===this)closeBcReset()">
+<div class="md" style="max-width:560px">
+  <div class="mh"><h2>🔢 バーコード振り直し（13桁）</h2><button class="mc" onclick="closeBcReset()">✕</button></div>
+  <div class="mb">
+
+    <div style="background:#e8f0fb;border-radius:8px;padding:10px 14px;font-size:12px;color:#1a3a5c;margin-bottom:14px">
+      📌 <b style="font-family:monospace">2XXXXXXXXXXX C</b>　2固定 ＋ 11桁連番 ＋ チェックディジット自動計算（EAN-13）<br>
+      <span style="color:#6b7a8d">例：<b style="font-family:monospace">2000000000015</b>、<b style="font-family:monospace">2000000000022</b>…（Airレジ自動発番と同じ形式）</span>
+    </div>
+
+    <!-- 開始番号 & 全選択 -->
+    <div style="display:flex;align-items:center;gap:12px;margin-bottom:10px;flex-wrap:wrap">
+      <div style="display:flex;align-items:center;gap:6px">
+        <span style="font-size:12px;font-weight:700;color:#6b7a8d">開始番号</span>
+        <input class="fi" type="number" id="bcStartNum" value="1" min="1" max="99999"
+          style="width:90px;padding:5px 8px;font-size:13px" oninput="renderBcList()">
+      </div>
+      <div style="margin-left:auto;display:flex;gap:8px">
+        <button class="btn bh" style="padding:5px 12px;font-size:12px" onclick="bcSelAll(true)">全選択</button>
+        <button class="btn bh" style="padding:5px 12px;font-size:12px" onclick="bcSelAll(false)">全解除</button>
+        <button class="btn bh" style="padding:5px 12px;font-size:12px" onclick="bcSelNoBarcode()">バーコードなしのみ</button>
+      </div>
+    </div>
+
+    <!-- 商品リスト -->
+    <div style="border:1px solid #dde3ea;border-radius:8px;overflow:hidden;max-height:340px;overflow-y:auto">
+      <table style="width:100%;border-collapse:collapse;font-size:12px">
+        <thead><tr>
+          <th style="background:#1a3a5c;color:#fff;padding:8px 10px;width:36px;text-align:center">
+            <input type="checkbox" id="bcChkAll" onchange="bcSelAll(this.checked)" style="accent-color:#4caf50">
+          </th>
+          <th style="background:#1a3a5c;color:#fff;padding:8px 10px;text-align:left">商品名</th>
+          <th style="background:#1a3a5c;color:#fff;padding:8px 10px;text-align:left">現在のバーコード</th>
+          <th style="background:#1a3a5c;color:#fff;padding:8px 10px;text-align:left;color:#a5d6a7">新しいバーコード</th>
+        </tr></thead>
+        <tbody id="bcListBody"></tbody>
+      </table>
+    </div>
+    <div style="font-size:12px;color:#6b7a8d;margin-top:8px" id="bcSelNote"></div>
+
+  </div>
+  <div class="mf">
+    <button class="btn cn" onclick="closeBcReset()">キャンセル</button>
+    <button class="btn" id="bcExecBtn" style="background:#c0392b;color:#fff;padding:9px 20px;font-size:13px" onclick="doBcReset()">🔢 振り直し実行</button>
+  </div>
+</div></div>
+
+<!-- ラベルCSV出力モーダル -->
+<div class="ov" id="labelOv" style="display:none" onclick="if(event.target===this)closeLabelCsv()">
+<div class="md" style="max-width:580px">
+  <div class="mh"><h2>🏷 ラベルCSV出力（ラベル屋さん用）</h2><button class="mc" onclick="closeLabelCsv()">✕</button></div>
+  <div class="mb">
+
+    <!-- カテゴリーフィルター -->
+    <div style="margin-bottom:12px">
+      <div style="font-size:11px;font-weight:700;color:#6b7a8d;margin-bottom:6px">カテゴリーで絞り込み</div>
+      <div style="display:flex;flex-wrap:wrap;gap:6px" id="labelCatBtns"></div>
+    </div>
+
+    <!-- 検索＋全選択ボタン -->
+    <div style="display:flex;align-items:center;gap:8px;margin-bottom:10px;flex-wrap:wrap">
+      <div class="sbox" style="flex:1;max-width:220px">
+        <span style="color:#6b7a8d">🔍</span>
+        <input id="labelSearch" placeholder="商品名で絞り込み…" oninput="renderLabelList()" style="font-size:12px">
+      </div>
+      <div style="margin-left:auto;display:flex;gap:6px">
+        <button class="btn bh" style="padding:5px 12px;font-size:12px" onclick="labelSelAll(true)">全選択</button>
+        <button class="btn bh" style="padding:5px 12px;font-size:12px" onclick="labelSelAll(false)">全解除</button>
+      </div>
+    </div>
+
+    <!-- 商品リスト -->
+    <div style="border:1px solid #dde3ea;border-radius:8px;overflow:hidden;max-height:340px;overflow-y:auto">
+      <table style="width:100%;border-collapse:collapse;font-size:12px">
+        <thead><tr>
+          <th style="background:#1a3a5c;color:#fff;padding:8px 10px;width:36px;text-align:center;position:sticky;top:0;z-index:5">
+            <input type="checkbox" id="labelChkAll" onchange="labelSelAll(this.checked)" style="accent-color:#4caf50">
+          </th>
+          <th style="background:#1a3a5c;color:#fff;padding:8px 10px;text-align:left;position:sticky;top:0;z-index:5">商品名</th>
+          <th style="background:#1a3a5c;color:#fff;padding:8px 10px;text-align:left;position:sticky;top:0;z-index:5">カテゴリー</th>
+          <th style="background:#1a3a5c;color:#fff;padding:8px 10px;text-align:right;position:sticky;top:0;z-index:5">税込価格</th>
+          <th style="background:#1a3a5c;color:#fff;padding:8px 10px;text-align:left;position:sticky;top:0;z-index:5">バーコード</th>
+        </tr></thead>
+        <tbody id="labelListBody"></tbody>
+      </table>
+    </div>
+    <div style="font-size:12px;color:#6b7a8d;margin-top:8px" id="labelSelNote"></div>
+
+  </div>
+  <div class="mf">
+    <button class="btn cn" onclick="closeLabelCsv()">キャンセル</button>
+    <button class="btn" id="labelExecBtn" style="background:#1a5c2e;color:#fff;padding:9px 20px;font-size:13px" onclick="doExportLabelCsv()">⬇ CSVをダウンロード</button>
+  </div>
+</div></div>
+
+<div class="toast" id="toast"></div>
+
+<script>
+const FK='mc_fb_v1', PP='mc_products', CP='mc_cats', AP='mc_arrivals';
+let db=null, offline=false;
+let products={}, cats={}, arrivals={};
+let editId=null, curTax='10', impRows=[];
+
+// ===== Firebase =====
+function loadFB(cb){
+  if(window.firebase&&firebase.apps!==undefined){cb();return}
+  const s1=document.createElement('script');
+  s1.src='https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js';
+  s1.onload=()=>{const s2=document.createElement('script');s2.src='https://www.gstatic.com/firebasejs/9.23.0/firebase-database-compat.js';s2.onload=cb;document.head.appendChild(s2);};
+  document.head.appendChild(s1);
+}
+function doParse(){
+  const t=document.getElementById('fcPaste').value,msg=document.getElementById('parseMsg'),map={};
+  t.split('\n').forEach(l=>{const m=l.match(/[\"']?(\w+)[\"']?\s*:\s*[\"']([^\"']+)[\"']/);if(m)map[m[1]]=m[2];});
+  if(map.databaseURL)document.getElementById('sDbUrl').value=map.databaseURL;
+  if(map.apiKey)document.getElementById('sApiKey').value=map.apiKey;
+  if(map.projectId)document.getElementById('sProjId').value=map.projectId;
+  msg.textContent=(map.databaseURL||map.apiKey)?'✅ 読み取り完了！「保存して接続」を押してください':'⚠ 読み取れませんでした。手動で入力してください';
+  msg.style.color=(map.databaseURL||map.apiKey)?'#27ae60':'#e74c3c';
+}
+function doSetup(){
+  const cfg={databaseURL:document.getElementById('sDbUrl').value.trim(),apiKey:document.getElementById('sApiKey').value.trim(),projectId:document.getElementById('sProjId').value.trim()};
+  if(!cfg.databaseURL||!cfg.apiKey){alert('データベースURLとAPIキーを入力してください');return}
+  localStorage.setItem(FK,JSON.stringify(cfg)); loadFB(()=>connectFB(cfg));
+}
+function connectFB(cfg){
+  try{
+    if(!window.firebase)throw new Error('Firebase未ロード');
+    if(firebase.apps.length===0)firebase.initializeApp(cfg);
+    db=firebase.database(); offline=false;
+    startListeners(); showPage('pgMain');
+  }catch(e){alert('Firebase接続エラー：'+e.message);}
+}
+function startOffline(){
+  offline=true; db=null;
+  try{products=JSON.parse(localStorage.getItem('mc_op')||'{}')}catch(e){products={}}
+  try{cats=JSON.parse(localStorage.getItem('mc_oc')||'{}')}catch(e){cats={}}
+  try{arrivals=JSON.parse(localStorage.getItem('mc_oa')||'{}')}catch(e){arrivals={}}
+  showPage('pgMain'); setSS(false); renderP(); renderCatFilter(); renderA(); renderAPSel();
+  toast('オフラインモードで起動しました');
+}
+function doLogout(){if(!confirm('設定をリセットしてセットアップ画面に戻りますか？'))return;localStorage.removeItem(FK);location.reload();}
+function startListeners(){
+  setSS(true);
+  db.ref(PP).on('value',s=>{products=s.val()||{};renderP();renderAPSel();document.getElementById('hdrSub').textContent='商品 '+Object.keys(products).length+'件';});
+  db.ref(CP).on('value',s=>{cats=s.val()||{};renderCatFilter();renderCatPanel();});
+  db.ref(AP).on('value',s=>{arrivals=s.val()||{};renderA();});
+}
+function setSS(on){document.getElementById('sdot').className='sdot'+(on?'':' off');document.getElementById('slabel').textContent=on?'同期中':'オフライン';}
+
+// ===== ページ =====
+function showPage(id){document.querySelectorAll('.page').forEach(p=>p.classList.remove('active'));document.getElementById(id).classList.add('active');}
+function switchTab(t){['p','a'].forEach(x=>{document.getElementById('tab-'+x).className='tab'+(x===t?' on':'');document.getElementById('pnl-'+x).style.display=x===t?'':'none';});}
+
+// ===== カテゴリー =====
+function cn(id){return cats[id]?.name||'';}
+function renderCatFilter(){
+  const f=document.getElementById('cf'),cur=f.value;
+  f.innerHTML='<option value="">すべてのカテゴリー</option>'+Object.entries(cats).map(([id,c])=>`<option value="${id}" ${cur===id?'selected':''}>${esc(c.name)}</option>`).join('');
+  const fc=document.getElementById('fc');if(fc){const cv=fc.value;fc.innerHTML='<option value="">（未設定）</option>'+Object.entries(cats).map(([id,c])=>`<option value="${id}" ${cv===id?'selected':''}>${esc(c.name)}</option>`).join('');}
+}
+function renderCatPanel(){
+  const el=document.getElementById('catListEl');if(!el)return;
+  const en=Object.entries(cats);
+  el.innerHTML=en.length?en.map(([id,c])=>`<div class="ctag">${esc(c.name)}<button class="cdb" onclick="delCat('${id}')">×</button></div>`).join(''):'<span style="color:#aab;font-size:12px">カテゴリーなし</span>';
+}
+function openCatModal(){renderCatPanel();document.getElementById('catOv').style.display='';}
+function closeCatModal(){document.getElementById('catOv').style.display='none';}
+function addCat(){const inp=document.getElementById('cai'),name=inp.value.trim();if(!name)return;const id='C'+Date.now().toString(36).toUpperCase();saveCats({...cats,[id]:{name,id}});inp.value='';toast('カテゴリー追加：'+name);}
+function delCat(id){if(!confirm('カテゴリー「'+cats[id]?.name+'」を削除しますか？'))return;const nc={...cats};delete nc[id];const np={};Object.entries(products).forEach(([pid,p])=>{np[pid]=p.catId===id?{...p,catId:''}:p;});saveCats(nc);saveProds(np);}
+function saveCats(c){if(offline){cats=c;localStorage.setItem('mc_oc',JSON.stringify(c));renderCatFilter();renderCatPanel();}else db.ref(CP).set(c);}
+
+// ===== 商品 =====
+function renderP(){
+  const q=(document.getElementById('si').value||'').toLowerCase();
+  const catF=document.getElementById('cf').value,taxF=document.getElementById('tf').value;
+  const list=Object.values(products).filter(p=>{
+    if(q&&!p.name.toLowerCase().includes(q)&&!(p.barcode||'').toLowerCase().includes(q))return false;
+    if(catF&&p.catId!==catF)return false;
+    if(taxF&&p.tax!==taxF)return false;
+    return true;
+  }).sort((a,b)=>(a.createdAt||0)-(b.createdAt||0));
+  document.getElementById('cinfo').textContent=list.length+' / '+Object.keys(products).length+'件';
+  const tb=document.getElementById('pb'),em=document.getElementById('ep');
+  if(!list.length){tb.innerHTML='';em.style.display='';return;}
+  em.style.display='none';
+  tb.innerHTML=list.map((p,i)=>{
+    const c=cn(p.catId);
+    return `<tr onclick="openEdit('${p.id}')">
+      <td style="color:#aab;font-size:11px">${i+1}</td>
+      <td style="font-weight:700;color:#0f2744">${esc(p.name)}</td>
+      <td>${c?`<span class="bj bc">${esc(c)}</span>`:''}</td>
+      <td class="r" style="font-weight:700">¥${Number(p.price||0).toLocaleString()}</td>
+      <td><span class="bj ${p.tax==='8'?'b8':'b10'}">${p.tax==='8'?'8%軽減':'10%標準'}</span></td>
+      <td style="font-family:monospace;font-size:11px;color:#555">${esc(p.barcode||'')}</td>
+      <td style="color:#666">${esc(p.unit||'')}</td>
+      <td style="color:#666;max-width:90px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${esc(p.supplier||'')}</td>
+      <td class="r" style="color:#666">${p.cost?'¥'+Number(p.cost).toLocaleString():''}</td>
+      <td style="color:#999;max-width:100px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${esc(p.note||'')}</td>
+      <td style="white-space:nowrap;display:flex;gap:3px" onclick="event.stopPropagation()">
+        <button class="ab ae" onclick="openEdit('${p.id}')">編集</button>
+        <button class="ab ad" onclick="delP('${p.id}')">削除</button>
+      </td></tr>`;
+  }).join('');
+}
+function openAdd(){editId=null;document.getElementById('et').textContent='商品追加';['fn','fu','fb','fs','fno'].forEach(id=>document.getElementById(id).value='');['fp','fco'].forEach(id=>document.getElementById(id).value='');renderCatFilter();document.getElementById('fc').value='';setTax('10');document.getElementById('editDelBtn').style.display='none';document.getElementById('editOv').style.display='';setTimeout(()=>document.getElementById('fn').focus(),50);}
+function openEdit(id){const p=products[id];if(!p)return;editId=id;document.getElementById('et').textContent='商品編集';document.getElementById('fn').value=p.name||'';document.getElementById('fp').value=p.price||'';document.getElementById('fu').value=p.unit||'';document.getElementById('fb').value=p.barcode||'';document.getElementById('fs').value=p.supplier||'';document.getElementById('fco').value=p.cost||'';document.getElementById('fno').value=p.note||'';renderCatFilter();document.getElementById('fc').value=p.catId||'';setTax(p.tax||'10');document.getElementById('editDelBtn').style.display='';document.getElementById('editOv').style.display='';}
+function closeEdit(){document.getElementById('editOv').style.display='none';}
+function delFromModal(){
+  if(!editId)return;
+  const p=products[editId];
+  if(!p||!confirm(`「${p.name}」を削除しますか？\nこの操作は元に戻せません。`))return;
+  const np={...products};delete np[editId];
+  saveProds(np);closeEdit();toast('🗑 削除しました');
+}
+function setTax(v){curTax=v;document.getElementById('t10').className='tb'+(v==='10'?' t10':'');document.getElementById('t8').className='tb'+(v==='8'?' t8':'');}
+function saveP(){
+  const name=document.getElementById('fn').value.trim();if(!name){alert('商品名を入力してください');return}
+  const price=document.getElementById('fp').value;if(!price){alert('価格を入力してください');return}
+  const id=editId||'P'+Date.now().toString(36).toUpperCase()+Math.random().toString(36).slice(-4);
+  const data={id,name,price,tax:curTax,catId:document.getElementById('fc').value,unit:document.getElementById('fu').value.trim(),barcode:document.getElementById('fb').value.trim(),supplier:document.getElementById('fs').value.trim(),cost:document.getElementById('fco').value,note:document.getElementById('fno').value.trim(),createdAt:products[id]?.createdAt||Date.now(),updatedAt:Date.now()};
+  saveProds({...products,[id]:data});closeEdit();toast(editId?'✅ 更新しました':'✅ 商品を追加しました');
+}
+function delP(id){const p=products[id];if(!p||!confirm(`「${p.name}」を削除しますか？`))return;const np={...products};delete np[id];saveProds(np);toast('削除しました');}
+function saveProds(p){if(offline){products=p;localStorage.setItem('mc_op',JSON.stringify(p));renderP();renderAPSel();}else db.ref(PP).set(p);}
+
+// ===== 入荷記録 =====
+function renderAPSel(){
+  const sel=document.getElementById('aprod');if(!sel)return;const cur=sel.value;
+  sel.innerHTML='<option value="">商品を選択</option>'+Object.values(products).sort((a,b)=>a.name.localeCompare(b.name,'ja')).map(p=>`<option value="${p.id}" ${cur===p.id?'selected':''}>${esc(p.name)}</option>`).join('');
+}
+function addArrival(){
+  const pid=document.getElementById('aprod').value,qty=document.getElementById('aqty').value,date=document.getElementById('adate').value;
+  if(!pid){alert('商品を選択してください');return}if(!qty||Number(qty)<=0){alert('入荷数を入力してください');return}
+  const id='A'+Date.now().toString(36).toUpperCase();
+  const data={id,productId:pid,productName:products[pid]?.name||'',qty:Number(qty),date,note:document.getElementById('anote').value.trim(),createdAt:Date.now()};
+  saveArr({...arrivals,[id]:data});document.getElementById('aqty').value='';document.getElementById('anote').value='';toast('✅ 入荷を記録しました');
+}
+function renderA(){
+  const q=(document.getElementById('asi')?.value||'').toLowerCase();
+  const list=Object.values(arrivals).filter(a=>!q||a.productName.toLowerCase().includes(q)).sort((a,b)=>(b.date||'').localeCompare(a.date||'')||b.createdAt-a.createdAt);
+  document.getElementById('acnt').textContent=list.length+'件';
+  const tb=document.getElementById('ab'),em=document.getElementById('ea');
+  if(!list.length){tb.innerHTML='';em.style.display='';return;}em.style.display='none';
+  tb.innerHTML=list.map(a=>{const p=products[a.productId],c=p?cn(p.catId):'';return `<tr><td>${a.date||''}</td><td style="font-weight:700">${esc(a.productName)}</td><td>${c?`<span class="bj bc">${esc(c)}</span>`:''}</td><td class="r" style="font-weight:700">${a.qty}</td><td style="color:#999">${esc(a.note||'')}</td><td><button class="ab ad" onclick="delA('${a.id}')">削除</button></td></tr>`;}).join('');
+}
+function delA(id){if(!confirm('この入荷記録を削除しますか？'))return;const na={...arrivals};delete na[id];saveArr(na);}
+function saveArr(a){if(offline){arrivals=a;localStorage.setItem('mc_oa',JSON.stringify(a));renderA();}else db.ref(AP).set(a);}
+
+// ===== CSV出力 =====
+function doExportCsv(){
+  const list=Object.values(products);if(!list.length){alert('商品が登録されていません');return}
+  const hd=['ページ','No','商品名','バーコード','税率','個数','単位','税込単価','税抜単価','10%仕入計','8%仕入計','仕入先','仕入率%','仕入単価','在庫価格','備考'];
+  const rows=[hd];
+  list.sort((a,b)=>a.name.localeCompare(b.name,'ja')).forEach((p,i)=>{
+    const c=cn(p.catId)||'未分類',price=parseFloat(p.price)||0,rate=p.tax==='8'?.08:.10,tf=price>0?Math.round(price/(1+rate)):'';
+    rows.push([c,i+1,p.name,p.barcode||'',p.tax==='8'?'8%':'10%','',p.unit||'',p.price||'',tf,'','',p.supplier||'','',p.cost||'','',p.note||'']);
+  });
+  const csv='\uFEFF'+rows.map(r=>r.map(v=>{const s=String(v??'');return s.includes(',')||s.includes('"')?'"'+s.replace(/"/g,'""')+'"':s;}).join(',')).join('\r\n');
+  const blob=new Blob([csv],{type:'text/csv;charset=utf-8;'});
+  const url=URL.createObjectURL(blob);const a=document.createElement('a');
+  a.href=url;a.download=`商品マスタ_${new Date().toISOString().slice(0,10)}.csv`;a.click();URL.revokeObjectURL(url);
+  toast(`📥 ${list.length}件をCSV出力しました`);
+}
+
+// ===== インポート =====
+function openImport(){impRows=[];document.getElementById('impOv').style.display='';document.getElementById('impPrev').style.display='none';const b=document.getElementById('impBtn');b.disabled=true;b.style.background='#ccc';document.getElementById('idz').className='idz';document.getElementById('idzT').textContent='クリックまたはドロップ';}
+function closeImport(){document.getElementById('impOv').style.display='none';}
+function impDrop(ev){const f=ev.dataTransfer.files[0];if(f)readImp(f);}
+function impSel(inp){if(inp.files[0])readImp(inp.files[0]);}
+function readImp(file){const r=new FileReader();r.onload=e=>{let t=e.target.result;if(t.charCodeAt(0)===0xFEFF)t=t.slice(1);parseImp(t,file.name);};r.readAsText(file,'UTF-8');}
+function parseImp(text,fname){
+  const lines=text.split(/\r?\n/).filter(l=>l.trim());if(lines.length<2){alert('データが見つかりません');return}
+  const hd=splitLine(lines[0]);
+  const gi=ns=>{for(const n of ns){const i=hd.findIndex(h=>h.includes(n));if(i>=0)return i;}return -1;};
+  const ni=gi(['商品名']),pri=gi(['税込単価','価格']),ti=gi(['税率']),ui=gi(['単位']),si=gi(['仕入先']),ci=gi(['仕入単価','原価']),noi=gi(['備考']),pgi=gi(['ページ','カテゴリー']);
+  if(ni<0){alert('「商品名」列が見つかりません');return}
+  const ex=new Set(Object.values(products).map(p=>p.name.trim()));
+  impRows=[];
+  lines.slice(1).forEach(line=>{const cols=splitLine(line);const name=(cols[ni]||'').trim();if(!name)return;impRows.push({name,dup:ex.has(name),price:pri>=0?(cols[pri]||''):'',tax:ti>=0?(cols[ti]||'').includes('8')?'8':'10':'10',unit:ui>=0?(cols[ui]||''):'',supplier:si>=0?(cols[si]||''):'',cost:ci>=0?(cols[ci]||''):'',note:noi>=0?(cols[noi]||''):'',page:pgi>=0?(cols[pgi]||''):''});});
+  const nN=impRows.filter(r=>!r.dup).length,nD=impRows.filter(r=>r.dup).length;
+  const pv=document.getElementById('impPrev');
+  pv.innerHTML=`✅ ${fname}　新規: <span style="color:#1a5c2e">${nN}件</span>　重複スキップ: <span style="color:#b03a00">${nD}件</span>`;pv.style.display='';
+  document.getElementById('idz').className='idz ok';document.getElementById('idzT').textContent='✅ '+fname;
+  const b=document.getElementById('impBtn');b.disabled=nN===0;b.style.background=nN>0?'':'#ccc';
+}
+function doImport(){
+  const nr=impRows.filter(r=>!r.dup);if(!nr.length){closeImport();return}
+  const nc={...cats},np={...products};
+  nr.forEach(r=>{
+    let catId='';if(r.page){let c=Object.values(nc).find(x=>x.name===r.page);if(!c){const cid='C'+Date.now().toString(36)+Math.random().toString(36).slice(-3);c={id:cid,name:r.page};nc[cid]=c;}catId=c.id;}
+    const id='P'+Date.now().toString(36).toUpperCase()+Math.random().toString(36).slice(-3);
+    np[id]={id,name:r.name,price:r.price,tax:r.tax,catId,unit:r.unit,supplier:r.supplier,cost:r.cost,note:r.note,barcode:'',createdAt:Date.now(),updatedAt:Date.now()};
+  });
+  saveCats(nc);saveProds(np);closeImport();toast(`✅ ${nr.length}件をインポートしました`);
+}
+
+// ===== バーコードスキャン =====
+let scanStream=null, scanDetector=null, scanAnimId=null, scanFieldTarget=null;
+
+async function openScan(fieldId){
+  scanFieldTarget=fieldId||null;
+  document.getElementById('scanOv').style.display='';
+  document.getElementById('scanResult').innerHTML='<span style="color:#6b7a8d;font-size:12px">カメラ起動中...</span>';
+  document.getElementById('scanActions').innerHTML='';
+  await startCamera();
+}
+function openScanIntoField(fieldId){ openScan(fieldId); }
+function closeScan(){
+  stopCamera();
+  document.getElementById('scanOv').style.display='none';
+  scanFieldTarget=null;
+}
+async function startCamera(){
+  stopCamera();
+  // カメラ一覧取得
+  try{
+    const devices=await navigator.mediaDevices.enumerateDevices();
+    const cams=devices.filter(d=>d.kind==='videoinput');
+    const sel=document.getElementById('scanCamSel');
+    sel.innerHTML=cams.map((c,i)=>`<option value="${c.deviceId}">${c.label||'カメラ '+(i+1)}</option>`).join('');
+    // 背面カメラを優先
+    const back=cams.findIndex(c=>c.label.toLowerCase().includes('back')||c.label.toLowerCase().includes('rear')||c.label.includes('背面'));
+    if(back>=0)sel.selectedIndex=back;
+  }catch(e){}
+  await doStartCamera();
+}
+async function doStartCamera(){
+  try{
+    const sel=document.getElementById('scanCamSel');
+    const deviceId=sel.value;
+    const constraints={video:deviceId?{deviceId:{exact:deviceId}}:{facingMode:{ideal:'environment'}}};
+    scanStream=await navigator.mediaDevices.getUserMedia(constraints);
+    const video=document.getElementById('scanVideo');
+    video.srcObject=scanStream;
+    await video.play();
+    startDetection(video);
+    document.getElementById('scanResult').innerHTML='<span style="color:#6b7a8d;font-size:12px">カメラを商品バーコードに向けてください</span>';
+  }catch(e){
+    document.getElementById('scanResult').innerHTML=`<span style="color:#e74c3c;font-size:12px">⚠ カメラにアクセスできません<br>${e.message}</span>`;
+  }
+}
+async function switchCamera(){ if(scanStream)await doStartCamera(); }
+function stopCamera(){
+  cancelAnimationFrame(scanAnimId);
+  if(scanStream){scanStream.getTracks().forEach(t=>t.stop());scanStream=null;}
+}
+function startDetection(video){
+  if(!window.BarcodeDetector){
+    document.getElementById('scanResult').innerHTML='<span style="color:#e74c3c;font-size:12px">⚠ このブラウザはバーコード読み取りに対応していません<br>Chrome（Android）またはEdgeをお使いください</span>';
+    return;
+  }
+  try{ scanDetector=new BarcodeDetector({formats:['ean_13','ean_8','upc_a','upc_e','code_128','code_39','qr_code','itf']}); }catch(e){ scanDetector=new BarcodeDetector(); }
+  let lastCode='', lastTime=0;
+  async function detect(){
+    if(!scanStream){return;}
+    try{
+      const barcodes=await scanDetector.detect(video);
+      if(barcodes.length>0){
+        const code=barcodes[0].rawValue;
+        if(code!==lastCode||Date.now()-lastTime>3000){
+          lastCode=code; lastTime=Date.now();
+          onBarcodeDetected(code);
+        }
+      }
+    }catch(e){}
+    scanAnimId=requestAnimationFrame(detect);
+  }
+  detect();
+}
+function onBarcodeDetected(code){
+  if(navigator.vibrate)navigator.vibrate(80);
+  if(scanFieldTarget){
+    // フォーム入力モード
+    document.getElementById(scanFieldTarget).value=code;
+    document.getElementById('scanResult').innerHTML=`<span style="color:#1a5c2e;font-size:13px;font-weight:700">✅ 読み取り完了：${esc(code)}</span>`;
+    document.getElementById('scanActions').innerHTML=`<button class="btn bn" onclick="closeScan()">✅ この値を使う</button>`;
+    stopCamera();
+    return;
+  }
+  // 商品検索モード
+  const found=Object.values(products).find(p=>p.barcode===code);
+  const resEl=document.getElementById('scanResult');
+  const actEl=document.getElementById('scanActions');
+  if(found){
+    resEl.innerHTML=`<div style="font-weight:700;color:#1a5c2e;font-size:13px">✅ 商品が見つかりました</div><div style="font-size:13px;color:#0f2744;font-weight:700">${esc(found.name)}</div><div style="font-size:12px;color:#555">¥${Number(found.price).toLocaleString()} / ${found.tax==='8'?'8%軽減':'10%標準'}</div>`;
+    actEl.innerHTML=`<button class="btn bn" onclick="closeScan();openEdit('${found.id}')">✏ 編集</button><button class="btn bh" onclick="scanAddArrival('${found.id}')">🚚 入荷記録</button>`;
+  } else {
+    resEl.innerHTML=`<div style="font-weight:700;color:#b03a00;font-size:13px">⚠ 登録なし</div><div style="font-family:monospace;font-size:13px;color:#555">${esc(code)}</div><div style="font-size:11px;color:#999">このバーコードの商品は未登録です</div>`;
+    actEl.innerHTML=`<button class="btn bn" onclick="closeScan();openAddWithBarcode('${code}')">＋ 新規登録</button>`;
+  }
+}
+function scanAddArrival(pid){
+  closeScan();
+  switchTab('a');
+  document.getElementById('aprod').value=pid;
+  document.getElementById('aqty').focus();
+  toast('🚚 入荷数を入力してください');
+}
+function openAddWithBarcode(code){
+  openAdd();
+  document.getElementById('fb').value=code;
+}
+
+// ===== Airレジ上書きインポート =====
+let auRows=[];
+
+function openAirUpdate(){
+  auRows=[];
+  document.getElementById('airUpdOv').style.display='';
+  document.getElementById('auSummary').style.display='none';
+  document.getElementById('auDz').className='idz';
+  document.getElementById('auDzT').textContent='クリックまたはドロップ';
+  document.getElementById('auBtn').disabled=true;
+  document.getElementById('auBtn').style.background='#ccc';
+}
+function closeAirUpdate(){ document.getElementById('airUpdOv').style.display='none'; }
+function auDrop(ev){ const f=ev.dataTransfer.files[0]; if(f)readAuFile(f); }
+function auSel(inp){ if(inp.files[0])readAuFile(inp.files[0]); }
+function readAuFile(file){
+  const r=new FileReader();
+  r.onload=e=>{let t=e.target.result; if(t.charCodeAt(0)===0xFEFF)t=t.slice(1); parseAuCsv(t,file.name);};
+  r.readAsText(file,'Shift-JIS');
+}
+function parseAuCsv(text,fname){
+  const lines=text.split(/\r?\n/).filter(l=>l.trim());
+  if(lines.length<2){ alert('データが見つかりません'); return; }
+  // 1行目はバージョン行（v1300）、2行目がヘッダー
+  let hdrIdx=0;
+  if(!splitLine(lines[0]).some(h=>h.includes('商品名'))) hdrIdx=1;
+  const hd=splitLine(lines[hdrIdx]);
+
+  // 列インデックス（Airレジ v1300 固定列を優先使用）
+  const ni  = hd.findIndex(h=>h.includes('【必須】')&&h.includes('商品名'));          // col 4
+  const bci = hd.findIndex(h=>h==='バーコード');                                       // col 19
+  const pri = hd.findIndex(h=>h.includes('【必須】')&&h.includes('価格'));             // col 14
+  const tri = hd.findIndex(h=>h.includes('適用税率'));                                 // col 10
+  const cid = hd.findIndex(h=>h.includes('カテゴリーID'));                             // col 3
+
+  if(ni<0){ alert('「商品名」列が見つかりません。Airレジの「商品一括編集CSV」を使ってください'); return; }
+
+  const prodByName={};
+  Object.values(products).forEach(p=>{ prodByName[p.name.trim()]=p; });
+
+  auRows=[];
+  lines.slice(hdrIdx+1).forEach(line=>{
+    const cols=splitLine(line);
+    const name=(cols[ni]||'').trim(); if(!name)return;
+    const barcode = bci>=0?(cols[bci]||'').trim().replace(/^#+/,''):'';  // #10000071 → 10000071
+    const price   = pri>=0?(cols[pri]||'').trim():'';
+    const taxStr  = tri>=0?(cols[tri]||'').trim():'';
+    const catIdAir= cid>=0?(cols[cid]||'').trim():'';
+    const tax     = taxStr.includes('軽減')?'8':'10';
+    const existing= prodByName[name];
+    // バーコードが新しく付いた or 変わった場合を「更新」とみなす
+    const bcChanged = barcode && barcode !== (existing?.barcode||'');
+    auRows.push({name,barcode,price,tax,catIdAir,existing,
+      status: existing ? (bcChanged?'update':'same') : 'notfound'
+    });
+  });
+
+  const nUpd=auRows.filter(r=>r.status==='update').length;
+  const nSame=auRows.filter(r=>r.status==='same').length;
+  const nNF=auRows.filter(r=>r.status==='notfound').length;
+
+  document.getElementById('auDz').className='idz ok';
+  document.getElementById('auDzT').textContent='✅ '+fname;
+  document.getElementById('auSummary').style.display='';
+
+  document.getElementById('auStats').innerHTML=`
+    <div class="sbox sbox-all" style="min-width:80px;font-size:11px">Airレジ商品<span>${auRows.length}</span></div>
+    <div class="sbox sbox-new" style="min-width:80px;font-size:11px">バーコード更新<span>${nUpd}</span></div>
+    <div class="sbox sbox-ex" style="min-width:80px;font-size:11px">変更なし<span>${nSame}</span></div>
+    <div class="sbox sbox-dup" style="min-width:80px;font-size:11px">マスタ未登録<span>${nNF}</span></div>`;
+
+  const tbody=document.getElementById('auBody');
+  tbody.innerHTML=auRows.filter(r=>r.status!=='same').map(r=>{
+    const tag = r.status==='update' ? `<span class="tag-upd">🔄 更新</span>`
+              : r.status==='notfound' ? `<span class="tag-nm">⚠ 未登録</span>`
+              : `<span class="tag-new">変更なし</span>`;
+    const bcDisp = r.barcode
+      ? `<span style="font-family:monospace;font-size:11px">${esc(r.barcode)}</span>`
+      : '<span style="color:#ccc">なし</span>';
+    const prevBc = r.existing?.barcode
+      ? `<span style="font-family:monospace;font-size:10px;color:#aab">（現：${esc(r.existing.barcode)}）</span>` : '';
+    return `<tr><td>${tag}</td><td style="font-weight:700">${esc(r.name)}</td><td>${bcDisp}${prevBc}</td><td class="r">${r.price?'¥'+Number(r.price).toLocaleString():''}</td><td>${r.tax==='8'?'<span class="b8 bj">8%軽減</span>':'<span class="b10 bj">10%標準</span>'}</td></tr>`;
+  }).join('')||'<tr><td colspan="5" style="text-align:center;color:#aab;padding:16px">差分なし（すべて最新）</td></tr>';
+
+  const btn=document.getElementById('auBtn');
+  btn.disabled=nUpd===0; btn.style.background=nUpd>0?'':'#ccc';
+  if(nUpd===0) btn.title='更新対象がありません';
+}
+function doAirUpdate(){
+  const toUpdate=auRows.filter(r=>r.status==='update');
+  if(!toUpdate.length){closeAirUpdate();return}
+  const np={...products};
+  toUpdate.forEach(r=>{
+    const p=r.existing; if(!p)return;
+    np[p.id]={...p, barcode:r.barcode,
+      price:r.price||p.price,
+      tax:r.tax||p.tax,
+      updatedAt:Date.now()
+    };
+  });
+  saveProds(np);
+  closeAirUpdate();
+  toast(`✅ ${toUpdate.length}件を上書き更新しました（バーコード・価格・税率）`);
+}
+
+
+// ===== バーコード振り直し（商品選択式・EAN-13固定） =====
+// EAN-13: 2 + 11桁連番 + チェックディジット1桁 = 13桁
+function calcEan13Check(body12){
+  // 奇数位置×1、偶数位置×3（左から1始まり）
+  const d = body12.split('').map(Number);
+  const sum = d.reduce((s,v,i) => s + v * (i%2===0 ? 1 : 3), 0);
+  return (10 - (sum % 10)) % 10;
+}
+function genBarcode(seq){
+  const body = '2' + String(seq).padStart(11, '0');
+  return body + calcEan13Check(body);
+}
+
+// 選択状態（productId → true/false）
+let bcSel = {};
+
+function openBcReset(){
+  if(!Object.keys(products).length){ toast('商品が登録されていません'); return; }
+  // 初期はすべて選択
+  bcSel = {};
+  Object.keys(products).forEach(id => { bcSel[id] = true; });
+  document.getElementById('bcStartNum').value = '1';
+  document.getElementById('bcResetOv').style.display = '';
+  renderBcList();
+}
+function closeBcReset(){ document.getElementById('bcResetOv').style.display = 'none'; }
+
+function bcSelAll(on){
+  Object.keys(bcSel).forEach(id => { bcSel[id] = on; });
+  document.getElementById('bcChkAll').checked = on;
+  renderBcList();
+}
+function bcSelNoBarcode(){
+  Object.keys(bcSel).forEach(id => { bcSel[id] = !products[id]?.barcode; });
+  renderBcList();
+}
+
+function renderBcList(){
+  const start = Math.max(1, parseInt(document.getElementById('bcStartNum').value)||1);
+  const list = Object.values(products).sort((a,b)=>(a.createdAt||0)-(b.createdAt||0));
+  let seq = start;
+  const tbody = document.getElementById('bcListBody');
+  tbody.innerHTML = list.map(p => {
+    const checked = bcSel[p.id];
+    const newBc = checked ? genBarcode(seq++) : '—';
+    const bcColor = checked ? '#1a5c2e' : '#ccc';
+    const rowBg = checked ? '' : 'background:#fafafa;';
+    return `<tr style="${rowBg}">
+      <td style="padding:7px 10px;border-bottom:1px solid #eee;text-align:center">
+        <input type="checkbox" ${checked?'checked':''} style="accent-color:#2a6496"
+          onchange="bcSel['${p.id}']=this.checked;renderBcList()">
+      </td>
+      <td style="padding:7px 10px;border-bottom:1px solid #eee;font-weight:${checked?'700':'400'};color:${checked?'#0f2744':'#aab'}">${esc(p.name)}</td>
+      <td style="padding:7px 10px;border-bottom:1px solid #eee;font-family:monospace;font-size:11px;color:#aab">${p.barcode?esc(p.barcode):'<span style="color:#ddd">なし</span>'}</td>
+      <td style="padding:7px 10px;border-bottom:1px solid #eee;font-family:monospace;font-size:12px;font-weight:700;color:${bcColor}">${newBc}</td>
+    </tr>`;
+  }).join('');
+
+  const selCount = Object.values(bcSel).filter(Boolean).length;
+  const allChecked = selCount === list.length;
+  document.getElementById('bcChkAll').checked = allChecked;
+  document.getElementById('bcChkAll').indeterminate = selCount > 0 && !allChecked;
+  document.getElementById('bcSelNote').textContent = `${selCount} 件を選択中（全 ${list.length} 件）`;
+  const btn = document.getElementById('bcExecBtn');
+  btn.disabled = selCount === 0;
+  btn.style.background = selCount > 0 ? '#c0392b' : '#ccc';
+}
+
+function doBcReset(){
+  const selIds = Object.entries(bcSel).filter(([,v])=>v).map(([id])=>id);
+  if(!selIds.length){ toast('商品を選択してください'); return; }
+  if(!confirm(`選択した ${selIds.length} 件のバーコードを振り直しますか？\nこの操作は元に戻せません。`)) return;
+  const start = Math.max(1, parseInt(document.getElementById('bcStartNum').value)||1);
+  const list = Object.values(products).sort((a,b)=>(a.createdAt||0)-(b.createdAt||0));
+  const np = {...products};
+  let seq = start;
+  list.forEach(p => {
+    if(bcSel[p.id]) np[p.id] = {...p, barcode: genBarcode(seq++), updatedAt: Date.now()};
+  });
+  saveProds(np);
+  closeBcReset();
+  toast(`✅ ${selIds.length} 件のバーコードを振り直しました`);
+}
+
+// ===== ラベルCSV出力 =====
+let labelSel = {};       // productId → true/false
+let labelCatFilter = ''; // 選択中カテゴリーID（''=全て）
+
+function openLabelCsv(){
+  if(!Object.keys(products).length){ toast('商品が登録されていません'); return; }
+  labelCatFilter = '';
+  labelSel = {};
+  Object.keys(products).forEach(id => { labelSel[id] = true; });
+  document.getElementById('labelSearch').value = '';
+  document.getElementById('labelOv').style.display = '';
+  renderLabelCatBtns();
+  renderLabelList();
+}
+function closeLabelCsv(){ document.getElementById('labelOv').style.display = 'none'; }
+
+function renderLabelCatBtns(){
+  const el = document.getElementById('labelCatBtns');
+  const entries = Object.entries(cats);
+  let html = `<button class="btn" style="padding:4px 12px;font-size:12px;${labelCatFilter===''?'background:#1a3a5c;color:#fff':'background:#e8edf5;color:#1a3a5c'}" onclick="setLabelCat('')">すべて</button>`;
+  html += entries.map(([id,c])=>`<button class="btn" style="padding:4px 12px;font-size:12px;${labelCatFilter===id?'background:#1a3a5c;color:#fff':'background:#e8edf5;color:#1a3a5c'}" onclick="setLabelCat('${id}')">${esc(c.name)}</button>`).join('');
+  el.innerHTML = html;
+}
+function setLabelCat(catId){
+  labelCatFilter = catId;
+  renderLabelCatBtns();
+  renderLabelList();
+}
+
+function getLabelFilteredList(){
+  const q = (document.getElementById('labelSearch').value||'').toLowerCase();
+  return Object.values(products)
+    .filter(p => {
+      if(labelCatFilter && p.catId !== labelCatFilter) return false;
+      if(q && !p.name.toLowerCase().includes(q)) return false;
+      return true;
+    })
+    .sort((a,b) => a.name.localeCompare(b.name, 'ja'));
+}
+
+function labelSelAll(on){
+  const list = getLabelFilteredList();
+  list.forEach(p => { labelSel[p.id] = on; });
+  document.getElementById('labelChkAll').checked = on;
+  renderLabelList();
+}
+
+function renderLabelList(){
+  const list = getLabelFilteredList();
+  const tbody = document.getElementById('labelListBody');
+
+  tbody.innerHTML = list.map(p => {
+    const checked = labelSel[p.id];
+    const cname = cn(p.catId);
+    const hasBc = !!p.barcode;
+    return `<tr style="${checked?'':'background:#fafafa'}">
+      <td style="padding:7px 10px;border-bottom:1px solid #eee;text-align:center">
+        <input type="checkbox" ${checked?'checked':''} style="accent-color:#2a6496"
+          onchange="labelSel['${p.id}']=this.checked;renderLabelList()">
+      </td>
+      <td style="padding:7px 10px;border-bottom:1px solid #eee;font-weight:${checked?'700':'400'};color:${checked?'#0f2744':'#aab'}">${esc(p.name)}</td>
+      <td style="padding:7px 10px;border-bottom:1px solid #eee">${cname?`<span class="bj bc">${esc(cname)}</span>`:''}</td>
+      <td style="padding:7px 10px;border-bottom:1px solid #eee;text-align:right;font-weight:700;color:${checked?'#0f2744':'#aab'}">¥${Number(p.price||0).toLocaleString()}</td>
+      <td style="padding:7px 10px;border-bottom:1px solid #eee;font-family:monospace;font-size:11px;color:${hasBc?'#555':'#ffb74d'}">
+        ${hasBc ? esc(p.barcode) : '⚠ なし'}
+      </td>
+    </tr>`;
+  }).join('') || '<tr><td colspan="5" style="text-align:center;color:#aab;padding:20px">該当する商品がありません</td></tr>';
+
+  // 全選択チェックボックスの状態更新
+  const selCount = list.filter(p => labelSel[p.id]).length;
+  const chkAll = document.getElementById('labelChkAll');
+  chkAll.checked = selCount === list.length && list.length > 0;
+  chkAll.indeterminate = selCount > 0 && selCount < list.length;
+
+  // フッター件数・ボタン状態
+  const totalSel = Object.values(labelSel).filter(Boolean).length;
+  const noBarcode = Object.entries(labelSel).filter(([id,v])=>v&&!products[id]?.barcode).length;
+  let note = `${totalSel} 件を選択中`;
+  if(noBarcode) note += `　⚠ バーコードなし ${noBarcode} 件（CSV行には空欄で出力されます）`;
+  document.getElementById('labelSelNote').innerHTML = note;
+  const btn = document.getElementById('labelExecBtn');
+  btn.disabled = totalSel === 0;
+  btn.style.background = totalSel > 0 ? '#1a5c2e' : '#ccc';
+}
+
+function doExportLabelCsv(){
+  const selList = Object.values(products).filter(p => labelSel[p.id])
+    .sort((a,b) => a.name.localeCompare(b.name, 'ja'));
+  if(!selList.length){ toast('商品を選択してください'); return; }
+
+  // ラベル屋さん向けCSV: 商品名, 税込価格, バーコード
+  const header = ['商品名', '税込価格', 'バーコード'];
+  const rows = [header, ...selList.map(p => [
+    p.name,
+    p.price ? '¥' + Number(p.price).toLocaleString() : '',
+    p.barcode || ''
+  ])];
+
+  const csv = '\uFEFF' + rows.map(r =>
+    r.map(v => { const s = String(v ?? ''); return s.includes(',') || s.includes('"') ? '"' + s.replace(/"/g, '""') + '"' : s; }).join(',')
+  ).join('\r\n');
+
+  const blob = new Blob([csv], {type: 'text/csv;charset=utf-8;'});
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = `ラベル_${new Date().toISOString().slice(0,10)}.csv`;
+  a.click();
+  URL.revokeObjectURL(url);
+  closeLabelCsv();
+  toast(`✅ ${selList.length} 件のラベルCSVを出力しました`);
+}
+
+function splitLine(line){const res=[];let cur='',inQ=false;for(let i=0;i<line.length;i++){const c=line[i];if(c==='"'){if(inQ&&line[i+1]==='"'){cur+='"';i++;}else inQ=!inQ;}else if(c===','&&!inQ){res.push(cur.trim());cur='';}else cur+=c;}res.push(cur.trim());return res;}
+function esc(s){return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;')}
+let tt=null;
+function toast(msg){const el=document.getElementById('toast');el.textContent=msg;el.classList.add('show');clearTimeout(tt);tt=setTimeout(()=>el.classList.remove('show'),2500);}
+
+// ===== 自動起動 =====
+(function(){
+  document.getElementById('adate').value=new Date().toISOString().slice(0,10);
+  try{
+    const s=JSON.parse(localStorage.getItem(FK)||'null');
+    if(s&&s.databaseURL&&s.apiKey){
+      document.getElementById('sDbUrl').value=s.databaseURL;
+      document.getElementById('sApiKey').value=s.apiKey;
+      document.getElementById('sProjId').value=s.projectId||'';
+      loadFB(()=>connectFB(s));
+    }
+  }catch(e){}
+})();
+</script>
+</body>
+</html>

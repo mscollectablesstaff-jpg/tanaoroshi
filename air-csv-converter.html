@@ -1,0 +1,458 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Airレジ CSV統合ツール</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/encoding-japanese/2.0.0/encoding.min.js"></script>
+<style>
+*{box-sizing:border-box;margin:0;padding:0}
+body{font-family:'Hiragino Kaku Gothic ProN','Yu Gothic',Meiryo,sans-serif;background:#f0f4f8;min-height:100vh;color:#1a2a3a;font-size:13px}
+.header{background:linear-gradient(135deg,#0f2744 0%,#1a4a8a 100%);color:#fff;padding:16px 24px;box-shadow:0 2px 12px rgba(0,0,0,.2)}
+.header h1{font-size:18px;font-weight:900}
+.header p{font-size:11px;opacity:.7;margin-top:3px}
+.main{max-width:1000px;margin:0 auto;padding:20px 16px}
+.flow{display:flex;align-items:center;gap:8px;background:#fff;border-radius:10px;padding:12px 18px;margin-bottom:18px;box-shadow:0 1px 6px rgba(0,0,0,.07);flex-wrap:wrap}
+.fs{text-align:center;padding:6px 12px;border-radius:7px;font-size:11px;font-weight:700;white-space:nowrap;line-height:1.5}
+.fs-air{background:#fff3e8;color:#c06000;border:1.5px solid #ffb74d}
+.fs-tan{background:#e8f5e9;color:#1b5e20;border:1.5px solid #81c784}
+.fs-check{background:#e8eaf6;color:#283593;border:1.5px solid #7986cb}
+.fs-dl{background:#fce4ec;color:#880e4f;border:1.5px solid #f48fb1}
+.farr{color:#bbb;font-size:16px;font-weight:700}
+.card{background:#fff;border-radius:10px;box-shadow:0 1px 8px rgba(0,0,0,.07);margin-bottom:16px;overflow:hidden}
+.card-head{background:#f5f7fa;border-bottom:1px solid #e2e8f0;padding:12px 18px;display:flex;align-items:center;gap:10px}
+.card-head h2{font-size:13px;font-weight:700;color:#0f2744;flex:1}
+.sbadge{width:22px;height:22px;border-radius:50%;background:#0f2744;color:#fff;font-size:11px;font-weight:900;display:flex;align-items:center;justify-content:center;flex-shrink:0}
+.card-body{padding:16px 18px}
+.two-col{display:grid;grid-template-columns:1fr 1fr;gap:16px}
+@media(max-width:600px){.two-col{grid-template-columns:1fr}}
+.dz{border:2px dashed #b0bec5;border-radius:8px;padding:22px 16px;text-align:center;cursor:pointer;transition:.2s;background:#fafbfc;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:5px;min-height:110px}
+.dz:hover,.dz.drag{border-color:#1a6ea6;background:#e8f4fd}
+.dz.ok-air{border-color:#FF6600;background:#fff8f0}
+.dz.ok-tan{border-color:#2ecc71;background:#f0fff8}
+.dz-label{font-size:12px;font-weight:700;color:#c06000;margin-bottom:6px}
+.dz-label-tan{color:#1b8a3c}
+.map-tbl{width:100%;border-collapse:collapse}
+.map-tbl th{background:#0f2744;color:#fff;padding:7px 10px;text-align:left;font-weight:700;font-size:12px}
+.map-tbl td{padding:6px 10px;border-bottom:1px solid #eee;vertical-align:middle}
+.map-tbl tr:last-child td{border-bottom:none}
+.inp-s{width:90px;padding:4px 7px;border:1.5px solid #d0d7de;border-radius:5px;font-size:12px;font-family:inherit;text-align:center}
+.inp-s:focus{outline:none;border-color:#1a6ea6}
+.summary{display:flex;gap:10px;margin-bottom:14px;flex-wrap:wrap}
+.sbox{padding:10px 16px;border-radius:8px;font-size:12px;font-weight:700;text-align:center;min-width:90px}
+.sbox span{display:block;font-size:22px;font-weight:900;margin-top:2px}
+.sbox-all{background:#e8edf5;color:#0f2744}
+.sbox-new{background:#d4eed8;color:#1a5c2e}
+.sbox-dup{background:#ffe0cc;color:#b03a00}
+.sbox-ex{background:#e8e8e8;color:#555}
+.res-wrap{overflow-x:auto;max-height:380px;overflow-y:auto}
+.res-tbl{width:100%;border-collapse:collapse;font-size:12px}
+.res-tbl th{background:#1a3a5c;color:#fff;padding:7px 10px;white-space:nowrap;position:sticky;top:0;z-index:1;font-size:11px}
+.res-tbl td{padding:5px 10px;border-bottom:1px solid #eee;white-space:nowrap}
+.res-tbl tr:nth-child(even) td{background:#fafbff}
+.row-new td{background:#f0fff4 !important}
+.row-dup td{background:#fff8f0 !important}
+.badge{display:inline-block;padding:1px 7px;border-radius:3px;font-size:11px;font-weight:700}
+.b-new{background:#d4eed8;color:#1a5c2e}
+.b-dup{background:#ffe0cc;color:#b03a00}
+.b-ex{background:#e8e8e8;color:#555}
+.b-8{background:#e8f5ff;color:#1a5090}
+.b-10{background:#fff3e8;color:#c06000}
+.b-auto{background:#e8eaf6;color:#283593}
+.filter-row{display:flex;gap:12px;margin-bottom:10px;flex-wrap:wrap;align-items:center}
+.filter-row label{display:flex;align-items:center;gap:4px;font-size:12px;cursor:pointer;font-weight:700}
+.btn{display:inline-flex;align-items:center;gap:6px;padding:10px 22px;border:none;border-radius:7px;font-size:13px;font-weight:700;cursor:pointer;font-family:inherit;transition:.15s}
+.btn-primary{background:#FF6600;color:#fff;box-shadow:0 2px 8px rgba(255,102,0,.3)}
+.btn-primary:hover{background:#e55a00}
+.btn-sec{background:#e8edf5;color:#0f2744}
+.btn-sec:hover{background:#d8e0ee}
+.note{font-size:11px;color:#777;line-height:1.8;margin-top:10px}
+.note strong{color:#333}
+.err{background:#fde8e8;border:1px solid #f5a5a5;color:#c0392b;border-radius:7px;padding:10px 14px;font-size:12px;font-weight:700;margin-top:12px;display:none}
+</style>
+</head>
+<body>
+
+<div class="header">
+  <h1>🏷️ Airレジ CSV統合ツール</h1>
+  <p>商品マスタCSV → Airレジアップロード用CSV（Shift-JIS）　※ Airレジ既存CSVは任意（なくてもOK）</p>
+</div>
+
+<div class="main">
+
+  <div class="flow">
+    <div class="fs fs-air">① Airレジ既存CSV<br><span style="font-weight:400;font-size:10px">（任意・重複チェック用）</span></div>
+    <div class="farr">＋</div>
+    <div class="fs fs-tan">② 商品マスタ or<br>棚卸システムCSV</div>
+    <div class="farr">→</div>
+    <div class="fs fs-check">③ カテゴリー設定・<br>重複チェック</div>
+    <div class="farr">→</div>
+    <div class="fs fs-dl">④ AirレジへCSV<br>アップロード</div>
+  </div>
+
+  <div class="card">
+    <div class="card-head"><div class="sbadge">1</div><h2>CSVファイルを読み込む</h2></div>
+    <div class="card-body">
+      <div class="two-col">
+        <div>
+          <div class="dz-label">📥 Airレジ 既存商品CSV　<span style="font-weight:400;font-size:11px;color:#aaa">（任意・なくてもOK）</span></div>
+          <div class="dz" id="dz-air" onclick="document.getElementById('fi-air').click()"
+               ondragover="dzOver(event,'dz-air')" ondragleave="dzOut('dz-air')" ondrop="dzDrop(event,'air')">
+            <div style="font-size:28px">🏪</div>
+            <div style="font-size:13px;font-weight:700;color:#555" id="dz-air-t">クリックまたはドロップ</div>
+            <div style="font-size:11px;color:#999;line-height:1.5">Airレジ →「商品一括編集」で<br>ダウンロードしたCSV（Shift-JIS）</div>
+          </div>
+          <input type="file" id="fi-air" accept=".csv" style="display:none" onchange="onFile(this,'air')">
+        </div>
+        <div>
+          <div class="dz-label dz-label-tan">📦 棚卸システム CSV</div>
+          <div class="dz" id="dz-tan" onclick="document.getElementById('fi-tan').click()"
+               ondragover="dzOver(event,'dz-tan')" ondragleave="dzOut('dz-tan')" ondrop="dzDrop(event,'tan')">
+            <div style="font-size:28px">📋</div>
+            <div style="font-size:13px;font-weight:700;color:#555" id="dz-tan-t">クリックまたはドロップ</div>
+            <div style="font-size:11px;color:#999;line-height:1.5">棚卸システムの「📥CSV」で<br>ダウンロードしたファイル（UTF-8）</div>
+          </div>
+          <input type="file" id="fi-tan" accept=".csv" style="display:none" onchange="onFile(this,'tan')">
+        </div>
+      </div>
+      <!-- カテゴリーCSV（任意） -->
+      <div style="margin-top:12px">
+        <div class="dz-label" style="color:#283593;margin-bottom:6px">🏷️ カテゴリーCSV（任意・読み込むとドロップダウンで選択できます）</div>
+        <div class="dz" id="dz-cat" onclick="document.getElementById('fi-cat').click()"
+             ondragover="dzOver(event,'dz-cat')" ondragleave="dzOut('dz-cat')" ondrop="dzDrop(event,'cat')"
+             style="flex-direction:row;gap:12px;padding:12px 18px;min-height:auto">
+          <div style="font-size:22px">🗂️</div>
+          <div style="text-align:left">
+            <div style="font-size:12px;font-weight:700;color:#555" id="dz-cat-t">クリックまたはドロップ</div>
+            <div style="font-size:11px;color:#999">Airレジ →「カテゴリー」でダウンロードしたCSV</div>
+          </div>
+        </div>
+        <input type="file" id="fi-cat" accept=".csv" style="display:none" onchange="onFile(this,'cat')">
+      </div>
+      <div class="err" id="errBox"></div>
+    </div>
+  </div>
+
+  <div class="card" id="step2" style="display:none">
+    <div class="card-head"><div class="sbadge">2</div><h2>新規商品のカテゴリー設定（任意）</h2></div>
+    <div class="card-body">
+      <p style="font-size:12px;color:#666;margin-bottom:12px">棚卸ページごとにAirレジのカテゴリーIDを設定できます。</p>
+      <table class="map-tbl">
+        <thead><tr><th>棚卸ページ</th><th>新規商品数</th><th>カテゴリーID</th></tr></thead>
+        <tbody id="mapBody"></tbody>
+      </table>
+    </div>
+  </div>
+
+  <div class="card" id="step3" style="display:none">
+    <div class="card-head">
+      <div class="sbadge">3</div>
+      <h2>重複チェック結果</h2>
+      <button class="btn btn-sec" style="padding:5px 12px;font-size:12px" onclick="buildResult()">🔄 更新</button>
+    </div>
+    <div class="card-body">
+      <div class="summary" id="summary"></div>
+      <div class="filter-row">
+        <span style="font-size:12px;color:#666;font-weight:700">表示：</span>
+        <label><input type="checkbox" id="chk-new" checked onchange="renderTable()"> <span style="color:#1a5c2e">🟢 新規追加</span></label>
+        <label><input type="checkbox" id="chk-dup" checked onchange="renderTable()"> <span style="color:#b03a00">🟠 重複スキップ</span></label>
+        <label><input type="checkbox" id="chk-ex" onchange="renderTable()"> <span style="color:#555">⚪ 既存（変更なし）</span></label>
+      </div>
+      <div class="res-wrap">
+        <table class="res-tbl">
+          <thead><tr>
+            <th>判定</th><th>商品名</th><th>価格（税込）</th><th>税率</th>
+            <th>カテゴリーID</th><th>バーコード</th><th>自動発番</th><th>出所</th>
+          </tr></thead>
+          <tbody id="resBody"></tbody>
+        </table>
+      </div>
+      <div class="note">
+        ※ 重複判定は<strong>商品名が完全一致</strong>で行います。<br>
+        ※ 重複商品はAirレジ側のデータ（バーコード含む）をそのまま使用し、棚卸側をスキップします。<br>
+        ※ 新規商品はバーコードがあればそのまま出力、なければAirレジが自動発番します。
+      </div>
+    </div>
+  </div>
+
+  <div class="card" id="step4" style="display:none">
+    <div class="card-head"><div class="sbadge">4</div><h2>Airレジ用CSV ダウンロード</h2></div>
+    <div class="card-body">
+      <p style="font-size:12px;color:#555;margin-bottom:14px">
+        「既存商品 ＋ 新規商品（重複除く）」を <strong>Shift-JIS形式</strong> で出力します。<br>
+        Airレジ管理画面 → 商品 → 商品一括編集 → CSVインポートでアップロードしてください。
+      </p>
+      <button class="btn btn-primary" onclick="doDownload()">📥 Airレジ用CSV ダウンロード</button>
+    </div>
+  </div>
+
+</div>
+
+<script>
+// Airレジ CSV列インデックス（v1300形式）
+const C = {
+  id:0, varId:1, del:2, catId:3, name:4, nameR:5, nameI:6,
+  var1:7, var2:8, taxSet:9, taxRate:10, taxP2:11, priceSet:12,
+  unitId:13, price:14, price2:15, cost:16, code:17,
+  autoBC:18, barcode:19, point:20, display:21, receipt:22,
+  regPrint:23, note:24, oldCode:25, tagId:26
+};
+const NCOLS = 27;
+
+let airRows=[], airVer='', airHeader=[];
+let tanRows=[], pageMap={}, merged=[];
+let catList=[]; // [{id, name}] カテゴリー一覧
+
+function dzOver(ev,id){ev.preventDefault();document.getElementById(id).classList.add('drag')}
+function dzOut(id){document.getElementById(id).classList.remove('drag')}
+function dzDrop(ev,type){ev.preventDefault();dzOut(type==='air'?'dz-air':type==='tan'?'dz-tan':'dz-cat');const f=ev.dataTransfer.files[0];if(f)readFile(f,type)}
+function onFile(inp,type){if(inp.files[0])readFile(inp.files[0],type)}
+
+function readFile(file,type){
+  const r=new FileReader();
+  if(type==='tan'){
+    // 棚卸CSV: UTF-8
+    r.onload=e=>{
+      let t=e.target.result;
+      if(t.charCodeAt(0)===0xFEFF) t=t.slice(1);
+      parseTan(t,file.name);
+    };
+    r.readAsText(file,'UTF-8');
+  } else {
+    // AirレジCSV・カテゴリーCSV: Shift-JIS → encoding-japaneseで確実に変換
+    r.onload=e=>{
+      const arr=new Uint8Array(e.target.result);
+      let t;
+      if(window.Encoding){
+        const uni=Encoding.convert(arr,{to:'UNICODE',from:'SJIS',type:'string'});
+        t=uni;
+      } else {
+        // フォールバック
+        t=new TextDecoder('shift-jis').decode(arr);
+      }
+      if(t.charCodeAt(0)===0xFEFF) t=t.slice(1);
+      if(type==='air') parseAir(t,file.name);
+      else parseCat(t,file.name);
+    };
+    r.readAsArrayBuffer(file);
+  }
+}
+
+function parseCat(text,fname){
+  const lines=text.split(/\r?\n/).filter(l=>l.trim());
+  catList=[];
+  lines.slice(1).forEach(line=>{
+    const cols=splitLine(line);
+    const id=(cols[0]||'').trim(), name=(cols[1]||'').trim();
+    if(id&&name) catList.push({id,name});
+  });
+  const dz=document.getElementById('dz-cat');
+  dz.style.borderColor='#7986cb'; dz.style.background='#f0f0ff';
+  document.getElementById('dz-cat-t').innerHTML=`<span style="color:#283593;font-weight:700">✅ ${fname}　${catList.length}カテゴリー読み込み完了</span>`;
+  // カテゴリー設定テーブルが既に表示中なら再描画
+  if(document.getElementById('step2').style.display!=='none') buildMapTable();
+}
+
+function parseAir(text,fname){
+  const lines=text.split(/\r?\n/).filter(l=>l.trim());
+  if(lines.length<2){showErr('Airレジ CSVが空です');return}
+  airVer=splitLine(lines[0])[0]||'';
+  airHeader=splitLine(lines[1]);
+  if(!airHeader.some(h=>h.includes('商品名'))){
+    showErr('Airレジの形式が違います。管理画面の「商品一括編集」からダウンロードしたCSVを使ってください。');return;
+  }
+  airRows=[];
+  lines.slice(2).forEach(line=>{
+    const cols=splitLine(line);
+    if(cols.length<5)return;
+    const name=(cols[C.name]||'').trim();
+    if(!name)return;
+    airRows.push({cols,name,barcode:(cols[C.barcode]||'').replace(/^#+/,''),autoBC:cols[C.autoBC]||''});
+  });
+  const dz=document.getElementById('dz-air');
+  dz.className='dz ok-air';
+  document.getElementById('dz-air-t').innerHTML=`<span style="color:#c06000;font-weight:700">✅ ${fname}<br>${airRows.length}件読み込み完了</span>`;
+  hideErr(); tryBuild();
+}
+
+function parseTan(text,fname){
+  const lines=text.split(/\r?\n/).filter(l=>l.trim());
+  if(lines.length<2){showErr('棚卸 CSVが空です');return}
+  const hd=splitLine(lines[0]);
+  const gi=ns=>{for(const n of ns){const i=hd.findIndex(h=>h.includes(n));if(i>=0)return i;}return -1;};
+  const pi=gi(['ページ']),ni=gi(['商品名']),ti=gi(['税率']),ui=gi(['単位']),pri=gi(['税込単価']),bci=gi(['バーコード']);
+  if(ni<0||pri<0){showErr('棚卸CSVの形式が違います。棚卸システムの「📥CSV」ボタンからダウンロードしたファイルを使ってください。');return}
+  tanRows=[];pageMap={};
+  lines.slice(1).forEach(line=>{
+    const cols=splitLine(line);
+    const name=(cols[ni]||'').trim();
+    if(!name)return;
+    const page=pi>=0?(cols[pi]||'未設定'):'未設定';
+    const barcode=bci>=0?(cols[bci]||'').replace(/^#+/,''):'';
+    tanRows.push({page,name,tax:ti>=0?(cols[ti]||'10%'):'10%',price:pri>=0?(cols[pri]||''):'',unit:ui>=0?(cols[ui]||''):'',barcode});
+    if(!pageMap[page])pageMap[page]={catId:'',newCount:0};
+  });
+  const dz=document.getElementById('dz-tan');
+  dz.className='dz ok-tan';
+  document.getElementById('dz-tan-t').innerHTML=`<span style="color:#1b8a3c;font-weight:700">✅ ${fname}<br>${tanRows.length}件読み込み完了</span>`;
+  hideErr(); tryBuild();
+}
+
+function tryBuild(){
+  // 商品マスタCSV（右側）だけあればOK。Airレジ既存CSVは任意。
+  if(!tanRows.length)return;
+  buildMapTable(); buildResult();
+  ['step2','step3','step4'].forEach(id=>document.getElementById(id).style.display='');
+}
+
+function buildMapTable(){
+  const an=new Set(airRows.map(r=>norm(r.name)));
+  Object.keys(pageMap).forEach(p=>{pageMap[p].newCount=0;});
+  tanRows.forEach(r=>{if(!an.has(norm(r.name)))pageMap[r.page].newCount++;});
+  const tb=document.getElementById('mapBody');
+  tb.innerHTML='';
+  Object.entries(pageMap).forEach(([name,info])=>{
+    const tr=document.createElement('tr');
+    const catInput = catList.length
+      ? `<select style="width:200px;padding:4px 7px;border:1.5px solid #d0d7de;border-radius:5px;font-size:12px;font-family:inherit"
+             onchange="pageMap[${JSON.stringify(name)}].catId=this.value">
+           <option value="">（未設定）</option>
+           ${catList.map(c=>`<option value="${esc(c.id)}" ${info.catId===c.id?'selected':''}>${esc(c.id)} ${esc(c.name)}</option>`).join('')}
+         </select>`
+      : `<input class="inp-s" placeholder="例: 0015" value="${esc(info.catId)}"
+             oninput="pageMap[${JSON.stringify(name)}].catId=this.value">`;
+    tr.innerHTML=`<td><span style="background:#e8edf5;border-radius:4px;padding:2px 8px;font-weight:700;color:#0f2744">${esc(name)}</span></td>
+      <td style="text-align:center;color:#1a5c2e;font-weight:700">${info.newCount}件</td>
+      <td>${catInput}</td>`;
+    tb.appendChild(tr);
+  });
+}
+
+function buildResult(){
+  const an=new Set(airRows.map(r=>norm(r.name)));
+  merged=[];
+  // Airレジ既存CSV（ある場合のみ）
+  airRows.forEach(r=>{
+    merged.push({status:'existing',name:r.name,price:r.cols[C.price]||'',
+      taxRate:r.cols[C.taxRate]||'',catId:r.cols[C.catId]||'',
+      barcode:r.barcode,autoBC:r.autoBC,source:'Airレジ（既存）',_cols:r.cols});
+  });
+  // 商品マスタ / 棚卸CSV
+  tanRows.forEach(r=>{
+    const isDup=an.has(norm(r.name));
+    const pg=pageMap[r.page]||{};
+    merged.push({status:isDup?'dup':'new',name:r.name,price:r.price,
+      taxRate:r.tax==='8%'?'軽減税率':'標準税率',
+      catId:pg.catId||'',barcode:r.barcode||'',autoBC:isDup?'':(r.barcode?'':'対象'),unit:r.unit,
+      source:isDup?`🔒 Airレジ側を使用（${r.page}）`:`新規（${r.page}）`});
+  });
+  const cN=merged.filter(r=>r.status==='new').length;
+  const cD=merged.filter(r=>r.status==='dup').length;
+  const cE=merged.filter(r=>r.status==='existing').length;
+  document.getElementById('summary').innerHTML=`
+    <div class="sbox sbox-all">出力件数<span>${cE+cN}</span></div>
+    <div class="sbox sbox-ex">Airレジ既存<span>${cE}</span></div>
+    <div class="sbox sbox-new">新規追加<span>${cN}</span></div>
+    <div class="sbox sbox-dup">重複スキップ<span>${cD}</span></div>`;
+  renderTable();
+}
+
+function renderTable(){
+  const sN=document.getElementById('chk-new').checked;
+  const sD=document.getElementById('chk-dup').checked;
+  const sE=document.getElementById('chk-ex').checked;
+  const tb=document.getElementById('resBody');
+  tb.innerHTML='';
+  merged.forEach(r=>{
+    if(r.status==='new'&&!sN)return;
+    if(r.status==='dup'&&!sD)return;
+    if(r.status==='existing'&&!sE)return;
+    const bm={new:'b-new',dup:'b-dup',existing:'b-ex'};
+    const lm={new:'🟢 新規',dup:'🟠 重複',existing:'⚪ 既存'};
+    const tr=document.createElement('tr');
+    tr.className=`row-${r.status}`;
+    const bcD=r.barcode?`<span style="font-family:monospace;font-size:11px">${esc(r.barcode)}</span>`:`<span style="color:#ccc">なし</span>`;
+    const autD=r.autoBC==='対象'?`<span class="badge b-auto">🔄 対象</span>`:`<span style="color:#ccc">-</span>`;
+    tr.innerHTML=`<td><span class="badge ${bm[r.status]}">${lm[r.status]}</span></td>
+      <td style="max-width:200px;overflow:hidden;text-overflow:ellipsis">${esc(r.name)}</td>
+      <td style="text-align:right;font-weight:700">${r.price?'¥'+Number(r.price).toLocaleString():'-'}</td>
+      <td><span class="badge ${r.taxRate==='軽減税率'?'b-8':'b-10'}">${r.taxRate||'-'}</span></td>
+      <td style="text-align:center">${esc(r.catId||'')}</td>
+      <td>${bcD}</td><td>${autD}</td>
+      <td style="color:#999;font-size:11px">${esc(r.source||'')}</td>`;
+    tb.appendChild(tr);
+  });
+}
+
+function doDownload(){
+  const rows=[];
+  // Airレジ既存CSVがない場合は自前でヘッダーを生成
+  const ver = airVer || '"v1300"';
+  const hdr = airHeader.length ? airHeader : [
+    '商品ID','バリエーションID','削除','カテゴリーID','商品名','商品名（よみ）','商品名（表示用）',
+    'バリエーション1','バリエーション2','税設定','適用税率','税設定2','価格設定','単位ID',
+    '税込単価','税込単価2','原価','商品コード','バーコード（自動採番）','バーコード',
+    'ポイント','表示設定','レシート印字','レジ印字','メモ','旧商品コード','タグID'
+  ];
+  rows.push(csvQ(ver.replace(/^"|"$/g,'')));
+  rows.push(hdr.map(h=>csvQ(h)).join(','));
+
+  merged.forEach(r=>{
+    if(r.status==='dup') return;
+    if(r.status==='existing'){
+      rows.push(r._cols.map(v=>csvQ(v)).join(','));
+    } else {
+      const arr=Array(NCOLS).fill('');
+      arr[C.catId]  = r.catId||'';
+      arr[C.name]   = r.name;
+      arr[C.nameR]  = r.name;
+      arr[C.nameI]  = r.name;
+      arr[C.taxSet] = '内税';
+      arr[C.taxRate]= r.taxRate||'標準税率';
+      arr[C.priceSet]='通常';
+      arr[C.price]  = r.price||'';
+      // バーコードがあればそのまま使用、なければ自動採番
+      if(r.barcode){
+        arr[C.barcode]  = '#'+r.barcode;
+        arr[C.autoBC]   = '';
+      } else {
+        arr[C.barcode]  = '';
+        arr[C.autoBC]   = '対象';
+      }
+      arr[C.point]    = '対象';
+      arr[C.display]  = '表示';
+      arr[C.receipt]  = '印字する';
+      arr[C.regPrint] = '印字する';
+      rows.push(arr.map(v=>csvQ(v)).join(','));
+    }
+  });
+  const csvText=rows.join('\r\n');
+  const ua=Encoding.stringToCode(csvText);
+  const sa=Encoding.convert(ua,{to:'SJIS',from:'UNICODE'});
+  const blob=new Blob([new Uint8Array(sa)],{type:'text/csv;charset=shift_jis'});
+  const url=URL.createObjectURL(blob);
+  const a=document.createElement('a');
+  a.href=url;
+  a.download=`商品一括編集_${new Date().toISOString().slice(0,10).replace(/-/g,'')}.csv`;
+  a.click();
+  URL.revokeObjectURL(url);
+}
+
+function norm(s){return String(s||'').trim().replace(/\s+/g,' ')}
+function esc(s){return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;')}
+function csvQ(s){s=String(s||'');return(s.includes(',')||s.includes('"')||s.includes('\n'))?'"'+s.replace(/"/g,'""')+'"':s}
+function splitLine(line){
+  const res=[]; let cur='',inQ=false;
+  for(let i=0;i<line.length;i++){
+    const c=line[i];
+    if(c==='"'){if(inQ&&line[i+1]==='"'){cur+='"';i++;}else inQ=!inQ;}
+    else if(c===','&&!inQ){res.push(cur.trim());cur='';}
+    else cur+=c;
+  }
+  res.push(cur.trim()); return res;
+}
+function showErr(msg){const el=document.getElementById('errBox');el.textContent=msg;el.style.display='';}
+function hideErr(){document.getElementById('errBox').style.display='none';}
+</script>
+</body>
+</html>
