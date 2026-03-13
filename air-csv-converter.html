@@ -330,12 +330,22 @@ function buildMapTable(){
 
 function buildResult(){
   const an=new Set(airRows.map(r=>norm(r.name)));
+  // 商品マスタを名前→行 のMapに
+  const tanMap=new Map(tanRows.map(r=>[norm(r.name),r]));
   merged=[];
   // Airレジ既存CSV（ある場合のみ）
   airRows.forEach(r=>{
+    const tanR=tanMap.get(norm(r.name));
+    // 商品マスタに同名があり、バーコードが新しく設定されている場合は上書き
+    const newBc = tanR?.barcode || '';
+    const airBc = r.barcode || '';
+    const bcUpdated = newBc && newBc !== airBc;
+    const useBc = bcUpdated ? newBc : airBc;
     merged.push({status:'existing',name:r.name,price:r.cols[C.price]||'',
       taxRate:r.cols[C.taxRate]||'',catId:r.cols[C.catId]||'',
-      barcode:r.barcode,autoBC:r.autoBC,source:'Airレジ（既存）',_cols:r.cols});
+      barcode:useBc,autoBC:r.autoBC,
+      source: bcUpdated ? `✏️ バーコード更新（${airBc||'なし'}→${newBc}）` : 'Airレジ（既存）',
+      bcUpdated,_cols:r.cols});
   });
   // 商品マスタ / 棚卸CSV
   tanRows.forEach(r=>{
@@ -344,7 +354,7 @@ function buildResult(){
     merged.push({status:isDup?'dup':'new',name:r.name,price:r.price,
       taxRate:r.tax==='8%'?'軽減税率':'標準税率',
       catId:pg.catId||'',barcode:r.barcode||'',autoBC:isDup?'':(r.barcode?'':'対象'),unit:r.unit,
-      source:isDup?`🔒 Airレジ側を使用（${r.page}）`:`新規（${r.page}）`});
+      source:isDup?`🔒 Airレジ側に反映済（${r.page}）`:`新規（${r.page}）`});
   });
   const cN=merged.filter(r=>r.status==='new').length;
   const cD=merged.filter(r=>r.status==='dup').length;
@@ -400,7 +410,15 @@ function doDownload(){
   merged.forEach(r=>{
     if(r.status==='dup') return;
     if(r.status==='existing'){
-      rows.push(r._cols.map(v=>csvQ(v)).join(','));
+      if(r.bcUpdated){
+        // バーコードを商品マスタの新しい値に上書き
+        const cols=[...r._cols];
+        cols[C.barcode]='#'+r.barcode;
+        cols[C.autoBC]='';
+        rows.push(cols.map(v=>csvQ(v)).join(','));
+      } else {
+        rows.push(r._cols.map(v=>csvQ(v)).join(','));
+      }
     } else {
       const arr=Array(NCOLS).fill('');
       arr[C.catId]  = r.catId||'';
