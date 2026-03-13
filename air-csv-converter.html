@@ -407,17 +407,38 @@ function doDownload(){
   rows.push(csvQ(ver.replace(/^"|"$/g,'')));
   rows.push(hdr.map(h=>csvQ(h)).join(','));
 
+  // 出力済みバーコードを追跡（重複防止）
+  const usedBC=new Set();
+  function safeBC(bc){
+    if(!bc) return null;
+    if(usedBC.has(bc)){ return null; } // 重複→空欄（自動採番）
+    usedBC.add(bc);
+    return bc;
+  }
+
   merged.forEach(r=>{
     if(r.status==='dup') return;
     if(r.status==='existing'){
       if(r.bcUpdated){
         // バーコードを商品マスタの新しい値に上書き
         const cols=[...r._cols];
-        cols[C.barcode]='#'+r.barcode;
-        cols[C.autoBC]='';
+        const bc=safeBC(r.barcode);
+        cols[C.barcode]=bc?'#'+bc:'';
+        cols[C.autoBC]=bc?'':'対象';
         rows.push(cols.map(v=>csvQ(v)).join(','));
       } else {
-        rows.push(r._cols.map(v=>csvQ(v)).join(','));
+        // 既存のバーコードも重複チェック
+        const existingBC=(r._cols[C.barcode]||'').replace(/^#+/,'');
+        if(existingBC && usedBC.has(existingBC)){
+          // 重複している→バーコードを空欄に
+          const cols=[...r._cols];
+          cols[C.barcode]='';
+          cols[C.autoBC]='対象';
+          rows.push(cols.map(v=>csvQ(v)).join(','));
+        } else {
+          if(existingBC) usedBC.add(existingBC);
+          rows.push(r._cols.map(v=>csvQ(v)).join(','));
+        }
       }
     } else {
       const arr=Array(NCOLS).fill('');
@@ -429,9 +450,10 @@ function doDownload(){
       arr[C.taxRate]= r.taxRate||'標準税率';
       arr[C.priceSet]='通常';
       arr[C.price]  = r.price||'';
-      // バーコードがあればそのまま使用、なければ自動採番
-      if(r.barcode){
-        arr[C.barcode]  = '#'+r.barcode;
+      // バーコードがあればそのまま使用、なければ自動採番（重複チェックあり）
+      const bc=safeBC(r.barcode);
+      if(bc){
+        arr[C.barcode]  = '#'+bc;
         arr[C.autoBC]   = '';
       } else {
         arr[C.barcode]  = '';
