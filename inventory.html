@@ -3371,14 +3371,14 @@ function calc(r){
   return {k,p,zt,st,sr,j,h,zk,ok};
 }
 function pageSub(rows){
-  let p10=0,p8=0,z=0;
-  (rows||[]).forEach(r=>{const c=calc(r);p10+=c.j;p8+=c.h;z+=c.zk;});
-  return {p10,p8,z};
+  let p10=0,p8=0,z=0,qty=0;
+  (rows||[]).forEach(r=>{const c=calc(r);p10+=c.j;p8+=c.h;z+=c.zk;qty+=c.k;});
+  return {p10,p8,z,qty};
 }
 function allTot(){
-  let t10=0,t8=0,tz=0;
-  order.forEach(k=>{if(!pages[k])return;const s=pageSub(pages[k].rows);t10+=s.p10;t8+=s.p8;tz+=s.z;});
-  return {t10,t8,tz};
+  let t10=0,t8=0,tz=0,tqty=0;
+  order.forEach(k=>{if(!pages[k])return;const s=pageSub(pages[k].rows);t10+=s.p10;t8+=s.p8;tz+=s.z;tqty+=s.qty;});
+  return {t10,t8,tz,tqty};
 }
 function fm(n){if(!n&&n!==0)return '';return Math.round(n).toLocaleString('ja-JP');}
 function e(s){return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');}
@@ -3531,7 +3531,11 @@ function renderTable(){
     <td class="sticky-col sticky-drag" style="background:#0f2744"></td>
     <td class="sticky-col sticky-no" style="background:#0f2744"></td>
     <td class="sticky-col sticky-del" style="background:#0f2744"></td>
-    <td class="sticky-col sticky-name" colspan="6" style="background:#0f2744;color:#fff;font-weight:700;text-align:right">頁　小計</td>
+    <td class="sticky-col sticky-name" colspan="2" style="background:#0f2744;color:#fff;font-weight:700;text-align:right">頁　小計</td>
+    <td style="background:#0f2744;color:#7fffb0;font-weight:900;text-align:center;font-size:13px">${sub.qty?fm(sub.qty):''}</td>
+    <td style="background:#0f2744;color:rgba(255,255,255,.5);font-size:11px">点</td>
+    <td style="background:#0f2744"></td>
+    <td style="background:#0f2744"></td>
     <td class="tfn sp-hide">${sub.p10?fm(sub.p10):''}</td>
     <td class="tfn sp-hide" style="color:#ffd97d">${sub.p8?fm(sub.p8):''}</td>
     <td colspan="3" class="tfl sp-hide">在庫合計</td>
