@@ -1520,6 +1520,20 @@ function mkRows(){
   }));
 }
 
+// 各ページの末尾に空行を補充する（最低R行 or 入力済み行+10行を確保）
+function ensureEmptyRows(){
+  Object.keys(pages).forEach(k=>{
+    if(!pages[k]) return;
+    const rows = pages[k].rows || [];
+    const filled = rows.filter(r=>r.n).length;
+    const target = Math.max(filled + 10, R);
+    while(rows.length < target){
+      rows.push({n:'',z:'10',k:'',u:'',p:'',ss:'',sr:'',st:'',b:'',cat:'',bc:'',pt:'通常'});
+    }
+    pages[k].rows = rows;
+  });
+}
+
 // ============================================================
 // 画面切替
 // ============================================================
@@ -1927,6 +1941,7 @@ function startListeners(){
     if(!sn.exists())return;
     pages=sn.val()||{};
     if(curKey&&!pages[curKey]&&order.length) curKey=order[0];
+    ensureEmptyRows();
     renderAll();
     const n=new Date(), el=document.getElementById('syncTime');
     if(el) el.textContent='同期 '+n.getHours()+':'+String(n.getMinutes()).padStart(2,'0')+':'+String(n.getSeconds()).padStart(2,'0');
@@ -3321,6 +3336,13 @@ let debT={};
 function upd(k,ri,f,v){
   if(!pages[k])return;
   pages[k].rows[ri][f]=v;
+  // 末尾に空行が少なくなったら補充
+  const rows=pages[k].rows;
+  const filled=rows.filter(r=>r.n).length;
+  const target=Math.max(filled+10,R);
+  while(rows.length<target){
+    rows.push({n:'',z:'10',k:'',u:'',p:'',ss:'',sr:'',st:'',b:'',cat:'',bc:'',pt:'通常'});
+  }
   renderTable(); renderQbar();
   const dk=k+'_'+ri+'_'+f;
   clearTimeout(debT[dk]);
