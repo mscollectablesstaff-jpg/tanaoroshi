@@ -1521,14 +1521,18 @@ function mkRows(){
 }
 
 // 各ページの末尾に空行を補充する（最低R行 or 入力済み行+10行を確保）
+// 既存行の未定義フィールドも補完する
 function ensureEmptyRows(){
+  const def={n:'',z:'10',k:'',u:'',p:'',ss:'',sr:'',st:'',b:'',cat:'',bc:'',pt:'通常'};
   Object.keys(pages).forEach(k=>{
     if(!pages[k]) return;
     const rows = pages[k].rows || [];
+    // 既存行の欠損フィールドを補完
+    rows.forEach(r=>{ Object.keys(def).forEach(f=>{ if(r[f]===undefined) r[f]=def[f]; }); });
     const filled = rows.filter(r=>r.n).length;
     const target = Math.max(filled + 10, R);
     while(rows.length < target){
-      rows.push({n:'',z:'10',k:'',u:'',p:'',ss:'',sr:'',st:'',b:'',cat:'',bc:'',pt:'通常'});
+      rows.push({...def});
     }
     pages[k].rows = rows;
   });
@@ -3519,8 +3523,8 @@ function renderTable(){
       <td style="${bj}" class="sp-hide"><span class="cc">${(!is8&&c.ok)?fy(c.j):''}</span></td>
       <td style="${bh}" class="sp-hide"><span class="cc" style="color:#d4a017">${(is8&&c.ok)?fy(c.h):''}</span></td>
       <td class="sp-hide"><div class="ac-wrap"><input class="ci" value="${e(r.ss)}" ${d} data-ac="ss" onchange="upd('${curKey}',${ri},'ss',this.value);acAdd('ss',this.value)" onfocus="showAcList(this,'ss',${ri},'${curKey}')" oninput="showAcList(this,'ss',${ri},'${curKey}')" placeholder="仕入先"></div></td>
-      <td class="sp-hide"><div class="ac-wrap"><input class="ci r" type="text" inputmode="decimal" value="${r.sr}" ${d} data-ac="sr" onchange="upd('${curKey}',${ri},'sr',this.value);acAdd('sr',this.value)" onfocus="showAcList(this,'sr',${ri},'${curKey}')" oninput="showAcList(this,'sr',${ri},'${curKey}')" placeholder="%"></div></td>
-      <td class="sp-hide"><div class="ac-wrap"><input class="ci r" type="text" inputmode="decimal" value="${r.st}" ${d} data-ac="st" onchange="upd('${curKey}',${ri},'st',this.value);acAdd('st',this.value)" onfocus="showAcList(this,'st',${ri},'${curKey}')" oninput="showAcList(this,'st',${ri},'${curKey}')" placeholder="${c.st&&!r.st?c.st:''}" title="${c.st&&!r.st?'自動計算: ¥'+fm(c.st):'手入力'}"></div></td>
+      <td class="sp-hide"><div class="ac-wrap"><input class="ci r" type="text" inputmode="decimal" value="${r.sr||''}" ${d} data-ac="sr" onchange="upd('${curKey}',${ri},'sr',this.value);acAdd('sr',this.value)" onfocus="showAcList(this,'sr',${ri},'${curKey}')" oninput="showAcList(this,'sr',${ri},'${curKey}')" placeholder="%"></div></td>
+      <td class="sp-hide"><div class="ac-wrap"><input class="ci r" type="text" inputmode="decimal" value="${r.st||''}" ${d} data-ac="st" onchange="upd('${curKey}',${ri},'st',this.value);acAdd('st',this.value)" onfocus="showAcList(this,'st',${ri},'${curKey}')" oninput="showAcList(this,'st',${ri},'${curKey}')" placeholder="${c.st&&!r.st?c.st:''}" title="${c.st&&!r.st?'自動計算: ¥'+fm(c.st):'手入力'}"></div></td>
       <td style="${bz}"><span class="cc g">${c.zk?fy(c.zk):''}</span>${c.st&&!r.st&&c.zk?`<br><span style="font-size:9px;color:#888">自動計算</span>`:''}</td>
       <td style="white-space:nowrap" class="sp-hide"><div class="ac-wrap"><input class="ci" value="${e(r.b)}" ${d} data-ac="b" onchange="upd('${curKey}',${ri},'b',this.value);acAdd('b',this.value)" onfocus="showAcList(this,'b',${ri},'${curKey}')" oninput="showAcList(this,'b',${ri},'${curKey}')" placeholder="備考"></div></td>
     </tr>`;
