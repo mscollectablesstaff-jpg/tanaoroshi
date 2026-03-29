@@ -448,7 +448,7 @@ function buildResult(){
   const cD=merged.filter(r=>r.status==='dup').length;
   const cE=merged.filter(r=>r.status==='existing').length;
   document.getElementById('summary').innerHTML=`
-    <div class="sbox sbox-all">出力件数<span>${cE+cN}</span></div>
+    <div class="sbox sbox-all">出力件数<span>${merged.filter(r=>r.status==='new'||(r.status==='existing'&&r.bcUpdated)).length}</span></div>
     <div class="sbox sbox-ex">Airレジ既存<span>${cE}</span></div>
     <div class="sbox sbox-new">新規追加<span>${cN}</span></div>
     <div class="sbox sbox-dup">重複スキップ<span>${cD}</span></div>`;
@@ -532,18 +532,17 @@ function doDownload(){
     usedKey.add(outKey);
 
     if(r.status==='existing'){
-      // existing行のバーコードをusedBCに登録（new行との重複防止）
-      const existBC=(r.bcUpdated?r.barcode:(r._cols[C.barcode]||'').replace(/^#+/,'')).trim();
+      // 既存行のバーコードをusedBCに登録（new行との重複防止）
+      const existBC=(r._cols[C.barcode]||'').replace(/^#+/,'').trim();
       if(existBC) usedBC.add(existBC);
       if(r.bcUpdated){
-        // バーコードを商品マスタの新しい値に上書き
+        // バーコードを更新した行だけ再アップロード
         const cols=[...r._cols];
         cols[C.barcode]='#'+r.barcode;
         cols[C.autoBC]='';
         rows.push(cols.map(v=>csvQ(v)).join(','));
-      } else {
-        rows.push(r._cols.map(v=>csvQ(v)).join(','));
       }
+      // 変更なし既存商品は出力しない（Airレジに既に正しく登録済み）
     } else {
       const arr=Array(NCOLS).fill('');
       arr[C.catId]  = r.catId||'';
