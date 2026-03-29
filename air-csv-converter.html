@@ -136,9 +136,16 @@ body{font-family:'Hiragino Kaku Gothic ProN','Yu Gothic',Meiryo,sans-serif;backg
   <div class="card" id="step2" style="display:none">
     <div class="card-head"><div class="sbadge">2</div><h2>新規商品のカテゴリー設定（任意）</h2></div>
     <div class="card-body">
-      <p style="font-size:12px;color:#666;margin-bottom:12px">棚卸ページごとにAirレジのカテゴリーIDを設定できます。</p>
+      <p style="font-size:12px;color:#666;margin-bottom:8px">棚卸ページごとにAirレジのカテゴリーIDを設定できます。</p>
+      <div style="margin-bottom:12px;display:flex;align-items:center;gap:10px;flex-wrap:wrap">
+        <button id="aiSuggestBtn" onclick="aiSuggestCategories()"
+          style="display:none;align-items:center;gap:6px;padding:8px 16px;background:linear-gradient(135deg,#6366f1,#8b5cf6);color:#fff;border:none;border-radius:7px;font-size:12px;font-weight:700;cursor:pointer;font-family:inherit">
+          🤖 AIに一括提案してもらう
+        </button>
+        <span id="aiSuggestStatus" style="font-size:11px;color:#888"></span>
+      </div>
       <table class="map-tbl">
-        <thead><tr><th>棚卸ページ</th><th>新規商品数</th><th>カテゴリーID</th></tr></thead>
+        <thead><tr><th>棚卸ページ</th><th>新規商品数</th><th>カテゴリーID</th><th style="width:80px;text-align:center">AI提案</th></tr></thead>
         <tbody id="mapBody"></tbody>
       </table>
     </div>
@@ -250,6 +257,8 @@ function parseCat(text,fname){
   const dz=document.getElementById('dz-cat');
   dz.style.borderColor='#7986cb'; dz.style.background='#f0f0ff';
   document.getElementById('dz-cat-t').innerHTML=`<span style="color:#283593;font-weight:700">✅ ${fname}　${catList.length}カテゴリー読み込み完了</span>`;
+  const aiBtn=document.getElementById('aiSuggestBtn');
+  if(aiBtn) aiBtn.style.display='inline-flex';
   // カテゴリー設定テーブルが既に表示中なら再描画
   if(document.getElementById('step2').style.display!=='none') buildMapTable();
 }
@@ -310,7 +319,83 @@ function buildMapTable(){
   const an=new Set(airRows.map(r=>norm(r.name)));
   Object.keys(pageMap).forEach(p=>{pageMap[p].newCount=0;});
   tanRows.forEach(r=>{if(!an.has(norm(r.name)))pageMap[r.page].newCount++;});
+  renderMapBody();
+}
+
+// ===== AI カテゴリー自動提案 =====
+async function aiSuggestCategories(){
+  if(!catList.length){ alert('先にカテゴリーCSVを読み込んでください'); return; }
+  const pages = Object.keys(pageMap);
+  if(!pages.length){ alert('先に商品マスタCSVを読み込んでください'); return; }
+
+  const btn = document.getElementById('aiSuggestBtn');
+  const status = document.getElementById('aiSuggestStatus');
+  btn.disabled = true;
+  btn.textContent = '⏳ 提案中...';
+  status.textContent = '';
+
+  const catNames = catList.map(c=>`${c.id}: ${c.name}`).join('\n');
+  const pageNames = pages.join('\n');
+
+  const prompt = `下記の「ページ名一覧」と「カテゴリー一覧」を照合して、各ページに最も合うカテゴリーIDを提案してください。
+似た言葉・連想される言葉・包含関係も考慮してください。
+完全に一致するものがなければ近いものを選んでください。どうしても合わないときはnullにしてください。
+
+## ページ名一覧
+${pageNames}
+
+## カテゴリー一覧（ID: 名前）
+${catNames}
+
+## 出力形式（JSONのみ・他の文字は不要）
+{"ページ名": "カテゴリーID or null", ...}`;
+
+  try {
+    const res = await fetch('https://api.anthropic.com/v1/messages', {
+      method:'POST',
+      headers:{'Content-Type':'application/json'},
+      body: JSON.stringify({
+        model:'claude-sonnet-4-20250514',
+        max_tokens:1000,
+        messages:[{role:'user', content:prompt}]
+      })
+    });
+    const data = await res.json();
+    const text = (data.content||[]).map(b=>b.text||'').join('').trim();
+    const clean = text.replace(/```json|```/g,'').trim();
+    const map = JSON.parse(clean);
+
+    let hit=0;
+    Object.entries(map).forEach(([pageName, catId])=>{
+      if(!catId || catId==='null') return;
+      if(!pageMap[pageName]) return;
+      const cat = catList.find(c=>c.id===catId);
+      if(!cat) return;
+      pageMap[pageName].aiSuggest = {catId, catName: cat.name};
+      hit++;
+    });
+
+    status.textContent = `✅ ${hit}件に提案しました（紫のバッジをクリックで適用）`;
+    renderMapBody();
+  } catch(e) {
+    status.textContent = '❌ エラーが発生しました: ' + e.message;
+  }
+  btn.disabled = false;
+  btn.textContent = '🤖 AIに一括提案してもらう';
+}
+
+function applySuggest(pageName){
+  const info = pageMap[pageName];
+  if(!info||!info.aiSuggest) return;
+  info.catId = info.aiSuggest.catId;
+  info.aiSuggest = null;
+  renderMapBody();
+}
+
+// renderMapBody を独立した関数として定義（既存のインライン処理から移動済み）
+function renderMapBody(){
   const tb=document.getElementById('mapBody');
+  if(!tb) return;
   tb.innerHTML='';
   Object.entries(pageMap).forEach(([name,info])=>{
     const tr=document.createElement('tr');
@@ -322,9 +407,14 @@ function buildMapTable(){
          </select>`
       : `<input class="inp-s" placeholder="例: 0015" value="${esc(info.catId)}"
              oninput="pageMap[${JSON.stringify(name)}].catId=this.value">`;
+    const sugBadge = info.aiSuggest
+      ? `<span style="font-size:10px;background:#ede9fe;color:#6d28d9;border-radius:5px;padding:2px 7px;font-weight:700;cursor:pointer;display:inline-block"
+           title="クリックで適用" onclick="applySuggest(${JSON.stringify(name)})">▶ ${esc(info.aiSuggest.catName)}</span>`
+      : `<span style="color:#ccc;font-size:11px">-</span>`;
     tr.innerHTML=`<td><span style="background:#e8edf5;border-radius:4px;padding:2px 8px;font-weight:700;color:#0f2744">${esc(name)}</span></td>
       <td style="text-align:center;color:#1a5c2e;font-weight:700">${info.newCount}件</td>
-      <td>${catInput}</td>`;
+      <td>${catInput}</td>
+      <td style="text-align:center">${sugBadge}</td>`;
     tb.appendChild(tr);
   });
 }
