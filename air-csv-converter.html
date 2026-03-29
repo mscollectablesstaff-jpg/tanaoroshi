@@ -385,13 +385,11 @@ function renderMapBody(){
   Object.entries(pageMap).forEach(([name,info])=>{
     const tr=document.createElement('tr');
     const catInput = catList.length
-      ? `<select style="width:200px;padding:4px 7px;border:1.5px solid #d0d7de;border-radius:5px;font-size:12px;font-family:inherit"
-             onchange="pageMap[${JSON.stringify(name)}].catId=this.value">
+      ? `<select class="cat-sel" data-page="${esc(name)}" style="width:200px;padding:4px 7px;border:1.5px solid #d0d7de;border-radius:5px;font-size:12px;font-family:inherit">
            <option value="">（未設定）</option>
            ${catList.map(c=>`<option value="${esc(c.id)}" ${info.catId===c.id?'selected':''}>${esc(c.id)} ${esc(c.name)}</option>`).join('')}
          </select>`
-      : `<input class="inp-s" placeholder="例: 0015" value="${esc(info.catId)}"
-             oninput="pageMap[${JSON.stringify(name)}].catId=this.value">`;
+      : `<input class="cat-inp" data-page="${esc(name)}" class="inp-s" placeholder="例: 0015" value="${esc(info.catId)}">`;
     const sugBadge = info.aiSuggest
       ? `<span class="sug-badge" data-page="${esc(name)}"
            style="font-size:10px;background:#ede9fe;color:#6d28d9;border-radius:5px;padding:2px 7px;font-weight:700;cursor:pointer;display:inline-block"
@@ -403,7 +401,21 @@ function renderMapBody(){
       <td style="text-align:center">${sugBadge}</td>`;
     tb.appendChild(tr);
   });
-  // イベント委任：紫バッジのクリックを一括処理
+  // イベント委任：selectのchange
+  tb.onchange = function(e){
+    const sel = e.target.closest('.cat-sel');
+    if(!sel) return;
+    const pageName = sel.dataset.page;
+    if(pageName && pageMap[pageName]) pageMap[pageName].catId = sel.value;
+  };
+  // イベント委任：inputのchange
+  tb.oninput = function(e){
+    const inp = e.target.closest('.cat-inp');
+    if(!inp) return;
+    const pageName = inp.dataset.page;
+    if(pageName && pageMap[pageName]) pageMap[pageName].catId = inp.value;
+  };
+  // イベント委任：紫バッジのクリック
   tb.onclick = function(e){
     const badge = e.target.closest('.sug-badge');
     if(!badge) return;
