@@ -393,8 +393,9 @@ function renderMapBody(){
       : `<input class="inp-s" placeholder="例: 0015" value="${esc(info.catId)}"
              oninput="pageMap[${JSON.stringify(name)}].catId=this.value">`;
     const sugBadge = info.aiSuggest
-      ? `<span style="font-size:10px;background:#ede9fe;color:#6d28d9;border-radius:5px;padding:2px 7px;font-weight:700;cursor:pointer;display:inline-block"
-           title="クリックで適用" onclick="applySuggest(${JSON.stringify(name)})">▶ ${esc(info.aiSuggest.catName)}</span>`
+      ? `<span class="sug-badge" data-page="${esc(name)}"
+           style="font-size:10px;background:#ede9fe;color:#6d28d9;border-radius:5px;padding:2px 7px;font-weight:700;cursor:pointer;display:inline-block"
+           title="クリックで適用">▶ ${esc(info.aiSuggest.catName)}</span>`
       : `<span style="color:#ccc;font-size:11px">-</span>`;
     tr.innerHTML=`<td><span style="background:#e8edf5;border-radius:4px;padding:2px 8px;font-weight:700;color:#0f2744">${esc(name)}</span></td>
       <td style="text-align:center;color:#1a5c2e;font-weight:700">${info.newCount}件</td>
@@ -402,6 +403,18 @@ function renderMapBody(){
       <td style="text-align:center">${sugBadge}</td>`;
     tb.appendChild(tr);
   });
+  // イベント委任：紫バッジのクリックを一括処理
+  tb.onclick = function(e){
+    const badge = e.target.closest('.sug-badge');
+    if(!badge) return;
+    const pageName = badge.dataset.page;
+    if(!pageName) return;
+    const info = pageMap[pageName];
+    if(!info||!info.aiSuggest) return;
+    info.catId = info.aiSuggest.catId;
+    info.aiSuggest = null;
+    renderMapBody();
+  };
 }
 
 function buildResult(){
@@ -429,7 +442,7 @@ function buildResult(){
     const pg=pageMap[r.page]||{};
     merged.push({status:isDup?'dup':'new',name:r.name,price:r.price,
       taxRate:r.tax==='8%'?'軽減税率':'標準税率',
-      catId:pg.catId||'',barcode:r.barcode||'',autoBC:isDup?'':(r.barcode?'':'対象'),unit:r.unit,
+      catId:pg.catId||'',_page:r.page,barcode:r.barcode||'',autoBC:isDup?'':(r.barcode?'':'対象'),unit:r.unit,
       source:isDup?`🔒 Airレジ側に反映済（${r.page}）`:`新規（${r.page}）`});
   });
   // skipフラグ初期化
@@ -520,8 +533,9 @@ function doDownload(){
 
   // 出力済み「名前＋価格」を追跡（同名同価格の2件目以降は行ごとスキップ）
   const usedKey=new Set();
-  // 出力済みバーコードを追跡（CSV内の重複を防ぐ）
-  const usedBC=new Set();
+  // AirレジにすでにあるバーコードをすべてusedBCに登録
+  // → new行のバーコードがAirレジ既存と被っていたら自動採番に切り替わる
+  const usedBC=new Set(airRows.map(r=>r.barcode).filter(b=>b));
 
   merged.forEach(r=>{
     if(r.status==='dup') return;
@@ -545,7 +559,8 @@ function doDownload(){
       // 変更なし既存商品は出力しない（Airレジに既に正しく登録済み）
     } else {
       const arr=Array(NCOLS).fill('');
-      arr[C.catId]  = r.catId||'';
+      // pageMapから最新のcatIdを取得（ダウンロード直前の設定を反映）
+      arr[C.catId]  = (pageMap[r._page]||{}).catId || r.catId || '';
       arr[C.name]   = r.name;
       arr[C.nameR]  = r.name;
       arr[C.nameI]  = r.name;
