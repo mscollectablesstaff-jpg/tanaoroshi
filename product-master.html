@@ -192,7 +192,13 @@ tbody td{padding:7px 10px;vertical-align:middle}
   <span class="ci" id="cinfo"></span>
 </div>
 <div class="mp"><div class="tw"><div class="ts" style="max-height:calc(100vh - 230px)">
+  <div id="bulkBar" style="display:none;align-items:center;gap:10px;padding:7px 12px;background:#fff3cd;border-radius:7px;margin-bottom:8px;border:1px solid #ffd97d">
+    <span id="bulkCount" style="font-weight:700;font-size:13px;color:#856404"></span>
+    <button onclick="bulkDelete()" style="padding:6px 14px;background:#c0392b;color:#fff;border:none;border-radius:6px;font-size:12px;font-weight:700;cursor:pointer;font-family:inherit">🗑 選択した商品を削除</button>
+    <button onclick="clearSel()" style="padding:6px 14px;background:#e8edf5;color:#0f2744;border:none;border-radius:6px;font-size:12px;font-weight:700;cursor:pointer;font-family:inherit">選択解除</button>
+  </div>
   <table><thead><tr>
+    <th style="width:32px;text-align:center"><input type="checkbox" id="chkAll" onchange="toggleAllSel(this.checked)" title="全選択"></th>
     <th style="width:30px">No</th><th>商品名</th><th>カテゴリー</th>
     <th class="r">税込価格</th><th>税率</th><th>バーコード</th><th>単位</th>
     <th>仕入先</th><th class="r">仕入単価</th><th>備考</th><th style="width:76px"></th>
@@ -520,10 +526,74 @@ function renderCatPanel(){
 function openCatModal(){renderCatPanel();document.getElementById('catOv').style.display='';}
 function closeCatModal(){document.getElementById('catOv').style.display='none';}
 function addCat(){const inp=document.getElementById('cai'),name=inp.value.trim();if(!name)return;const id='C'+Date.now().toString(36).toUpperCase();saveCats({...cats,[id]:{name,id}});inp.value='';toast('カテゴリー追加：'+name);}
-function delCat(id){if(!confirm('カテゴリー「'+cats[id]?.name+'」を削除しますか？'))return;const nc={...cats};delete nc[id];const np={};Object.entries(products).forEach(([pid,p])=>{np[pid]=p.catId===id?{...p,catId:''}:p;});saveCats(nc);saveProds(np);}
+function delCat(id){
+  const name=cats[id]?.name||'';
+  const prodCount=Object.values(products).filter(p=>p.catId===id).length;
+  let withProds=false;
+  if(prodCount>0){
+    const ans=confirm(`カテゴリー「${name}」を削除しますか？
+
+` +
+      `このカテゴリーには${prodCount}件の商品があります。
+` +
+      `【OK】→ カテゴリーのみ削除（商品は「未設定」になります）
+` +
+      `商品ごと削除したい場合は一度「キャンセル」して
+` +
+      `カテゴリーで絞り込み→全選択→一括削除を使ってください。`);
+    if(!ans)return;
+  } else {
+    if(!confirm('カテゴリー['+name+']を削除しますか?'))return;
+  }
+  const nc={...cats};delete nc[id];
+  const np={};
+  Object.entries(products).forEach(([pid,p])=>{np[pid]=p.catId===id?{...p,catId:''}:p;});
+  saveCats(nc);saveProds(np);
+  toast('\u{1F5D1} カテゴリー['+name+']を削除しました');
+}
 function saveCats(c){if(offline){cats=c;localStorage.setItem('mc_oc',JSON.stringify(c));renderCatFilter();renderCatPanel();}else db.ref(CP).set(c);}
 
 // ===== 商品 =====
+// ===== 一括削除 =====
+let selIds = new Set();
+function toggleSel(id, checked){
+  checked ? selIds.add(id) : selIds.delete(id);
+  updateBulkBar(); renderP();
+}
+function toggleAllSel(checked){
+  const q=(document.getElementById('si').value||'').toLowerCase();
+  const catF=document.getElementById('cf').value, taxF=document.getElementById('tf').value;
+  Object.values(products).forEach(p=>{
+    if(q&&!p.name.toLowerCase().includes(q)&&!(p.barcode||'').toLowerCase().includes(q))return;
+    if(catF&&p.catId!==catF)return;
+    if(taxF&&p.tax!==taxF)return;
+    checked ? selIds.add(p.id) : selIds.delete(p.id);
+  });
+  updateBulkBar(); renderP();
+}
+function clearSel(){ selIds.clear(); updateBulkBar(); renderP(); }
+function updateBulkBar(){
+  const bar=document.getElementById('bulkBar');
+  const cnt=document.getElementById('bulkCount');
+  if(!bar||!cnt)return;
+  if(selIds.size>0){
+    bar.style.display='flex';
+    cnt.textContent=selIds.size+'件選択中';
+  } else {
+    bar.style.display='none';
+  }
+}
+function bulkDelete(){
+  if(!selIds.size)return;
+  const cnt=selIds.size;
+  if(!confirm(cnt+' 件の商品を削除しますか? この操作は元に戻せません。'))return;
+  const np={...products};
+  selIds.forEach(id=>delete np[id]);
+  selIds.clear();
+  saveProds(np);
+  toast('\u{1F5D1} '+cnt+' 件削除しました');
+}
+
 function renderP(){
   const q=(document.getElementById('si').value||'').toLowerCase();
   const catF=document.getElementById('cf').value,taxF=document.getElementById('tf').value;
@@ -539,7 +609,9 @@ function renderP(){
   em.style.display='none';
   tb.innerHTML=list.map((p,i)=>{
     const c=cn(p.catId);
-    return `<tr onclick="openEdit('${p.id}')">
+    const chk=selIds.has(p.id);
+    return `<tr onclick="openEdit('${p.id}')" style="${chk?'background:#fff3cd;':''}" data-id="${p.id}">
+      <td onclick="event.stopPropagation()" style="text-align:center"><input type="checkbox" ${chk?'checked':''} onchange="toggleSel('${p.id}',this.checked)"></td>
       <td style="color:#aab;font-size:11px">${i+1}</td>
       <td style="font-weight:700;color:#0f2744">${esc(p.name)}</td>
       <td>${c?`<span class="bj bc">${esc(c)}</span>`:''}</td>
@@ -555,6 +627,10 @@ function renderP(){
         <button class="ab ad" onclick="delP('${p.id}')">削除</button>
       </td></tr>`;
   }).join('');
+  // 全選択チェックボックスの状態を反映
+  const chkAll=document.getElementById('chkAll');
+  if(chkAll) chkAll.checked=list.length>0&&list.every(p=>selIds.has(p.id));
+  updateBulkBar();
 }
 function openAdd(){editId=null;document.getElementById('et').textContent='商品追加';['fn','fu','fb','fs','fno'].forEach(id=>document.getElementById(id).value='');['fp','fco'].forEach(id=>document.getElementById(id).value='');renderCatFilter();document.getElementById('fc').value='';setTax('10');document.getElementById('editDelBtn').style.display='none';document.getElementById('editOv').style.display='';setTimeout(()=>document.getElementById('fn').focus(),50);}
 function openEdit(id){const p=products[id];if(!p)return;editId=id;document.getElementById('et').textContent='商品編集';document.getElementById('fn').value=p.name||'';document.getElementById('fp').value=p.price||'';document.getElementById('fu').value=p.unit||'';document.getElementById('fb').value=p.barcode||'';document.getElementById('fs').value=p.supplier||'';document.getElementById('fco').value=p.cost||'';document.getElementById('fno').value=p.note||'';renderCatFilter();document.getElementById('fc').value=p.catId||'';setTax(p.tax||'10');document.getElementById('editDelBtn').style.display='';document.getElementById('editOv').style.display='';}
