@@ -445,6 +445,8 @@ function doDownload(){
 
   // 出力済み「名前＋価格」を追跡（同名同価格の2件目以降は行ごとスキップ）
   const usedKey=new Set();
+  // 出力済みバーコードを追跡（CSV内の重複を防ぐ）
+  const usedBC=new Set();
 
   merged.forEach(r=>{
     if(r.status==='dup') return;
@@ -455,6 +457,9 @@ function doDownload(){
     usedKey.add(outKey);
 
     if(r.status==='existing'){
+      // existing行のバーコードをusedBCに登録（new行との重複防止）
+      const existBC=(r.bcUpdated?r.barcode:(r._cols[C.barcode]||'').replace(/^#+/,'')).trim();
+      if(existBC) usedBC.add(existBC);
       if(r.bcUpdated){
         // バーコードを商品マスタの新しい値に上書き
         const cols=[...r._cols];
@@ -474,9 +479,14 @@ function doDownload(){
       arr[C.taxRate]= r.taxRate||'標準税率';
       arr[C.priceSet]='通常';
       arr[C.price]  = r.price||'';
-      if(r.barcode){
+      if(r.barcode && !usedBC.has(r.barcode)){
+        usedBC.add(r.barcode);
         arr[C.barcode]  = '#'+r.barcode;
         arr[C.autoBC]   = '';
+      } else if(r.barcode && usedBC.has(r.barcode)){
+        // 既存行と重複するバーコードは空欄にして自動採番
+        arr[C.barcode]  = '';
+        arr[C.autoBC]   = '対象';
       } else {
         arr[C.barcode]  = '';
         arr[C.autoBC]   = '対象';
