@@ -161,6 +161,7 @@ body{font-family:'Hiragino Kaku Gothic ProN','Yu Gothic',Meiryo,sans-serif;backg
       <div class="res-wrap">
         <table class="res-tbl">
           <thead><tr>
+            <th style="width:40px;text-align:center"><input type="checkbox" id="chk-all" checked title="全選択/解除" onchange="toggleAllRows(this.checked)"></th>
             <th>判定</th><th>商品名</th><th>価格（税込）</th><th>税率</th>
             <th>カテゴリーID</th><th>バーコード</th><th>自動発番</th><th>出所</th>
           </tr></thead>
@@ -356,6 +357,8 @@ function buildResult(){
       catId:pg.catId||'',barcode:r.barcode||'',autoBC:isDup?'':(r.barcode?'':'対象'),unit:r.unit,
       source:isDup?`🔒 Airレジ側に反映済（${r.page}）`:`新規（${r.page}）`});
   });
+  // skipフラグ初期化（false=出力する）
+  merged.forEach((r,i)=>{ r._idx=i; r._skip=false; });
   const cN=merged.filter(r=>r.status==='new').length;
   const cD=merged.filter(r=>r.status==='dup').length;
   const cE=merged.filter(r=>r.status==='existing').length;
@@ -383,7 +386,14 @@ function renderTable(){
     tr.className=`row-${r.status}`;
     const bcD=r.barcode?`<span style="font-family:monospace;font-size:11px">${esc(r.barcode)}</span>`:`<span style="color:#ccc">なし</span>`;
     const autD=r.autoBC==='対象'?`<span class="badge b-auto">🔄 対象</span>`:`<span style="color:#ccc">-</span>`;
-    tr.innerHTML=`<td><span class="badge ${bm[r.status]}">${lm[r.status]}</span></td>
+    const isSkippable = r.status!=='dup';
+    const chked = isSkippable && !r._skip;
+    tr.style.opacity = (!isSkippable||chked) ? '1' : '0.4';
+    tr.innerHTML=`
+      <td style="text-align:center">${isSkippable
+        ? `<input type="checkbox" ${chked?'checked':''} onchange="toggleRow(${r._idx},this.checked)">`
+        : `<span style="color:#ccc;font-size:11px">-</span>`}</td>
+      <td><span class="badge ${bm[r.status]}">${lm[r.status]}</span></td>
       <td style="max-width:200px;overflow:hidden;text-overflow:ellipsis">${esc(r.name)}</td>
       <td style="text-align:right;font-weight:700">${r.price?'¥'+Number(r.price).toLocaleString():'-'}</td>
       <td><span class="badge ${r.taxRate==='軽減税率'?'b-8':'b-10'}">${r.taxRate||'-'}</span></td>
@@ -392,6 +402,20 @@ function renderTable(){
       <td style="color:#999;font-size:11px">${esc(r.source||'')}</td>`;
     tb.appendChild(tr);
   });
+}
+
+function toggleRow(idx, checked){
+  if(!merged[idx]) return;
+  merged[idx]._skip = !checked;
+  // 全選択チェックボックスの状態を更新
+  const anyUnchecked = merged.some(r=>r.status!=='dup'&&r._skip);
+  const allEl = document.getElementById('chk-all');
+  if(allEl) allEl.checked = !anyUnchecked;
+  renderTable();
+}
+function toggleAllRows(checked){
+  merged.forEach(r=>{ if(r.status!=='dup') r._skip=!checked; });
+  renderTable();
 }
 
 function doDownload(){
@@ -412,6 +436,7 @@ function doDownload(){
 
   merged.forEach(r=>{
     if(r.status==='dup') return;
+    if(r._skip) return;  // チェックを外した行はスキップ
     // 同名・同価格の重複行はスキップ
     const outKey=normKey(r.name, r.price||(r._cols?r._cols[C.price]||'':''));
     if(usedKey.has(outKey)) return;
