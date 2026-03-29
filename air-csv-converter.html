@@ -357,8 +357,18 @@ function buildResult(){
       catId:pg.catId||'',barcode:r.barcode||'',autoBC:isDup?'':(r.barcode?'':'対象'),unit:r.unit,
       source:isDup?`🔒 Airレジ側に反映済（${r.page}）`:`新規（${r.page}）`});
   });
-  // skipフラグ初期化（false=出力する）
-  merged.forEach((r,i)=>{ r._idx=i; r._skip=false; });
+  // skipフラグ初期化
+  // 価格なし・既存バーコード重複は最初からスキップ
+  const existingBarcodes = new Set(
+    airRows.map(r=>r.barcode).filter(b=>b)
+  );
+  merged.forEach((r,i)=>{
+    r._idx = i;
+    const noPrice = r.status!=='existing' && (!r.price || r.price==='');
+    const dupBC   = r.status==='new' && r.barcode && existingBarcodes.has(r.barcode);
+    r._skip = noPrice || dupBC;
+    r._skipReason = noPrice ? '価格なし' : dupBC ? 'BC重複' : '';
+  });
   const cN=merged.filter(r=>r.status==='new').length;
   const cD=merged.filter(r=>r.status==='dup').length;
   const cE=merged.filter(r=>r.status==='existing').length;
@@ -388,10 +398,12 @@ function renderTable(){
     const autD=r.autoBC==='対象'?`<span class="badge b-auto">🔄 対象</span>`:`<span style="color:#ccc">-</span>`;
     const isSkippable = r.status!=='dup';
     const chked = isSkippable && !r._skip;
-    tr.style.opacity = (!isSkippable||chked) ? '1' : '0.4';
+    tr.style.opacity = (!isSkippable||chked) ? '1' : '0.45';
+    const reasonBadge = r._skipReason
+      ? `<span style="font-size:9px;color:#c00;font-weight:700;display:block;margin-top:2px">${r._skipReason}</span>` : '';
     tr.innerHTML=`
       <td style="text-align:center">${isSkippable
-        ? `<input type="checkbox" ${chked?'checked':''} onchange="toggleRow(${r._idx},this.checked)">`
+        ? `<input type="checkbox" ${chked?'checked':''} onchange="toggleRow(${r._idx},this.checked)">${reasonBadge}`
         : `<span style="color:#ccc;font-size:11px">-</span>`}</td>
       <td><span class="badge ${bm[r.status]}">${lm[r.status]}</span></td>
       <td style="max-width:200px;overflow:hidden;text-overflow:ellipsis">${esc(r.name)}</td>
