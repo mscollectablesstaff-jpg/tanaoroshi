@@ -1,0 +1,365 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+<title>バーコード商品登録</title>
+<style>
+*{box-sizing:border-box;margin:0;padding:0;-webkit-tap-highlight-color:transparent}
+:root{--purple:#4a2080;--green:#1a5c2e;--ink:#0d1b2a;--gray:#6b7a8d;--border:#dde3ea;--cream:#f8f5f0}
+body{font-family:'Hiragino Kaku Gothic ProN','Yu Gothic',sans-serif;background:var(--cream);min-height:100vh;color:var(--ink)}
+
+.header{background:linear-gradient(135deg,#0d1b2a,var(--purple));color:#fff;padding:14px 20px;display:flex;align-items:center;justify-content:space-between}
+.header h1{font-size:16px;font-weight:900}
+.header-sub{font-size:10px;opacity:.6;margin-top:2px}
+.home-btn{background:rgba(255,255,255,.15);color:#fff;border:none;border-radius:7px;padding:7px 13px;font-size:12px;font-weight:700;cursor:pointer;text-decoration:none;display:inline-flex;align-items:center;gap:5px}
+
+.main{max-width:480px;margin:0 auto;padding:20px 16px 40px}
+
+/* スキャン受付エリア */
+.scan-area{
+  background:#fff;border-radius:14px;padding:24px;margin-bottom:20px;
+  box-shadow:0 2px 12px rgba(0,0,0,.08);
+  border:3px solid var(--border);transition:border-color .2s;
+  cursor:pointer;text-align:center;position:relative
+}
+.scan-area.active{border-color:var(--purple)}
+.scan-area.ready{border-color:#27ae60;background:#f0fff8}
+.scan-icon{font-size:48px;margin-bottom:10px}
+.scan-label{font-size:14px;font-weight:700;color:var(--gray);margin-bottom:4px}
+.scan-hint{font-size:11px;color:#aab}
+.scan-code{font-family:monospace;font-size:22px;font-weight:900;color:var(--purple);margin:8px 0;letter-spacing:.1em}
+/* 非表示の実入力 */
+#scanInput{position:absolute;opacity:0;width:1px;height:1px;top:0;left:0;pointer-events:none}
+
+/* フォーム */
+.form-card{background:#fff;border-radius:14px;padding:20px;box-shadow:0 2px 12px rgba(0,0,0,.08);display:none}
+.form-card.show{display:block}
+.form-row{margin-bottom:16px}
+.form-label{font-size:11px;font-weight:700;color:var(--gray);margin-bottom:5px;display:block}
+.form-input{width:100%;padding:12px 14px;border:2px solid var(--border);border-radius:9px;font-size:16px;font-family:inherit;outline:none;transition:.2s;background:#fff}
+.form-input:focus{border-color:var(--purple)}
+.form-input.readonly{background:#f5f7fa;color:#555;border-color:#e0e0e0}
+
+.tax-row{display:flex;gap:8px;margin-bottom:16px}
+.tax-btn{flex:1;padding:11px;border:2px solid var(--border);border-radius:9px;font-size:14px;font-weight:700;cursor:pointer;background:#fff;font-family:inherit;transition:.2s}
+.tax-btn.sel-10{border-color:var(--purple);background:#f3eeff;color:var(--purple)}
+.tax-btn.sel-8{border-color:#e67e22;background:#fff7ed;color:#e67e22}
+
+.save-btn{width:100%;padding:16px;background:var(--green);color:#fff;border:none;border-radius:10px;font-size:16px;font-weight:900;cursor:pointer;font-family:inherit;margin-bottom:10px;transition:.15s}
+.save-btn:active{background:#134520}
+.cancel-btn{width:100%;padding:12px;background:#f0f0f0;color:var(--gray);border:none;border-radius:10px;font-size:14px;font-weight:700;cursor:pointer;font-family:inherit}
+
+/* トースト */
+.toast{position:fixed;bottom:30px;left:50%;transform:translateX(-50%);background:#1a2a3a;color:#fff;padding:12px 24px;border-radius:30px;font-size:13px;font-weight:700;opacity:0;transition:.3s;pointer-events:none;white-space:nowrap;z-index:999}
+.toast.show{opacity:1}
+
+/* 登録済みリスト */
+.recent-title{font-size:12px;font-weight:700;color:var(--gray);margin:24px 0 10px;padding-left:2px}
+.recent-list{display:flex;flex-direction:column;gap:8px}
+.recent-item{background:#fff;border-radius:10px;padding:12px 16px;display:flex;align-items:center;gap:12px;box-shadow:0 1px 4px rgba(0,0,0,.06)}
+.recent-bc{font-family:monospace;font-size:10px;color:#aab;flex-shrink:0}
+.recent-name{font-weight:700;font-size:13px;flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.recent-price{font-weight:700;font-size:13px;color:var(--green);flex-shrink:0}
+
+/* Firebase設定 */
+.fb-hint{background:#e8f0fb;border-radius:10px;padding:14px;font-size:12px;color:#1a3a5c;line-height:1.7;margin-bottom:16px}
+.fb-btn{width:100%;padding:12px;background:var(--purple);color:#fff;border:none;border-radius:8px;font-size:14px;font-weight:700;cursor:pointer;font-family:inherit}
+</style>
+</head>
+<body>
+
+<div class="header">
+  <div>
+    <div class="header h1" style="font-size:16px;font-weight:900;color:#fff">🔫 バーコード商品登録</div>
+    <div class="header-sub">Socket D750 HIDモード対応</div>
+  </div>
+  <a href="index.html" class="home-btn">🏠 ホーム</a>
+</div>
+
+<div class="main">
+
+  <!-- Firebase未接続の場合 -->
+  <div id="fbSetup" style="display:none">
+    <div class="fb-hint">
+      <b>⚙️ Firebase接続設定</b><br>
+      商品マスタ管理と同じFirebase設定を入力してください。<br>
+      設定済みの場合は自動で引き継がれます。
+    </div>
+    <div style="margin-bottom:10px">
+      <label class="form-label">データベースURL</label>
+      <input class="form-input" id="fbUrl" placeholder="https://xxxxx-default-rtdb.firebaseio.com">
+    </div>
+    <div style="margin-bottom:10px">
+      <label class="form-label">APIキー</label>
+      <input class="form-input" id="fbApiKey" placeholder="AIza...">
+    </div>
+    <div style="margin-bottom:16px">
+      <label class="form-label">プロジェクトID</label>
+      <input class="form-input" id="fbProjId" placeholder="my-project-id">
+    </div>
+    <button class="fb-btn" onclick="connectFirebase()">🔗 接続する</button>
+    <button class="cancel-btn" style="margin-top:8px" onclick="useOffline()">オフラインで使う</button>
+  </div>
+
+  <!-- メイン操作UI -->
+  <div id="mainUi" style="display:none">
+
+    <!-- スキャン受付 -->
+    <div class="scan-area" id="scanArea" onclick="activateScan()">
+      <div class="scan-icon">📦</div>
+      <div class="scan-label" id="scanLabel">タップしてスキャン待機</div>
+      <div class="scan-hint" id="scanHint">Socket D750をiPadに接続してからここをタップしてください</div>
+      <div class="scan-code" id="scanCode" style="display:none"></div>
+      <input id="scanInput" type="text" inputmode="none"
+        onkeydown="handleScanKey(event)"
+        oninput="handleScanInput(this)"
+        onblur="onScanBlur()">
+    </div>
+
+    <!-- 商品入力フォーム -->
+    <div class="form-card" id="formCard">
+      <div class="form-row">
+        <label class="form-label">バーコード</label>
+        <input class="form-input readonly" id="fBarcode" readonly>
+      </div>
+      <div class="form-row">
+        <label class="form-label">商品名 <span style="color:#e74c3c">*</span></label>
+        <input class="form-input" id="fName" placeholder="商品名を入力" autocomplete="off">
+      </div>
+      <div class="form-row">
+        <label class="form-label">税込価格 <span style="color:#e74c3c">*</span></label>
+        <input class="form-input" id="fPrice" type="number" placeholder="0" inputmode="numeric">
+      </div>
+      <div style="margin-bottom:16px">
+        <label class="form-label">税率</label>
+        <div class="tax-row">
+          <button class="tax-btn sel-10" id="tax10" onclick="setTax('10')">10% 標準</button>
+          <button class="tax-btn" id="tax8" onclick="setTax('8')">8% 軽減</button>
+        </div>
+      </div>
+      <button class="save-btn" onclick="saveProduct()">✅ 登録する</button>
+      <button class="cancel-btn" onclick="cancelForm()">キャンセル</button>
+    </div>
+
+    <!-- 今回の登録リスト -->
+    <div id="recentWrap" style="display:none">
+      <div class="recent-title">✅ 今回登録した商品</div>
+      <div class="recent-list" id="recentList"></div>
+    </div>
+
+  </div>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script>
+// ===== 設定 =====
+const FK='mc_fb_v1', PP='mc_products';
+let db=null, offline=true, products={}, curTax='10';
+let scanBuffer='', scanTimer=null, scanActive=false;
+const recentAdded=[];
+
+// ===== 起動 =====
+window.addEventListener('DOMContentLoaded', ()=>{
+  // 商品マスタと同じFirebase設定を自動引き継ぎ
+  const saved = localStorage.getItem(FK);
+  if(saved){
+    try{
+      const cfg=JSON.parse(saved);
+      if(cfg.databaseURL && cfg.apiKey){
+        document.getElementById('fbUrl').value=cfg.databaseURL;
+        document.getElementById('fbApiKey').value=cfg.apiKey;
+        document.getElementById('fbProjId').value=cfg.projectId||'';
+        connectFirebase();
+        return;
+      }
+    }catch(e){}
+  }
+  // 設定なし→オフラインか設定画面
+  const localProds = localStorage.getItem('mc_op');
+  if(localProds){
+    useOffline();
+  } else {
+    document.getElementById('fbSetup').style.display='';
+  }
+});
+
+function loadFirebaseSDK(cb){
+  if(window.firebase && firebase.apps!==undefined){cb();return}
+  const s1=document.createElement('script');
+  s1.src='https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js';
+  s1.onload=()=>{
+    const s2=document.createElement('script');
+    s2.src='https://www.gstatic.com/firebasejs/9.23.0/firebase-database-compat.js';
+    s2.onload=cb;
+    document.head.appendChild(s2);
+  };
+  document.head.appendChild(s1);
+}
+
+function connectFirebase(){
+  const cfg={
+    databaseURL:document.getElementById('fbUrl').value.trim(),
+    apiKey:document.getElementById('fbApiKey').value.trim(),
+    projectId:document.getElementById('fbProjId').value.trim()
+  };
+  if(!cfg.databaseURL||!cfg.apiKey){alert('データベースURLとAPIキーを入力してください');return}
+  loadFirebaseSDK(()=>{
+    try{
+      if(!firebase.apps.length) firebase.initializeApp(cfg);
+      db=firebase.database(); offline=false;
+      localStorage.setItem(FK,JSON.stringify(cfg));
+      db.ref(PP).on('value',sn=>{products=sn.val()||{};});
+      showMain();
+    }catch(e){ alert('接続失敗: '+e.message); }
+  });
+}
+
+function useOffline(){
+  offline=true;
+  try{products=JSON.parse(localStorage.getItem('mc_op')||'{}')}catch(e){products={}}
+  showMain();
+}
+
+function showMain(){
+  document.getElementById('fbSetup').style.display='none';
+  document.getElementById('mainUi').style.display='';
+}
+
+// ===== スキャン =====
+function activateScan(){
+  const inp=document.getElementById('scanInput');
+  inp.focus();
+  scanActive=true;
+  scanBuffer='';
+  inp.value='';
+  document.getElementById('scanArea').className='scan-area active';
+  document.getElementById('scanLabel').textContent='スキャン待機中...';
+  document.getElementById('scanHint').textContent='バーコードをスキャンしてください';
+  document.getElementById('scanCode').style.display='none';
+}
+
+function onScanBlur(){
+  // フォームが表示中でなければ非アクティブ表示に戻す
+  if(document.getElementById('formCard').classList.contains('show')) return;
+  setTimeout(()=>{
+    if(document.activeElement!==document.getElementById('scanInput')){
+      document.getElementById('scanArea').className='scan-area';
+      document.getElementById('scanLabel').textContent='タップしてスキャン待機';
+      document.getElementById('scanHint').textContent='Socket D750をiPadに接続してからここをタップしてください';
+      scanActive=false;
+    }
+  }, 200);
+}
+
+function handleScanInput(inp){
+  // スキャナーは短時間に連続入力→100ms止まったら確定
+  clearTimeout(scanTimer);
+  scanBuffer=inp.value;
+  scanTimer=setTimeout(()=>{
+    const val=scanBuffer.trim();
+    if(val.length>=4) onScanned(val);
+    inp.value='';
+    scanBuffer='';
+  }, 150);
+}
+
+function handleScanKey(e){
+  if(e.key==='Enter'){
+    clearTimeout(scanTimer);
+    const val=e.target.value.trim()||scanBuffer.trim();
+    if(val.length>=4) onScanned(val);
+    e.target.value='';
+    scanBuffer='';
+    e.preventDefault();
+  }
+}
+
+function onScanned(code){
+  document.getElementById('scanArea').className='scan-area ready';
+  document.getElementById('scanLabel').textContent='読み取り完了';
+  document.getElementById('scanHint').textContent='';
+  const codeEl=document.getElementById('scanCode');
+  codeEl.textContent=code;
+  codeEl.style.display='';
+
+  // 既存商品チェック
+  const exists=Object.values(products).find(p=>p.barcode===code);
+  if(exists){
+    toast('⚠ 登録済み: '+exists.name);
+    setTimeout(()=>activateScan(), 2000);
+    return;
+  }
+
+  // フォームに設定
+  document.getElementById('fBarcode').value=code;
+  document.getElementById('fName').value='';
+  document.getElementById('fPrice').value='';
+  setTax('10');
+  document.getElementById('formCard').classList.add('show');
+  setTimeout(()=>document.getElementById('fName').focus(), 100);
+}
+
+// ===== フォーム =====
+function setTax(v){
+  curTax=v;
+  document.getElementById('tax10').className='tax-btn'+(v==='10'?' sel-10':'');
+  document.getElementById('tax8').className='tax-btn'+(v==='8'?' sel-8':'');
+}
+
+function saveProduct(){
+  const barcode=document.getElementById('fBarcode').value.trim();
+  const name=document.getElementById('fName').value.trim();
+  const price=document.getElementById('fPrice').value.trim();
+  if(!name){alert('商品名を入力してください');document.getElementById('fName').focus();return}
+  if(!price){alert('価格を入力してください');document.getElementById('fPrice').focus();return}
+
+  const id='P'+Date.now().toString(36).toUpperCase()+Math.random().toString(36).slice(-4);
+  const data={id,name,price,tax:curTax,catId:'',unit:'点',barcode,supplier:'',cost:'',note:'',createdAt:Date.now(),updatedAt:Date.now()};
+
+  const np={...products,[id]:data};
+  if(offline){
+    products=np;
+    localStorage.setItem('mc_op',JSON.stringify(np));
+  } else {
+    db.ref(PP).set(np);
+  }
+
+  // 今回の登録リストに追加
+  recentAdded.unshift({name,price,barcode,tax:curTax});
+  renderRecent();
+
+  toast('✅ 登録しました: '+name);
+  document.getElementById('formCard').classList.remove('show');
+  activateScan();
+}
+
+function cancelForm(){
+  document.getElementById('formCard').classList.remove('show');
+  activateScan();
+}
+
+function renderRecent(){
+  const wrap=document.getElementById('recentWrap');
+  const list=document.getElementById('recentList');
+  if(!recentAdded.length){wrap.style.display='none';return}
+  wrap.style.display='';
+  list.innerHTML=recentAdded.map(r=>`
+    <div class="recent-item">
+      <div class="recent-bc">${esc(r.barcode)}</div>
+      <div class="recent-name">${esc(r.name)}</div>
+      <div class="recent-price">¥${Number(r.price).toLocaleString()}</div>
+    </div>`).join('');
+}
+
+// ===== ユーティリティ =====
+function toast(msg){
+  const el=document.getElementById('toast');
+  el.textContent=msg; el.classList.add('show');
+  setTimeout(()=>el.classList.remove('show'),2500);
+}
+function esc(s){return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;')}
+</script>
+</body>
+</html>
