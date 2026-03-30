@@ -306,15 +306,40 @@ tbody td{padding:7px 10px;vertical-align:middle}
 <div class="md" style="max-width:400px">
   <div class="mh"><h2>📷 バーコードスキャン</h2><button class="mc" onclick="closeScan()">✕</button></div>
   <div class="mb">
-    <div class="scan-video-wrap" id="scanVideoWrap">
-      <video id="scanVideo" autoplay playsinline muted></video>
-      <div class="scan-line"></div>
-      <div class="scan-corners"></div>
+    <!-- タブ切り替え -->
+    <div style="display:flex;gap:0;margin-bottom:14px;border-bottom:2px solid #e0e0e0">
+      <button id="scanTabCam" onclick="switchScanTab('cam')"
+        style="flex:1;padding:8px;border:none;background:none;font-weight:700;font-size:12px;cursor:pointer;border-bottom:3px solid #4a2080;color:#4a2080;margin-bottom:-2px;font-family:inherit">
+        📷 カメラ
+      </button>
+      <button id="scanTabHand" onclick="switchScanTab('hand')"
+        style="flex:1;padding:8px;border:none;background:none;font-weight:700;font-size:12px;cursor:pointer;border-bottom:3px solid transparent;color:#888;margin-bottom:-2px;font-family:inherit">
+        🔫 ハンディスキャナー
+      </button>
+    </div>
+    <!-- カメラパネル -->
+    <div id="scanPanelCam">
+      <div class="scan-video-wrap" id="scanVideoWrap">
+        <video id="scanVideo" autoplay playsinline muted></video>
+        <div class="scan-line"></div>
+        <div class="scan-corners"></div>
+      </div>
+    </div>
+    <!-- ハンディスキャナーパネル -->
+    <div id="scanPanelHand" style="display:none">
+      <div style="background:#f0f4f8;border-radius:8px;padding:14px;margin-bottom:12px;font-size:12px;color:#555;line-height:1.7">
+        スキャナーをパソコンに接続し、下の入力欄にカーソルを合わせてからバーコードをスキャンしてください。
+      </div>
+      <input id="handScanInput" type="text" placeholder="ここにスキャン（またはバーコード番号を入力してEnter）"
+        style="width:100%;padding:10px 12px;border:2px solid #4a2080;border-radius:8px;font-size:14px;font-family:monospace;outline:none"
+        onkeydown="if(event.key==='Enter'){onBarcodeDetected(this.value.trim());this.select();}"
+        oninput="this.style.borderColor=this.value?'#4a2080':'#4a2080'">
+      <div style="margin-top:8px;font-size:11px;color:#999;text-align:center">Enterキーで検索 / 次のスキャンで自動上書き</div>
     </div>
     <div class="scan-result-box" id="scanResult">
       <span style="color:#6b7a8d;font-size:12px">カメラを商品バーコードに向けてください</span>
     </div>
-    <div style="margin-top:10px;display:flex;gap:8px;justify-content:center" id="scanActions" style="display:none"></div>
+    <div style="margin-top:10px;display:flex;gap:8px;justify-content:center" id="scanActions"></div>
   </div>
   <div class="mf">
     <select class="fsel" id="scanCamSel" onchange="switchCamera()" style="flex:1;max-width:200px"></select>
@@ -726,6 +751,27 @@ function doImport(){
 
 // ===== バーコードスキャン =====
 let scanStream=null, scanDetector=null, scanAnimId=null, scanFieldTarget=null;
+let scanTab='cam';
+
+function switchScanTab(tab){
+  scanTab=tab;
+  document.getElementById('scanPanelCam').style.display  = tab==='cam'  ? '' : 'none';
+  document.getElementById('scanPanelHand').style.display = tab==='hand' ? '' : 'none';
+  document.getElementById('scanCamSel').style.display    = tab==='cam'  ? '' : 'none';
+  document.getElementById('scanTabCam').style.borderBottomColor  = tab==='cam'  ? '#4a2080' : 'transparent';
+  document.getElementById('scanTabCam').style.color               = tab==='cam'  ? '#4a2080' : '#888';
+  document.getElementById('scanTabHand').style.borderBottomColor = tab==='hand' ? '#4a2080' : 'transparent';
+  document.getElementById('scanTabHand').style.color              = tab==='hand' ? '#4a2080' : '#888';
+  if(tab==='cam'){
+    document.getElementById('scanResult').innerHTML='<span style="color:#6b7a8d;font-size:12px">カメラを商品バーコードに向けてください</span>';
+    startCamera();
+  } else {
+    stopCamera();
+    document.getElementById('scanResult').innerHTML='<span style="color:#6b7a8d;font-size:12px">スキャナーで読み取ってください</span>';
+    document.getElementById('scanActions').innerHTML='';
+    setTimeout(()=>document.getElementById('handScanInput').focus(), 100);
+  }
+}
 
 async function openScan(fieldId){
   scanFieldTarget=fieldId||null;
