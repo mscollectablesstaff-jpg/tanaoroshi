@@ -306,42 +306,10 @@ tbody td{padding:7px 10px;vertical-align:middle}
 <div class="md" style="max-width:400px">
   <div class="mh"><h2>📷 バーコードスキャン</h2><button class="mc" onclick="closeScan()">✕</button></div>
   <div class="mb">
-    <!-- タブ切り替え -->
-    <div style="display:flex;gap:0;margin-bottom:14px;border-bottom:2px solid #e0e0e0">
-      <button id="scanTabCam" onclick="switchScanTab('cam')"
-        style="flex:1;padding:8px;border:none;background:none;font-weight:700;font-size:12px;cursor:pointer;border-bottom:3px solid #4a2080;color:#4a2080;margin-bottom:-2px;font-family:inherit">
-        📷 カメラ
-      </button>
-      <button id="scanTabHand" onclick="switchScanTab('hand')"
-        style="flex:1;padding:8px;border:none;background:none;font-weight:700;font-size:12px;cursor:pointer;border-bottom:3px solid transparent;color:#888;margin-bottom:-2px;font-family:inherit">
-        🔫 ハンディスキャナー
-      </button>
-    </div>
-    <!-- カメラパネル -->
-    <div id="scanPanelCam">
-      <div class="scan-video-wrap" id="scanVideoWrap">
-        <video id="scanVideo" autoplay playsinline muted></video>
-        <div class="scan-line"></div>
-        <div class="scan-corners"></div>
-      </div>
-    </div>
-    <!-- ハンディスキャナーパネル -->
-    <div id="scanPanelHand" style="display:none">
-      <div style="background:#f0f4f8;border-radius:8px;padding:12px 14px;margin-bottom:12px;font-size:12px;color:#555;line-height:1.7">
-        Bluetoothスキャナー（Socket Mobileなど）をiPad/PCに接続し、<b>下の緑枠</b>をタップしてからスキャンしてください。
-      </div>
-      <!-- 大きくタップしやすいスキャン受付エリア -->
-      <div id="handScanArea" onclick="refocusHandScan()"
-        style="border:3px solid #ccc;border-radius:10px;padding:16px;text-align:center;cursor:text;transition:.2s;margin-bottom:10px;background:#fff">
-        <div id="handScanReady" style="font-size:13px;color:#aaa">▼ ここをタップしてスキャン待機</div>
-        <input id="handScanInput" type="text"
-          style="position:absolute;opacity:0;width:1px;height:1px;pointer-events:none"
-          onkeydown="handleHandScan(event)"
-          oninput="handleHandInput(this)">
-      </div>
-      <div style="font-size:11px;color:#999;text-align:center">
-        スキャン後に自動検索 / Enterでも検索
-      </div>
+    <div class="scan-video-wrap" id="scanVideoWrap">
+      <video id="scanVideo" autoplay playsinline muted></video>
+      <div class="scan-line"></div>
+      <div class="scan-corners"></div>
     </div>
     <div class="scan-result-box" id="scanResult">
       <span style="color:#6b7a8d;font-size:12px">カメラを商品バーコードに向けてください</span>
@@ -758,78 +726,7 @@ function doImport(){
 
 // ===== バーコードスキャン =====
 let scanStream=null, scanDetector=null, scanAnimId=null, scanFieldTarget=null;
-let scanTab='cam';
 
-function switchScanTab(tab){
-  scanTab=tab;
-  document.getElementById('scanPanelCam').style.display  = tab==='cam'  ? '' : 'none';
-  document.getElementById('scanPanelHand').style.display = tab==='hand' ? '' : 'none';
-  document.getElementById('scanCamSel').style.display    = tab==='cam'  ? '' : 'none';
-  document.getElementById('scanTabCam').style.borderBottomColor  = tab==='cam'  ? '#4a2080' : 'transparent';
-  document.getElementById('scanTabCam').style.color               = tab==='cam'  ? '#4a2080' : '#888';
-  document.getElementById('scanTabHand').style.borderBottomColor = tab==='hand' ? '#4a2080' : 'transparent';
-  document.getElementById('scanTabHand').style.color              = tab==='hand' ? '#4a2080' : '#888';
-  if(tab==='cam'){
-    document.getElementById('scanResult').innerHTML='<span style="color:#6b7a8d;font-size:12px">カメラを商品バーコードに向けてください</span>';
-    stopHandScanKeepFocus();
-    startCamera();
-  } else {
-    stopCamera();
-    document.getElementById('scanResult').innerHTML='<span style="color:#6b7a8d;font-size:12px">スキャナーで読み取ってください</span>';
-    document.getElementById('scanActions').innerHTML='';
-    setTimeout(()=>refocusHandScan(), 200);
-  }
-}
-
-let handScanBuffer='', handScanTimer=null, handFocusInterval=null;
-
-function refocusHandScan(){
-  const inp=document.getElementById('handScanInput');
-  const area=document.getElementById('handScanArea');
-  const ready=document.getElementById('handScanReady');
-  if(!inp) return;
-  inp.focus();
-  inp.value='';
-  handScanBuffer='';
-  if(area) area.style.borderColor='#1a5c2e';
-  if(ready) ready.innerHTML='<span style="color:#1a5c2e;font-weight:700;font-size:14px">● スキャン待機中...</span><br><span style="font-size:11px;color:#888">バーコードをスキャンしてください</span>';
-  // フォーカスが外れたら自動で戻す（Bluetooth入力受付のため）
-  stopHandScanKeepFocus();
-  handFocusInterval=setInterval(()=>{
-    if(document.getElementById('scanPanelHand')&&
-       document.getElementById('scanPanelHand').style.display!=='none'&&
-       document.activeElement!==inp){
-      inp.focus();
-    }
-  }, 800);
-}
-
-function stopHandScanKeepFocus(){
-  if(handFocusInterval){ clearInterval(handFocusInterval); handFocusInterval=null; }
-}
-
-function handleHandInput(inp){
-  // スキャナーは短時間に一気に入力→タイマーで検出
-  clearTimeout(handScanTimer);
-  handScanTimer=setTimeout(()=>{
-    const val=inp.value.trim();
-    if(val.length>=4){
-      onBarcodeDetected(val);
-      inp.value='';
-      handScanBuffer='';
-    }
-  }, 100); // 100ms以内に入力が止まったら確定
-}
-
-function handleHandScan(e){
-  if(e.key==='Enter'){
-    clearTimeout(handScanTimer);
-    const val=e.target.value.trim();
-    if(val) onBarcodeDetected(val);
-    e.target.value='';
-    e.preventDefault();
-  }
-}
 
 async function openScan(fieldId){
   scanFieldTarget=fieldId||null;
@@ -841,7 +738,6 @@ async function openScan(fieldId){
 function openScanIntoField(fieldId){ openScan(fieldId); }
 function closeScan(){
   stopCamera();
-  stopHandScanKeepFocus();
   document.getElementById('scanOv').style.display='none';
   scanFieldTarget=null;
 }
@@ -880,58 +776,57 @@ function stopCamera(){
   if(scanStream){scanStream.getTracks().forEach(t=>t.stop());scanStream=null;}
 }
 function startDetection(video){
-  // ZXingを使用（Safari/iPad含む全ブラウザ対応）
+  const resEl=document.getElementById('scanResult');
+  // ZXing（Safari/iPad含む全ブラウザ対応）
   if(!window.ZXing){
-    document.getElementById('scanResult').innerHTML='<span style="color:#6b7a8d;font-size:12px">⏳ バーコードリーダー読み込み中...</span>';
+    resEl.innerHTML='<span style="color:#6b7a8d;font-size:12px">⏳ 読み取りエンジン読み込み中...</span>';
     const s=document.createElement('script');
     s.src='https://cdn.jsdelivr.net/npm/@zxing/library@0.20.0/umd/index.min.js';
     s.onload=()=>startDetection(video);
-    s.onerror=()=>{document.getElementById('scanResult').innerHTML='<span style="color:#e74c3c;font-size:12px">⚠ ライブラリの読み込みに失敗しました。インターネット接続を確認してください。</span>';};
+    s.onerror=()=>{resEl.innerHTML='<span style="color:#e74c3c;font-size:12px">⚠ ライブラリ読み込み失敗。インターネット接続を確認してください。</span>';};
     document.head.appendChild(s);
     return;
   }
+
+  let reader;
   try{
     const hints=new Map();
-    const formats=[
-      ZXing.BarcodeFormat.EAN_8,
-      ZXing.BarcodeFormat.EAN_13,
-      ZXing.BarcodeFormat.UPC_A,
-      ZXing.BarcodeFormat.UPC_E,
-      ZXing.BarcodeFormat.CODE_128,
-      ZXing.BarcodeFormat.CODE_39,
-      ZXing.BarcodeFormat.ITF,
-      ZXing.BarcodeFormat.QR_CODE,
-    ];
-    hints.set(ZXing.DecodeHintType.POSSIBLE_FORMATS, formats);
+    hints.set(ZXing.DecodeHintType.POSSIBLE_FORMATS,[
+      ZXing.BarcodeFormat.EAN_8, ZXing.BarcodeFormat.EAN_13,
+      ZXing.BarcodeFormat.UPC_A, ZXing.BarcodeFormat.UPC_E,
+      ZXing.BarcodeFormat.CODE_128, ZXing.BarcodeFormat.CODE_39,
+      ZXing.BarcodeFormat.ITF, ZXing.BarcodeFormat.QR_CODE
+    ]);
     hints.set(ZXing.DecodeHintType.TRY_HARDER, true);
-    scanDetector=new ZXing.MultiFormatReader();
-    scanDetector.setHints(hints);
+    reader=new ZXing.MultiFormatReader();
+    reader.setHints(hints);
   }catch(e){
-    document.getElementById('scanResult').innerHTML='<span style="color:#e74c3c;font-size:12px">⚠ バーコードリーダー初期化失敗: '+e.message+'</span>';
+    resEl.innerHTML='<span style="color:#e74c3c;font-size:12px">⚠ 初期化失敗: '+e.message+'</span>';
     return;
   }
+
+  resEl.innerHTML='<span style="color:#6b7a8d;font-size:12px">カメラをバーコードに近づけてください</span>';
   const canvas=document.createElement('canvas');
-  const ctx=canvas.getContext('2d');
+  const ctx=canvas.getContext('2d',{willReadFrequently:true});
   let lastCode='', lastTime=0;
+
   function detect(){
-    if(!scanStream){return;}
-    if(video.readyState===video.HAVE_ENOUGH_DATA){
+    if(!scanStream) return;
+    if(video.readyState>=2 && video.videoWidth>0){
       canvas.width=video.videoWidth;
       canvas.height=video.videoHeight;
       ctx.drawImage(video,0,0);
       try{
         const imgData=ctx.getImageData(0,0,canvas.width,canvas.height);
-        const luminance=new ZXing.RGBLuminanceSource(imgData.data,canvas.width,canvas.height);
-        const bitmap=new ZXing.BinaryBitmap(new ZXing.HybridBinarizer(luminance));
-        const result=scanDetector.decode(bitmap);
+        const lum=new ZXing.RGBLuminanceSource(imgData.data,canvas.width,canvas.height);
+        const bmp=new ZXing.BinaryBitmap(new ZXing.HybridBinarizer(lum));
+        const result=reader.decode(bmp);
         const code=result.getText();
-        if(code&&(code!==lastCode||Date.now()-lastTime>3000)){
+        if(code && (code!==lastCode || Date.now()-lastTime>3000)){
           lastCode=code; lastTime=Date.now();
           onBarcodeDetected(code);
         }
-      }catch(e){
-        // NotFoundException は通常のスキャン待機状態なので無視
-      }
+      }catch(e){ /* NotFoundException = バーコードがまだ見えていない */ }
     }
     scanAnimId=requestAnimationFrame(detect);
   }
