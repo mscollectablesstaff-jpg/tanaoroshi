@@ -3319,6 +3319,31 @@ function delPage(k){
   renderAll();
 }
 function switchPage(k){curKey=k;renderAll();}
+
+// ===== 掛け率一括設定 =====
+function setBulkSr(k, val){
+  if(!pages[k]) return;
+  pages[k].bulkSr = val;
+}
+function applyBulkSr(k){
+  if(!pages[k]) return;
+  const sr = pages[k].bulkSr||'';
+  if(!sr){ alert('掛け率を入力してください'); return; }
+  const rows = pages[k].rows||[];
+  const filled = rows.filter(r=>r.n).length;
+  if(!filled){ alert('商品が入力されていません'); return; }
+  if(!confirm(filled+'件の商品に掛け率 '+sr+'% を一括設定します')) return;
+  rows.forEach(r=>{ if(r.n) r.sr=sr; });
+  // Firebaseに保存
+  if(!offline&&db){
+    db.ref('s/'+sid+'/pages/'+k+'/rows').set(rows);
+    db.ref('s/'+sid+'/pages/'+k+'/at').set(Date.now());
+  } else {
+    // ローカル保存は自動（pages参照）
+  }
+  renderTable(); renderQbar();
+  toast('✅ '+filled+'件に掛け率 '+sr+'% を設定しました');
+}
 function updTanto(k,v){
   if(!pages[k])return; pages[k].tanto=v;
   if(!offline&&db) db.ref('s/'+sid+'/pages/'+k+'/tanto').set(v);
@@ -3399,6 +3424,7 @@ function renderPTabs(){
   order.forEach((k,i)=>{
     const pg=pages[k]||{}, on=k===curKey;
     const t=pg.tanto||'';
+    const pgSr = pg.bulkSr||'';
     h+=`<div class="ptab">
       <div class="ptab-top${on?' on':''}" onclick="switchPage('${k}')">
         <span>${i+1}P</span>
@@ -3407,6 +3433,14 @@ function renderPTabs(){
       <div class="ptab-bot" style="flex-wrap:wrap;gap:4px;padding:5px 6px">
         <input class="ptinp" style="width:140px" value="${e(t)}" placeholder="担当者名・ページ名" onchange="updTanto('${k}',this.value)" title="このページのブランド名がエアレジのカテゴリー名になります">
         ${order.length>1?`<button class="ptdel" onclick="delPage('${k}')">✕</button>`:''}
+        <div style="display:flex;align-items:center;gap:4px;margin-top:3px;width:100%">
+          <span style="font-size:10px;color:#6b7a8d;white-space:nowrap">掛率一括:</span>
+          <input type="number" class="ptinp" style="width:60px;text-align:right" value="${e(pgSr)}" placeholder="%" min="0" max="100" step="0.1"
+            title="このページの全行に掛け率を一括設定"
+            onchange="setBulkSr('${k}',this.value)">
+          <span style="font-size:10px;color:#6b7a8d">%</span>
+          <button onclick="applyBulkSr('${k}')" style="padding:2px 8px;font-size:10px;font-weight:700;background:#1a3a5c;color:#fff;border:none;border-radius:4px;cursor:pointer;font-family:inherit;white-space:nowrap">適用</button>
+        </div>
       </div>
     </div>`;
   });
