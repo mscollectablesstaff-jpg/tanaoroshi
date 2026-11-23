@@ -77,7 +77,7 @@ label.chk{font-size:13px;color:var(--sub);display:flex;gap:6px;align-items:cente
   <button class="big" id="go" disabled>印刷用PDFを作る</button>
   <div class="msg" id="msg"></div>
   <ol class="steps">
-    <li>ダウンロードしたPDFを<b>Adobe Acrobat</b>で開き、サイズは<b>「実際のサイズ」</b>で印刷（プリンターの設定は変えない）。</li>
+    <li>ダウンロードしたPDFを<b>Adobe Acrobat</b>で開き、印刷画面のサイズは<b>「実際のサイズ」</b>を選ぶ。「合わせる」「縮小」は選ばない（小さくなってバーコードが読めなくなります）。</li><li>印刷したら、シート上の<b>線を定規で測って10cm</b>か確認。</li>
     <li>ラベル用紙は今までと同じ向きで差し込む。</li>
     <li>貼る前に、商品名と値段が合っているか確認。</li>
   </ol>
@@ -579,11 +579,20 @@ function textImg(name,price){
 function makePdf(){
   const {jsPDF}=window.jspdf;
   const doc=new jsPDF({unit:'mm',format:'a4'}); doc.setProperties({title:'バーコードラベル（A-one 31297）'});
+  // 印刷時に「縮小」されないよう、実際のサイズで印刷する指定をPDFに入れる
+  try{doc.viewerPreferences({PrintScaling:'None'});}catch(e){}
+  const ruler=()=>{ // シート上の余白に10cmの線（実際のサイズで印刷できたかの確認用）
+    doc.setLineWidth(0.25); doc.line(50,8,150,8); doc.line(50,6.8,50,9.2); doc.line(150,6.8,150,9.2);
+    const cv=document.createElement('canvas'),W=100,H=4; cv.width=W*S; cv.height=H*S;
+    const g=cv.getContext('2d'); g.font=`${7*PT*S}px ${FONT}`; g.textAlign='center'; g.fillText('この線が10cmなら正しい大きさで印刷できています',cv.width/2,2.6*S);
+    doc.addImage(cv.toDataURL('image/png'),'PNG',50,9.3,W,H);
+  };
+  ruler();
   const list=[]; cartItems().forEach(it=>{for(let k=0;k<it.k;k++)list.push(it);});
   let pos=start, page=0;
   const frame=$('frame').checked;
   list.forEach(it=>{
-    if(pos===200){doc.addPage();pos=0;page++;}
+    if(pos===200){doc.addPage();ruler();pos=0;page++;}
     const col=pos%COLS,row=Math.floor(pos/COLS), x=LEFT+col*PX, y=TOP+row*PY;
     if(frame){doc.setLineWidth(0.1);doc.roundedRect(x,y,LW,LH,1,1,'S');}
     // 文字の下線＝ラベル下端から4.55mm
