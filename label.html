@@ -47,6 +47,15 @@ label.chk{font-size:13px;color:var(--sub);display:flex;gap:6px;align-items:cente
 .msg.err{color:var(--warn)}
 .steps{font-size:13px;color:var(--sub);line-height:1.7;margin:10px 0 0;padding-left:18px}
 .steps b{color:var(--ink)}
+#printArea{display:none}
+@page{size:A4;margin:0}
+@media print{
+  body{background:#fff;margin:0}
+  header,main{display:none!important}
+  #printArea{display:block}
+  #printArea svg{display:block;width:210mm;height:297mm;page-break-after:always;break-after:page}
+  #printArea svg:last-child{page-break-after:auto;break-after:auto}
+}
 </style>
 </head>
 <body>
@@ -74,16 +83,19 @@ label.chk{font-size:13px;color:var(--sub);display:flex;gap:6px;align-items:cente
   <div class="sheet" id="sheet"></div>
   <p class="hint" id="startTxt"></p>
   <label class="chk"><input type="checkbox" id="frame">枠線も印刷する（普通紙で位置を確かめるとき用）</label>
-  <button class="big" id="go" disabled>印刷用PDFを作る</button>
+  <button class="big" id="pr" disabled>印刷する</button>
+  <button class="sub" id="go" disabled style="margin-top:8px">うまく印刷できないとき：PDFで保存</button>
   <div class="msg" id="msg"></div>
   <ol class="steps">
-    <li>ダウンロードしたPDFを<b>Adobe Acrobat</b>で開き、印刷画面のサイズは<b>「実際のサイズ」</b>を選ぶ。「合わせる」「縮小」は選ばない（小さくなってバーコードが読めなくなります）。</li><li>印刷したら、シート上の<b>線を定規で測って10cm</b>か確認。</li>
+    <li>「印刷する」を押すと印刷画面が出ます。<b>倍率・余白などの設定は変えずに</b>そのまま印刷（倍率は「100」／「デフォルト」のまま）。</li>
     <li>ラベル用紙は今までと同じ向きで差し込む。</li>
+    <li>印刷したら、シート上の<b>線を定規で測って10cm</b>か確認。短いときは縮小されています。</li>
     <li>貼る前に、商品名と値段が合っているか確認。</li>
   </ol>
 </section>
 </div>
 </main>
+<div id="printArea"></div>
 <script>/** @license
  *
  * jsPDF - PDF Document creation from JavaScript
@@ -532,7 +544,7 @@ function drawCart(){
   c.forEach(it=>$('cart').appendChild(rowEl(it)));
   const n=c.reduce((a,b)=>a+b.k,0);
   $('tot').textContent=n?`合計 ${n} 枚`+(start+n>200?`（シート ${Math.ceil((start+n)/200)} 枚使います）`:''):'';
-  $('go').disabled=!n;
+  $('go').disabled=!n; $('pr').disabled=!n;
 }
 function drawSheet(){
   const n=cartItems().reduce((a,b)=>a+b.k,0);
@@ -617,6 +629,52 @@ $('go').onclick=()=>{
     const nx=document.createElement('div');nx.className='hint';
     nx.textContent=`次回は ${r.next>=200?'新しいシートの1':r.next+1} 番目からになります（このページを次に開いたとき自動で選ばれます）。`;m.appendChild(nx);
   }catch(e){m.className='msg err';m.textContent='PDFを作れませんでした：'+e.message;}
+};
+
+// ---- ページから直接印刷（SVGで1ページ＝A4を作る） ----
+const NS='http://www.w3.org/2000/svg';
+const el=(n,a,p)=>{const e=document.createElementNS(NS,n);for(const k in a)e.setAttribute(k,a[k]);if(p)p.appendChild(e);return e;};
+const mctx=document.createElement('canvas').getContext('2d');
+function fitName(name,maxw){ // maxw: mm
+  const w=(t,sz)=>{mctx.font=`${sz*PT*S}px ${FONT}`;return mctx.measureText(t).width/S;};
+  let s=4.8,t=name; while(s>3.5&&w(t,s)>maxw)s-=0.2; while(w(t,s)>maxw&&t.length>1)t=t.slice(0,-1); return [t,s];
+}
+function priceW(top){mctx.font=`${6.4*PT*S}px ${FONT}`;return mctx.measureText(top).width/S;}
+function newPage(area){
+  const svg=el('svg',{viewBox:'0 0 210 297',width:'210mm',height:'297mm'},area);
+  const g=el('g',{stroke:'#000','stroke-width':0.25},svg);
+  el('line',{x1:50,y1:8,x2:150,y2:8},g);el('line',{x1:50,y1:6.8,x2:50,y2:9.2},g);el('line',{x1:150,y1:6.8,x2:150,y2:9.2},g);
+  const t=el('text',{x:105,y:11.4,'text-anchor':'middle','font-size':7*PT,'font-family':FONT},svg);t.textContent='この線が10cmなら正しい大きさで印刷できています';
+  return svg;
+}
+function buildPrint(){
+  const area=$('printArea'); area.innerHTML='';
+  const list=[]; cartItems().forEach(it=>{for(let k=0;k<it.k;k++)list.push(it);});
+  let pos=start, svg=newPage(area); const frame=$('frame').checked;
+  list.forEach(it=>{
+    if(pos===200){svg=newPage(area);pos=0;}
+    const x=LEFT+(pos%COLS)*PX, y=TOP+Math.floor(pos/COLS)*PY;
+    if(frame) el('rect',{x,y,width:LW,height:LH,rx:1,fill:'none',stroke:'#000','stroke-width':0.1},svg);
+    const base=y+LH-4.55, top=it.p+'円';
+    const pt=el('text',{x:x+LW-PAD,y:base,'text-anchor':'end','font-size':6.4*PT,'font-family':FONT},svg);pt.textContent=top;
+    const [nm,sz]=fitName(it.l,LW-2*PAD-priceW(top)-0.5);
+    const nt=el('text',{x:x+PAD,y:base,'font-size':sz*PT,'font-family':FONT},svg);nt.textContent=nm;
+    const w=LW-2*PAD, mod=w/95, m=modules(it.b), by=y+LH-0.7-3.4; let i=0; let d='';
+    while(i<m.length){if(m[i]==='1'){let j=i;while(j<m.length&&m[j]==='1')j++;
+      const bw=Math.max((j-i)*mod-BWR,0.05), bx=x+PAD+i*mod+BWR/2; d+=`M${bx.toFixed(4)} ${by.toFixed(4)}h${bw.toFixed(4)}v3.4h${(-bw).toFixed(4)}z`;i=j;}else i++;}
+    el('path',{d,fill:'#000'},svg);
+    pos++;
+  });
+  return {next:pos,count:list.length};
+}
+$('pr').onclick=()=>{
+  const m=$('msg'); m.className='msg';
+  try{
+    const r=buildPrint();
+    try{localStorage.setItem('lbl_next',r.next>=200?0:r.next);}catch(e){}
+    m.textContent=`${r.count}枚分を印刷します。次回は ${r.next>=200?'新しいシートの1':r.next+1} 番目からになります。`;
+    setTimeout(()=>window.print(),50);
+  }catch(e){m.className='msg err';m.textContent='印刷の準備ができませんでした：'+e.message;}
 };
 $('q').oninput=drawList; $('showHid').onchange=drawList;
 drawCats(); refresh();
